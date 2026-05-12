@@ -132,6 +132,17 @@ export async function probeMcpStdoutPurity(opts: ProbeOptions = {}): Promise<Doc
       stdoutBuf += chunk.toString('utf8');
     });
 
+    // WR-04: EPIPE on `child.stdin.write` after the child exits surfaces as
+    // an unhandled stream 'error' event. Without this listener the event
+    // becomes an unhandled rejection in the IIFE below. The try/catch around
+    // each write() additionally converts a synchronous throw into a clean
+    // `fail` result.
+    child.stdin.on('error', () => {
+      // Swallow — EPIPE / write-after-end here is recoverable; the next
+      // write iteration's writable-check + try/catch surfaces the failure
+      // through finalise() if the child has exited.
+    });
+
     child.on('error', (err) => {
       finalise({
         name: 'mcp_stdout_purity',
@@ -154,9 +165,21 @@ export async function probeMcpStdoutPurity(opts: ProbeOptions = {}): Promise<Doc
     void (async (): Promise<void> => {
       try {
         for (const frame of frames) {
-          if (settled) return;
-          if (!child.stdin.writable) break;
-          child.stdin.write(frame);
+          if (settled || !child.stdin.writable) break;
+          try {
+            child.stdin.write(frame);
+          } catch (err) {
+            // WR-04: writable can flip false between the check and the write
+            // (child exits mid-loop). The error event listener above swallows
+            // the async 'error' event; the try/catch here catches the
+            // synchronous throw and surfaces a clean fail result.
+            finalise({
+              name: 'mcp_stdout_purity',
+              status: 'fail',
+              detail: `stdin write failed: ${err instanceof Error ? err.message : String(err)}`,
+            });
+            return;
+          }
           await new Promise((r) => setTimeout(r, FRAME_SETTLE_MS));
         }
         await new Promise((r) => setTimeout(r, FINAL_DRAIN_MS));
