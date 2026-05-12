@@ -161,20 +161,40 @@ describe('runDoctor — CR-01 skipSubprocessChecks contract', () => {
     }
   });
 
-  test('runDoctor() honours RL_INSIDE_MCP=1 env even without explicit option', async () => {
+  // MR-14: the RL_INSIDE_MCP env-var fallback was removed from runDoctor()
+  // because a stale env var in the user's shell would silently skip the
+  // subprocess check when they invoked `recovery-ledger doctor` — they
+  // explicitly asked for the doctor's full surface and would have gotten a
+  // hollow pass instead. The MCP tool handler always passes
+  // `skipSubprocessChecks: true` explicitly, so the recursion-break still
+  // works through the trusted option path. This test pins the new contract:
+  // RL_INSIDE_MCP alone is NOT enough to skip; the option must be explicit.
+  test('runDoctor() ignores RL_INSIDE_MCP=1 env without explicit skipSubprocessChecks option (MR-14)', async () => {
     const prev = process.env.RL_INSIDE_MCP;
     process.env.RL_INSIDE_MCP = '1';
     try {
-      const start = Date.now();
+      // With the env var set but NO explicit option, the subprocess check
+      // should still attempt to run. We can't run the full spawn in this
+      // unit test (no `dist/mcp.mjs` in the test environment necessarily),
+      // but the detail must NOT match the "skipped" string the skip arm
+      // returns. The actual probe will fail or pass for other reasons
+      // (spawn / stdin / drain) — we only assert that the env var did not
+      // silently short-circuit.
       const result = await runDoctor();
-      const elapsed = Date.now() - start;
-
       const mcpCheck = result.checks.find((c) => c.name === 'mcp_stdout_purity');
-      expect(mcpCheck?.detail).toBe('skipped (running inside MCP transport)');
-      expect(elapsed).toBeLessThan(500);
+      expect(mcpCheck?.detail).not.toBe('skipped (running inside MCP transport)');
     } finally {
       if (prev === undefined) delete process.env.RL_INSIDE_MCP;
       else process.env.RL_INSIDE_MCP = prev;
     }
+  });
+
+  test('runDoctor({ skipSubprocessChecks: true }) honors the explicit flag (MR-14)', async () => {
+    const start = Date.now();
+    const result = await runDoctor({ skipSubprocessChecks: true });
+    const elapsed = Date.now() - start;
+    const mcpCheck = result.checks.find((c) => c.name === 'mcp_stdout_purity');
+    expect(mcpCheck?.detail).toBe('skipped (running inside MCP transport)');
+    expect(elapsed).toBeLessThan(500);
   });
 });

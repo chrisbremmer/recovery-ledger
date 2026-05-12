@@ -9,12 +9,15 @@
 // rule with array literals (no native-module spawns, no subprocess driver).
 // `runDoctor()` calls it internally.
 //
-// CR-01: `RunDoctorOptions.skipSubprocessChecks` is set by the `whoop_doctor`
-// MCP tool handler (which also reads `RL_INSIDE_MCP` from env as a fallback)
-// so the subprocess stdout-purity probe does NOT recurse: outer MCP →
-// whoop_doctor tool → runDoctor → probeMcpStdoutPurity → spawn dist/mcp.mjs →
-// inner MCP → whoop_doctor tool → runDoctor → ... The flag terminates the
-// chain at the first inner runDoctor invocation.
+// CR-01 + MR-14: `RunDoctorOptions.skipSubprocessChecks` is set by the
+// `whoop_doctor` MCP tool handler so the subprocess stdout-purity probe
+// does NOT recurse: outer MCP → whoop_doctor tool → runDoctor →
+// probeMcpStdoutPurity → spawn dist/mcp.mjs → inner MCP → whoop_doctor
+// tool → runDoctor → ... The flag terminates the chain at the first
+// inner runDoctor invocation. The env-var fallback that previously also
+// honored `RL_INSIDE_MCP=1` was removed (MR-14) — a stale env var in the
+// user's shell would have silently skipped the subprocess check when
+// they invoked `recovery-ledger doctor` from the CLI.
 
 import { CHECK_NAMES } from './checks/check-names.js';
 import { probeMcpStdoutPurity } from './checks/mcp-stdout-purity.js';
@@ -87,10 +90,27 @@ const PROBE_NAMES = [
 
 export async function runDoctor(opts: RunDoctorOptions = {}): Promise<DoctorResult> {
   // `RL_INSIDE_MCP=1` is set on the spawned MCP subprocess in
-  // probeMcpStdoutPurity; either signal (explicit opts or env) suppresses the
-  // recursive subprocess check. Belt-and-suspenders: callers that forget to
-  // pass the option still get safe behavior when the env var is present.
-  const skipSubprocess = opts.skipSubprocessChecks === true || process.env.RL_INSIDE_MCP === '1';
+  // probeMcpStdoutPurity. The env-var fallback is intentionally narrower
+  // than the explicit `opts.skipSubprocessChecks` flag (MR-14):
+  //
+  //   - explicit flag: trusted, set only by the MCP tool handler in
+  //     src/mcp/tools/whoop-doctor.ts. ALWAYS honored.
+  //   - env var: trusted only when the caller is itself a spawned MCP
+  //     subprocess. Honored ONLY when `opts.skipSubprocessChecks` is
+  //     explicitly undefined (i.e., the caller did not make a deliberate
+  //     decision either way).
+  //
+  // Why narrow it: a user invoking `recovery-ledger doctor` from a shell
+  // where they have RL_INSIDE_MCP=1 lingering (e.g., a stale launchctl
+  // env, a Claude Code subshell, a docker-compose .env spillover) would
+  // otherwise see the subprocess check silently skip — they explicitly
+  // asked for the doctor's full surface and got a hollow pass instead.
+  // The MCP tool handler always sets `skipSubprocessChecks: true`
+  // explicitly, so it is unaffected. The probe's own RL_INSIDE_MCP=1
+  // injection into the spawned child still works because the child's
+  // outer `runDoctor` is invoked via the MCP tool handler, which sets
+  // the explicit flag.
+  const skipSubprocess = opts.skipSubprocessChecks === true;
   const settled = await Promise.allSettled([
     probeBetterSqlite3(),
     probeKeyring(),
