@@ -91,11 +91,20 @@ Full list with reasons: [`.planning/PROJECT.md` § Out of Scope](./.planning/PRO
 
 > **From Phase 1 onward: never push directly to `main`.** All code changes go through a worktree + branch + PR + explicit user approval.
 
-Branch protection on `main` (GitHub) and a Claude Code PreToolUse hook in [`.claude/settings.json`](./.claude/settings.json) enforce this at two layers.
+Two-layer enforcement:
 
-The carve-out: while Phase 0 (planning) is still active, `.planning/**`-only edits can land directly on `main`. The moment Phase 1 produces any `src/` content, this exception expires.
+1. **GitHub branch protection on `main`** — the actual fence. Refuses non-PR pushes, force-pushes, and deletions at the API level. This is the load-bearing layer.
+2. **Best-effort PreToolUse guards** in [`.claude/settings.json`](./.claude/settings.json) — refuse the obvious mistakes (`git push origin main`, `--no-verify`, `--gpg-sign=false`) before the request reaches git. These do **not** plug every shell indirection (`sh -c`, `eval`, `$(…)`, heredoc-driven file writes). Branch protection catches what slips past them. Treat the hooks as cheap first-line guards, not a sufficient defense.
 
-Full rules (branch naming, commit format, hook bypass policy): [`agent_docs/workflows/contributing.md`](./agent_docs/workflows/contributing.md).
+Carve-out (Phase 0 only): `.planning/**`-only edits may land directly on `main`. The carve-out expires the moment any `src/` content is tracked. Check with:
+
+```sh
+git ls-tree -r --name-only origin/main | grep -q '^src/' && echo "carve-out EXPIRED" || echo "carve-out ACTIVE"
+```
+
+If expired, this section gets updated to drop the carve-out.
+
+Full rules (branch naming, commit format, hook scope, bypass policy): [`agent_docs/workflows/contributing.md`](./agent_docs/workflows/contributing.md).
 
 ## Bash
 

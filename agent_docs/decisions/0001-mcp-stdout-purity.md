@@ -22,9 +22,10 @@ used from `src/cli/` (where stdout is for humans).
 
 **Code reachable from `src/mcp/` — directly or transitively — must never
 write to stdout.** Logging goes through Pino, configured to write to
-stderr only. `console.log` / `console.error` / `console.warn` /
-`console.info` are forbidden in `src/mcp/`, `src/services/`,
-`src/domain/`, `src/infrastructure/`, and `src/formatters/`. CLI-only
+stderr only. Every `console.*` method (`log`, `error`, `warn`, `info`,
+`debug`, `trace`) — and `process.stdout.write` — are forbidden in
+`src/mcp/`, `src/services/`, `src/domain/`, `src/infrastructure/`, and
+`src/formatters/`. CLI-only
 output (human-facing tables, progress) is restricted to `src/cli/` and
 must not be imported back into shared code.
 

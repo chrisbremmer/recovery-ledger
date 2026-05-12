@@ -18,13 +18,25 @@ The only carve-out: while Phase 0 (planning) is still active,
 `.planning/**`-only changes can land directly on `main` because the work
 is faster than the gate is useful. The moment Phase 1 produces any `src/`
 content, *every* change — including planning updates that ship alongside
-code — goes through PR. Once that flip happens, this section gets
-updated to drop the carve-out.
+code — goes through PR. Check with:
 
-Branch protection on `main` enforces this at the GitHub layer (require
-PR, require linear history, no force push). The Claude Code hook in
-[`.claude/settings.json`](../../.claude/settings.json) is defence in
-depth — it refuses `git push origin main` before it reaches GitHub.
+```sh
+git ls-tree -r --name-only origin/main | grep -q '^src/' && echo "carve-out EXPIRED" || echo "carve-out ACTIVE"
+```
+
+Once expired, this section gets updated to drop the carve-out.
+
+**Two enforcement layers, in order of importance:**
+
+1. **GitHub branch protection on `main`** — refuses non-PR pushes,
+   force-pushes, and deletions at the API level. This is the actual
+   fence; everything else is best-effort.
+2. **PreToolUse guards** in [`.claude/settings.json`](../../.claude/settings.json)
+   — refuse the obvious mistakes before they reach git: literal `git push
+   origin main`, `--no-verify`, `--gpg-sign=false`, `console.*` writes
+   into MCP-reachable paths. The guards **do not** plug every shell
+   indirection (`sh -c`, `eval`, `$(…)`, heredoc-driven file writes).
+   Treat them as cheap first-line guards, not as a sufficient defense.
 
 ## Worktree + PR workflow
 
@@ -101,18 +113,32 @@ Keep the slug short and grep-able. Avoid issue numbers in branch names
 
 ## Hook bypass and destructive operations
 
-The following are **refused** without an explicit, in-conversation user
-authorization (the Claude Code hook will block them):
+The PreToolUse guards in [`.claude/settings.json`](../../.claude/settings.json)
+**refuse** these patterns:
 
-- `git push origin main` (or any direct push to `main` / `master`)
-- `git commit --no-verify`
-- `git commit --no-gpg-sign` / `-c commit.gpgsign=false`
-- `git push --force` / `--force-with-lease` to `main`
-- `git reset --hard` when there are uncommitted changes
-- `git branch -D` on a branch with unpushed commits
+- `git push` whose refspec resolves to `main` / `master`
+- `git commit --no-verify` (and quoted variants outside a `-m` message body)
+- `--no-gpg-sign`, `-c commit.gpgsign=false`, `--gpg-sign=false`, and
+  `GIT_CONFIG_PARAMETERS=...commit.gpgsign=…`
+- `Edit` / `Write` / `MultiEdit` writes to `.claude/settings.json` or
+  `.claude/hooks/**` (the hooks defend themselves)
+
+The following are **not** machine-refused today; the agent simply
+prefers safer alternatives:
+
+- `git push --force` / `--force-with-lease` to `main` — caught at the
+  branch-protection layer, not by the hook
+- `git reset --hard` with uncommitted changes — agent should stash or
+  branch first
+- `git branch -D` on a branch with unpushed commits — agent should
+  push or rebase first
+- Shell indirection that wraps a refused command (`sh -c "git push origin main"`,
+  `eval "..."`) — structurally outside the hook's scope; branch
+  protection catches it
 
 For destructive operations the agent prefers safer alternatives first
-(stash, checkout, fix the failing hook). Bypass is the last resort.
+(stash, checkout, fix the failing hook). Bypass is the last resort and
+requires explicit user authorization.
 
 ## Planning artifacts
 
