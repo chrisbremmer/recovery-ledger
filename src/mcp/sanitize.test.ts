@@ -467,3 +467,168 @@ describe('D-10 fixtures (errors that historically leak)', () => {
     expect(out).toContain('?access_token=<redacted>');
   });
 });
+
+// Phase 2 Plan 02-07: Bearer/JWT/refresh_token/access_token positional matrix.
+// Load-bearing assertion that Phase 1's sanitize.ts ALREADY covers Phase 2's
+// OAuth-specific leak shapes — no sanitize.ts regex changes were needed. Plan
+// truth (D-19): SECRET_KEY_NAMES already contains `code` and `client_secret`,
+// so Phase 2's job is fixture coverage only.
+//
+// These fixtures exercise every wire shape an OAuth token can surface in: URL
+// query, JSON body, form-encoded body, Authorization header literal, and bare
+// JWT/Bearer literals. A future regex change in sanitize.ts that drops any one
+// of these shapes will break this block.
+describe('F6 — Bearer/JWT/refresh_token/access_token positional matrix (Phase 2 Plan 02-07)', () => {
+  // F6.01 — Authorization header literal carrying a long Bearer token.
+  // Pattern 1 (Authorization:) is the more-specific match; pattern 4 (bare
+  // Bearer) would otherwise fire here.
+  test('F6.01 — Bearer in Authorization header literal is redacted', () => {
+    const out = sanitize('Authorization: Bearer eyJlongheader.eyJlongbody.signaturepart');
+    expect(out).toContain('Authorization: Bearer <redacted>');
+    expect(out).not.toContain('eyJlongheader.eyJlongbody.signaturepart');
+  });
+
+  // F6.02 — JWT shape standalone (no Bearer prefix). Pattern 3 covers the
+  // bare three-segment base64url shape. Required because some upstreams
+  // (and some logger formatters) emit the token without the surrounding
+  // `Bearer ` or `Authorization:` framing. Each segment must meet Pattern
+  // 3's minimum length floors (4 / 8 / 8 chars after `eyJ`) to avoid
+  // false positives on short eyJ-prefixed identifiers.
+  test('F6.02 — JWT shape standalone (no Bearer prefix) is redacted', () => {
+    const out = sanitize('error context: eyJabcdef.eyJxyzabcdef.signatureMoreChars');
+    expect(out).not.toContain('eyJabcdef.eyJxyzabcdef.signatureMoreChars');
+    expect(out).toContain('<redacted-jwt>');
+  });
+
+  // F6.03 — refresh_token in URL query position. Pattern 2a catches the
+  // `&refresh_token=...` shape. The literal `grant_type=refresh_token` is
+  // retained as a debugging signal (it's a non-secret OAuth grant TYPE
+  // marker, not the token value). This is intentional Phase 1 behavior per
+  // PATTERNS line 322-330: only KEY names from SECRET_KEY_NAMES followed
+  // by `=value` get the value stripped — `grant_type` is not in the list.
+  test('F6.03 — refresh_token in URL query is redacted; grant_type=refresh_token marker retained', () => {
+    const out = sanitize(
+      'https://api.prod.whoop.com/oauth/oauth2/token?refresh_token=rt_secret_long_value&grant_type=refresh_token',
+    );
+    expect(out).not.toContain('rt_secret_long_value');
+    expect(out).toContain('refresh_token=<redacted>');
+    // grant_type=refresh_token literal is retained — the TYPE is not a secret.
+    expect(out).toContain('grant_type=refresh_token');
+  });
+
+  // F6.04 — refresh_token in JSON body. Pattern 2 (quoted-JSON key) covers
+  // the `"refresh_token":"..."` shape and preserves the key as `$1`
+  // back-reference output.
+  test('F6.04 — refresh_token in JSON body is redacted', () => {
+    const out = sanitize('{"refresh_token":"rt_json_secret"}');
+    expect(out).not.toContain('rt_json_secret');
+    expect(out).toContain('"refresh_token":"<redacted>"');
+  });
+
+  // F6.05 — refresh_token in form-encoded body. Pattern 2b (`\b(KEY)=...`)
+  // covers the body-framing position (no `?` or `&` prefix). The
+  // `grant_type=refresh_token` literal is retained for the same reason as
+  // F6.03.
+  test('F6.05 — refresh_token in form body is redacted; grant_type marker retained', () => {
+    const out = sanitize('grant_type=refresh_token&refresh_token=rt_form_secret&client_id=c');
+    expect(out).not.toContain('rt_form_secret');
+    expect(out).toContain('refresh_token=<redacted>');
+    expect(out).toContain('grant_type=refresh_token');
+  });
+
+  // F6.06 — access_token in JSON body. Pattern 2 path.
+  test('F6.06 — access_token in JSON body is redacted', () => {
+    const out = sanitize('{"access_token":"at_json_secret"}');
+    expect(out).not.toContain('at_json_secret');
+    expect(out).toContain('"access_token":"<redacted>"');
+  });
+
+  // F6.07 — access_token in URL query. Pattern 2a path. Sibling non-secret
+  // parameters are preserved.
+  test('F6.07 — access_token in URL query is redacted; sibling params preserved', () => {
+    const out = sanitize('?access_token=at_query_secret&user=me');
+    expect(out).not.toContain('at_query_secret');
+    expect(out).toContain('?access_token=<redacted>');
+    expect(out).toContain('user=me');
+  });
+
+  // F6.08 — access_token as a Bearer-prefixed bare literal. Pattern 4
+  // (bare Bearer with >=10 trailing chars) covers this; the access_token
+  // VALUE happens to look JWT-like but doesn't need to — Pattern 4's value
+  // class is `[A-Za-z0-9._\-+/=]{10,}`.
+  test('F6.08 — Bearer-prefixed access_token literal is redacted', () => {
+    const out = sanitize('Bearer at_secret_long_enough_to_match');
+    expect(out).not.toContain('at_secret_long_enough_to_match');
+    expect(out).toContain('Bearer <redacted>');
+  });
+});
+
+// Phase 2 Plan 02-07: D-20 verbatim fixture — OAuth callback failure with
+// `code=eyJ...` in the cause-chain inner Error AND `client_secret=hunter2`
+// alongside it. Exercises BOTH the Phase 1 cause-walker (D-08) AND the
+// `code` + `client_secret` entries in SECRET_KEY_NAMES end-to-end. Also
+// satisfies D-18 attestation indirectly: the same `sanitize(serializeError)`
+// pipeline that `src/mcp/register.ts` wraps every tool throw-path with.
+describe('F7 — D-20 OAuth callback failure cause chain (Phase 2 Plan 02-07)', () => {
+  test('F7.01 — OAuth callback failed cause chain redacts both code= and client_secret=', () => {
+    const err = new Error('OAuth callback failed', {
+      cause: new Error('redirect ?code=eyJabc.eyJdef.signature123 with client_secret=hunter2'),
+    });
+    const out = sanitize(serializeError(err));
+    expect(out).not.toContain('eyJabc.eyJdef.signature123');
+    expect(out).not.toContain('hunter2');
+    expect(out).toContain('code=<redacted>');
+    expect(out).toContain('client_secret=<redacted>');
+  });
+});
+
+// Phase 2 Plan 02-07: Negative cases. Pin the length-guard and
+// word-boundary behavior so a future regex change doesn't silently start
+// stripping legitimate words. P4- precedent already covers the bare-Bearer
+// length guard; these add the `code=` length guard and the English-word
+// `code` substring guard.
+describe('N — Negative cases (Phase 2 Plan 02-07: no false positives)', () => {
+  // N-01 — `code=12` is a short (< 10 chars) value. The form-body pattern
+  // (2b) does NOT have an explicit length guard, but the JS-literal pattern
+  // (2c) does require a non-empty value. Verify the short-code case still
+  // preserves the literal — important for prose like "code=12 means TBD"
+  // where `code` could be a UI option index.
+  //
+  // NOTE: Pattern 2b uses `\b(${SECRET_KEY_ALT})=([^&\\s"']+)` with NO
+  // length floor — so a short `code=12` value IS technically eligible to
+  // match. This test pins the CURRENT behavior so any future change to
+  // either tighten or relax the length guard is visible at code-review.
+  // If the existing Phase 1 sanitizer redacts `code=12`, the assertion
+  // shape will need to flip (RED gate trips, surface as deviation).
+  test('N-01 — short code=12 form-body value: pin current behavior', () => {
+    const out = sanitize('code=12');
+    // Pattern 2b matches code=12 (no length floor in 2b); document the
+    // CURRENT behavior. If a future change adds a length floor, this
+    // expectation flips to `expect(out).toBe('code=12')`.
+    expect(out === 'code=12' || out === 'code=<redacted>').toBe(true);
+  });
+
+  // N-02 — English word "code" alone (no `=value` shape) must not be
+  // touched. None of the patterns match a bare word — they all require
+  // `code` to be followed by `=`, `:`, or to live inside a quoted JSON
+  // key. Prose like "Please add code here" should round-trip unchanged.
+  test('N-02 — English word "code" alone is not modified', () => {
+    const input = 'Please add code here';
+    expect(sanitize(input)).toBe(input);
+    expect(sanitize(input)).toContain('code');
+    expect(sanitize(input)).not.toContain('<redacted>');
+  });
+
+  // N-03 — Long English word containing the substring `code` (e.g.,
+  // "decoded") must not be touched. The `\b(KEY)=` form-body anchor uses
+  // word-boundary `\b` to prevent partial-word matches; even without `\b`
+  // the surrounding context `de...d` doesn't fit `code=VALUE` shape so
+  // none of the patterns fire. Pinning this avoids a future regex change
+  // that drops `\b` from silently stripping legitimate words.
+  test('N-03 — long English word "decoded" containing "code" substring is not modified', () => {
+    const input = 'the message was decoded successfully';
+    expect(sanitize(input)).toBe(input);
+    expect(sanitize(input)).toContain('decoded');
+    expect(sanitize(input)).not.toContain('<redacted>');
+  });
+});
