@@ -22,7 +22,7 @@
 // is Pitfall F: cheap defense-in-depth that we own; ADR-0002 doesn't mandate
 // it but the cost is one extra read per refresh and a few extra LOC.
 
-import { mkdir, open, readFile, rename, stat, unlink, writeFile } from 'node:fs/promises';
+import { mkdir, open, readFile, rename, unlink, writeFile } from 'node:fs/promises';
 import { Entry } from '@napi-rs/keyring';
 import * as lockfile from 'proper-lockfile';
 import { z } from 'zod';
@@ -366,21 +366,6 @@ function isNotFound(err: unknown): boolean {
     'code' in err &&
     (err as { code?: string }).code === 'ENOENT'
   );
-}
-
-// Unused on the public surface but kept reachable for the type-checker so the
-// `stat`-import path is exercised by the future doctor check (Plan 02-06) —
-// avoids "unused import" lint and keeps the dependency on node:fs/promises
-// explicit. The doctor check's `auth.ts` (Plan 02-06) will call this to
-// distinguish "file exists but unreadable" from "file does not exist".
-export async function tokenFileExists(p: string): Promise<boolean> {
-  try {
-    await stat(p);
-    return true;
-  } catch (err) {
-    if (isNotFound(err)) return false;
-    throw err;
-  }
 }
 
 // Production singleton — bound at module load to the default paths + global
