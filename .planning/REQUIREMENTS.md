@@ -11,10 +11,10 @@ Requirements for the initial release. Each maps to roadmap phases.
 
 - [x] **FND-01**: Bootstrapped TypeScript repo (Node 22 LTS, ESM, tsup build, tsx dev) with Biome lint/format and Vitest test runner configured
 - [ ] **FND-02**: Empty CLI entry point (`recovery-ledger`) registered via `bin` and runnable via `npx recovery-ledger`
-- [ ] **FND-03**: Empty MCP stdio server entry point (`recovery-ledger-mcp`) using `@modelcontextprotocol/sdk` and stdio transport
+- [x] **FND-03**: Empty MCP stdio server entry point (`recovery-ledger-mcp`) using `@modelcontextprotocol/sdk` and stdio transport
 - [x] **FND-04**: Pino logger configured to write exclusively to stderr (never stdout) with a CI-enforced assertion that the MCP server's stdout contains only valid JSON-RPC frames under fixture load
 - [ ] **FND-05**: Lint rule banning bare `console.*` outside `src/cli/` and CI gate that fails on stdout pollution
-- [ ] **FND-06**: MCP error-sanitizer contract that strips `Authorization` headers and JWT-shaped strings from any error surfaced to a tool result
+- [x] **FND-06**: MCP error-sanitizer contract that strips `Authorization` headers and JWT-shaped strings from any error surfaced to a tool result
 - [ ] **FND-07**: Native-module load verification (`better-sqlite3`, `@napi-rs/keyring`) reported by a stub `doctor` command
 
 ### Authentication
@@ -127,10 +127,10 @@ Explicitly excluded. Gated behind the hard scope guardrail in PROJECT.md (≥ 12
 |-------------|-------|--------|
 | FND-01 | Phase 1 | Complete (Plan 01-01, 2026-05-12) |
 | FND-02 | Phase 1 | Pending |
-| FND-03 | Phase 1 | Pending |
+| FND-03 | Phase 1 | Complete |
 | FND-04 | Phase 1 | Complete (Plan 01-02, 2026-05-12 — unit half D-02a; integration half D-02b lands Plan 01-06) |
 | FND-05 | Phase 1 | Pending |
-| FND-06 | Phase 1 | Pending |
+| FND-06 | Phase 1 | Complete |
 | FND-07 | Phase 1 | Pending |
 | AUTH-01 | Phase 2 | Pending |
 | AUTH-02 | Phase 2 | Pending |
