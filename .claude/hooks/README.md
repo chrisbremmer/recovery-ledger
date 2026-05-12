@@ -14,6 +14,19 @@ Claude). Hooks are wired up in [`../settings.json`](../settings.json).
 | [`guard-mcp-stdout.sh`](./guard-mcp-stdout.sh) | Edit / Write / MultiEdit / NotebookEdit | `console.*` and `process.stdout.write` writes into `src/{mcp,services,domain,infrastructure,formatters}/`. `*.test.ts` / `*.spec.ts` exempt. |
 | [`guard-settings-edit.sh`](./guard-settings-edit.sh) | Edit / Write / MultiEdit / NotebookEdit | Direct edits to `.claude/settings.json` or `.claude/hooks/*.sh`. README updates in this directory are allowed. |
 
+## Tests
+
+Run the committed smoke-test runner before merging any hook change:
+
+```sh
+bash .claude/hooks/tests.sh
+```
+
+47 cases cover the four active hooks against the bypasses surfaced in
+PR #1 review (refspec forms, quoted args, chained commands, `*.test.ts`
+exemption, MultiEdit handling, etc.). Add a new row in `tests.sh` when
+you discover a new bypass — same pattern as the existing entries.
+
 ## How to add a new hook
 
 1. Drop the script in this directory. Pattern:
