@@ -1,27 +1,18 @@
-// Phase 1 Services barrel — stub. Plan 05 replaces createServices() with the
-// real composition over native-module probes + the MCP stdout-purity self-test.
-// The shape is locked here so Plan 03 (mcp/) and Plan 04 (sanitizer tests) can
-// consume a stable contract while Plan 05's runDoctor() lands its implementation.
+// Services barrel — composition root for orchestration code.
+//
+// Plan 05 replaces the Plan 03 stub: `createServices()` now delegates to the
+// real `runDoctor()` over the three Phase 1 doctor checks. The interface
+// shape was locked early so `src/mcp/tools/whoop-doctor.ts` and the upcoming
+// CLI `doctor` command both consume `DoctorResult` without rework.
 
-// DoctorCheck / DoctorResult are the view-layer shapes from CONTEXT.md D-06.
-// MCP tools and the CLI `doctor` subcommand both render against these types.
-export interface DoctorCheck {
-  name: string;
-  status: 'pass' | 'warn' | 'fail';
-  detail: string;
-}
+import { runDoctor } from './doctor/index.js';
 
-export interface DoctorResult {
-  checks: DoctorCheck[];
-  overall: 'pass' | 'warn' | 'fail';
-}
+export type { DoctorCheck, DoctorResult } from './doctor/index.js';
 
 export interface Services {
-  runDoctor: () => Promise<DoctorResult>;
+  runDoctor: typeof runDoctor;
 }
 
 export function createServices(): Services {
-  return {
-    runDoctor: async (): Promise<DoctorResult> => ({ checks: [], overall: 'pass' }),
-  };
+  return { runDoctor };
 }
