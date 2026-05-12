@@ -15,6 +15,18 @@
 // every fail detail ends with a "`run \`recovery-ledger ...\`" remediation.
 
 import { type Tokens, tokenStore } from '../../../infrastructure/whoop/token-store.js';
+// Cross-layer import (WR-06): the MCP register wrapper sanitizes results before
+// they leave the JSON-RPC boundary, but `runDoctorCommand` on the CLI path
+// emits probe `detail` strings verbatim through `process.stdout.write`. A
+// ZodError or AuthError whose cause-chain carries token material (the
+// StoredTokensSchema parse error includes the parsed blob's `received` field)
+// would land on the user's terminal unredacted. Routing `err.message` through
+// the shared sanitizer is defense-in-depth — the primary contract still
+// requires that errors NOT carry token bytes, but this is the second net.
+// Relocating sanitize into `src/infrastructure/observability/` remains
+// deferred work (PLAN-03-CROSS-LAYER); the same cross-layer dependency
+// exists in oauth.ts and auth.ts (CR-04).
+import { sanitize } from '../../../mcp/sanitize.js';
 import type { DoctorCheck } from '../index.js';
 import { CHECK_NAMES } from './check-names.js';
 
@@ -58,7 +70,7 @@ export async function probeAuth(deps?: AuthProbeDeps): Promise<DoctorCheck> {
     return {
       name: CHECK_NAMES.AUTH,
       status: 'fail',
-      detail: `probe threw: ${err instanceof Error ? err.message : String(err)}`,
+      detail: `probe threw: ${sanitize(err instanceof Error ? err.message : String(err))}`,
     };
   }
 }

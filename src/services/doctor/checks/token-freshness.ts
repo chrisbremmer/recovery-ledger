@@ -19,6 +19,10 @@ import {
   type Tokens,
   tokenStore,
 } from '../../../infrastructure/whoop/token-store.js';
+// Cross-layer import (WR-06): see auth.ts in this directory for the full
+// rationale. CLI path's runDoctorCommand emits probe detail strings via
+// process.stdout.write without going through the MCP sanitizer wrapper.
+import { sanitize } from '../../../mcp/sanitize.js';
 import type { DoctorCheck } from '../index.js';
 import { CHECK_NAMES } from './check-names.js';
 
@@ -93,7 +97,7 @@ export async function probeTokenFreshness(deps?: TokenFreshnessProbeDeps): Promi
     return {
       name: CHECK_NAMES.TOKEN_FRESHNESS,
       status: 'fail',
-      detail: `probe threw: ${err instanceof Error ? err.message : String(err)}`,
+      detail: `probe threw: ${sanitize(err instanceof Error ? err.message : String(err))}`,
     };
   }
 }
