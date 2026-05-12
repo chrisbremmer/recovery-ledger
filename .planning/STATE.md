@@ -2,20 +2,20 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-current_plan: 4
+current_plan: 5
 status: executing
-last_updated: "2026-05-12T18:00:52.173Z"
+last_updated: "2026-05-12T18:14:46.565Z"
 progress:
   total_phases: 5
   completed_phases: 0
   total_plans: 6
-  completed_plans: 4
-  percent: 67
+  completed_plans: 5
+  percent: 83
 ---
 
 # State: Recovery Ledger
 
-**Last updated:** 2026-05-12 — completed Plan 01-04 (sanitizer unit tests + CI grep gates)
+**Last updated:** 2026-05-12 — completed Plan 01-05 (CLI Commander wiring + real doctor service)
 **Mode:** yolo
 **Granularity:** standard
 
@@ -26,19 +26,19 @@ progress:
 
 ## Current Position
 
-**Current Plan:** 4
+**Current Plan:** 5
 **Total Plans in Phase:** 6
 Phase: 01 (foundation-stdout-pure-mcp-bootstrap) — EXECUTING
-Plan: 4 of 6
+Plan: 5 of 6
 
 - **Milestone:** v1
 - **Phase:** 1 — Foundation & Stdout-Pure MCP Bootstrap
-- **Plan:** 01-05-cli-doctor-PLAN.md (next) — CLI Commander wiring + real doctor service (FND-07)
+- **Plan:** 01-06-ci-integration-PLAN.md (next) — GitHub Actions workflow + dist/mcp.mjs subprocess round-trip integration test
 - **Status:** Ready to execute
-- **Progress:** [███████░░░] 67%
+- **Progress:** [████████░░] 83%
 
 ```
-[█░░░░░░░░░░░░░░░░░░░] 0 / 5 phases complete (4 / 6 plans complete in Phase 1)
+[█░░░░░░░░░░░░░░░░░░░] 0 / 5 phases complete (5 / 6 plans complete in Phase 1)
 ```
 
 ## Performance Metrics
@@ -48,9 +48,9 @@ Plan: 4 of 6
 | Phases planned | 5 |
 | Phases complete | 0 |
 | v1 requirements mapped | 49 / 49 |
-| v1 requirements complete | 5 / 49 |
+| v1 requirements complete | 7 / 49 |
 | Plans drafted | 6 (Phase 1) |
-| Plans complete | 4 |
+| Plans complete | 5 |
 
 ### Plan Execution History
 
@@ -60,6 +60,7 @@ Plan: 4 of 6
 | 01-02-logger      | 4m 56s | 2 | 3 | Complete (2026-05-12) |
 | 01-03-mcp-skeleton | 4m 42s | 3 | 6 | Complete (2026-05-12) |
 | 01-04-sanitizer-lint | 3m 17s | 2 | 2 | Complete (2026-05-12) |
+| 01-05-cli-doctor   | 5m 18s | 3 | 15 | Complete (2026-05-12) |
 
 ## Accumulated Context
 
@@ -87,11 +88,15 @@ Plan: 4 of 6
 - **[Phase 01] Plan 01-04 decision:** byte-level emoji detection via LC_ALL=C plus 4-byte UTF-8 prefix range — portable across BSD and GNU grep without `-P` (GNU-only).
 - **[Phase 01] Plan 01-04 decision:** cause-walker depth-8 cap pinned in both directions — `at most 9 split segments` plus `exactly 8 cause segments` on a 10-deep chain — drift in either direction breaks the suite.
 - **[Phase 01] Plan 01-04 decision:** no defects discovered in Plan 03's sanitize.ts — all 20 characterization tests pass on first run; the Plan 03 implementation ships as designed.
+- **[Phase 01] Plan 01-05 decision:** `deriveOverall` exported as a pure named function so the fail>warn>pass precedence rule is unit-tested without spawning native modules or the MCP subprocess.
+- **[Phase 01] Plan 01-05 decision:** A2 / A3 RESOLVED — SDK 1.29.0 echoes the fixture's `protocolVersion: "2025-06-18"` verbatim in the initialize response (LATEST is `2025-11-25`; both are in SUPPORTED). `@napi-rs/keyring` 1.3.0 ships `Entry(service, username)` as the named-export class constructor per its `index.d.ts`; no fallback assertion needed.
+- **[Phase 01] Plan 01-05 decision:** subprocess settle timing pinned at 200ms per-frame + 300ms final drain (vs Pattern 5b's ~100ms) — empirically required on the Node 25.2.1 dev box without dragging the doctor command above sub-second.
+- **[Phase 01] Plan 01-05 deviation:** Biome import-order + line-collapsing required minor reshape of the doctor service core after first write (Rule 3 — blocking; auto-fixed inline).
+- **[Phase 01] Plan 01-05 deviation:** plan's verify command uses Vitest 4-removed `--reporter=basic`; substituted the default reporter (Rule 1 — plan-text bug; no code change). Worth surfacing as a planner-template fix for the Vitest-4-pinned stack.
 
 ### Open Todos
 
-- Execute Plan 01-05 (`01-05-cli-doctor-PLAN.md`) — real Commander wiring in `src/cli/index.ts`, `src/cli/commands/doctor.ts` (the one Gate-C-exempt CLI output point), and the real `createServices()` over `services/doctor/checks/native-modules.ts` + `services/doctor/checks/mcp-stdout-purity.ts` (FND-07).
-- Plan 01-06 remains (CI workflow + subprocess round-trip integration test for `dist/mcp.mjs`).
+- Execute Plan 01-06 (`01-06-ci-integration-PLAN.md`) — GitHub Actions workflow (`npm ci → npm run lint → npm run build → npm run test → bash scripts/ci-grep-gates.sh` on `macos-latest`) plus the Vitest integration test under `test/integration/` that imports `probeMcpStdoutPurity` (already factored as a reusable export by Plan 01-05) and asserts the subprocess round-trip against the four committed `test/fixtures/mcp/*.json` fixtures.
 - Confirm whether to deepen research before Phase 2 planning (cross-process file-lock semantics + replay-on-401 contract are research-flagged).
 - Confirm whether to deepen research before Phase 4 planning (confidence-tier thresholds, MAD scaling for small samples, FDR q-value defaults; Zod→JSON-Schema fidelity at the pinned SDK × Zod combination).
 
@@ -109,11 +114,11 @@ None.
 
 ### Last Session Summary
 
-Executed Plan 01-04 (sanitizer unit tests + CI grep gates). Shipped two files: `src/mcp/sanitize.test.ts` (168 lines, 20 Vitest cases across three describe blocks — `sanitize patterns` covers every D-07 pattern with positive + negative cases plus a `PATTERNS.length === 4` drift pin; `serializeError cause chain` covers linear + cycle + depth>8 + boundary-exactly-8 + non-Error + mixed-cause shapes; `D-10 fixtures` exercises fetch TypeError, undici UND_ERR_*, JSON access_token, bare Bearer) and `scripts/ci-grep-gates.sh` (110 lines, mode 100755, `#!/usr/bin/env bash` + `set -euo pipefail`, three gates per the active prompt's `<critical_constraints>` — Gate A: banned tone words from CLAUDE.md plus emoji via LC_ALL=C byte-level UTF-8 prefix range; Gate B: console.log/error/warn outside `src/cli/**` and `*.test.ts`; Gate C: `process.stdout.write` outside `src/cli/commands/doctor.ts`). Each gate's `::error::`-prefixed message fires on a planted violation (recorded in SUMMARY.md). Adopted the user's prompt-level gate set over the plan's verbatim three (which named biome-ignore-noConsole / process.stdout / server.registerTool); the user's set is stricter and aligns with CLAUDE.md §Critical Rules. No defects discovered in Plan 03's sanitize.ts — all 20 characterization tests pass on first run. `npm run test && npm run lint && npx tsc --noEmit && bash scripts/ci-grep-gates.sh` all exit 0. Commits: `63e3867` (sanitize.test.ts), `325b72d` (ci-grep-gates.sh).
+Executed Plan 01-05 (CLI Commander wiring + real doctor service). Shipped 13 created files + 2 modified across three task commits. Created: `src/services/doctor/index.ts` (real `runDoctor()` + exported `deriveOverall` precedence helper), `src/services/doctor/checks/native-modules.ts` (`probeBetterSqlite3` opens `:memory:` + closes; `probeKeyring` constructs `new Entry('recovery-ledger', 'doctor-probe')` only — touches zero disk, zero keychain), `src/services/doctor/checks/mcp-stdout-purity.ts` (spawns `dist/mcp.mjs`, writes the four newline-delimited fixtures, parses each captured stdout line as JSON-RPC 2.0 — the same reusable function Plan 06 will import into its integration test), `src/formatters/doctor.txt.ts` (compact `[status] name — detail` per check, trailing `overall: <status>`), `src/cli/index.ts` (overwrites the Plan 03 `export {};` stub with Commander 14: `name`, `version('0.1.0')`, `description`, `command('doctor').option('--text').action(runDoctorCommand)`, top-level `await parseAsync`), `src/cli/commands/doctor.ts` (the codebase's ONLY `process.stdout.write` call site; renders JSON by default or plaintext under `--text`; `process.exit(overall === 'fail' ? 1 : 0)`), three test files (5 → 7 tests added; suite now 29 tests across 5 files), and four `test/fixtures/mcp/*.json` JSON-RPC fixtures at `protocolVersion: "2025-06-18"`. Modified: `src/services/index.ts` (stub `createServices` replaced with one-line delegation), `src/mcp/tools/whoop-doctor.ts` (inline `renderDoctor` stub swapped for the real formatter import — D-06 parity between CLI `--text` and MCP `content[0].text`). End-to-end smoke verified: `node dist/cli.mjs --version` → `0.1.0`; `node dist/cli.mjs doctor` → 3-check `{checks, overall: "pass"}` JSON; `--text` → plaintext with `overall:` trailer; `node dist/mcp.mjs` driven with all four fixtures returns three JSON-RPC frames containing real probe data with zero stderr leakage. `npm run test && npm run lint && npx tsc --noEmit && npm run build && bash scripts/ci-grep-gates.sh` all exit 0. Three deviations all auto-fixed (Rule 3 Biome shape, Rule 1 self-tripping comment grep, Rule 1 Vitest 4 reporter removal). A2 + A3 both resolved positively against the installed SDK + keyring packages. Commits: `ed7e343` (service core + fixtures), `3032d0e` (formatter + tests), `67a2592` (CLI Commander wiring).
 
 ### Next Session
 
-Execute Plan 01-05 (`01-05-cli-doctor-PLAN.md`) — overwrite the `src/cli/index.ts` stub with the real Commander wiring, land `src/cli/commands/doctor.ts` as the one Gate-C-exempt CLI output point, and replace the stub `createServices()` in `src/services/index.ts` with the real three-check composition (better-sqlite3 native-module probe, @napi-rs/keyring native-module probe, mcp_stdout_purity subprocess self-test). Services contract is locked; MCP tool shim does not need to change.
+Execute Plan 01-06 (`01-06-ci-integration-PLAN.md`) — write `.github/workflows/ci.yml` (macos-latest, Node 22 from `.nvmrc`) sequencing `npm ci → npm run lint → npm run build → npm run test → bash scripts/ci-grep-gates.sh`, and land the Vitest integration test under `test/integration/` that imports the already-factored `probeMcpStdoutPurity` from Plan 01-05 and asserts the subprocess round-trip against the four committed `test/fixtures/mcp/*.json`. No new source modules required — Plan 01-05 shipped every reusable piece. The integration test doubles as Phase 1's "build runs against compiled `dist/`" assertion (success criterion 5 in ROADMAP §Phase 1).
 
 ---
 *State initialized: 2026-05-11*
@@ -122,3 +127,4 @@ Execute Plan 01-05 (`01-05-cli-doctor-PLAN.md`) — overwrite the `src/cli/index
 *Plan 01-02 complete: 2026-05-12 (4m 56s, 3 files — 2 src + 1 modified config)*
 *Plan 01-03 complete: 2026-05-12 (4m 42s, 6 files)*
 *Plan 01-04 complete: 2026-05-12 (3m 17s, 2 files)*
+*Plan 01-05 complete: 2026-05-12 (5m 18s, 15 files — 13 created + 2 modified)*
