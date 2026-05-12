@@ -49,7 +49,7 @@
 - [x] 02-03-oauth-round-trip-PLAN.md — buildAuthorizeUrl + listenForCallback (127.0.0.1 loopback + D-09 HTML pages) + exchangeCode + runOAuth; AuthError gets `auth_port_in_use` kind
 - [x] 02-04-refresh-orchestrator-PLAN.md — callWithAuth() 401-reactive retry orchestrator (budget=1); services barrel exports refreshOrchestrator
 - [x] 02-05-cli-shims-PLAN.md — `recovery-ledger init` (config bootstrap) + `recovery-ledger auth` (runOAuth+tokenStore.write); Commander wiring; Gate C broadened to src/cli/commands/**/*.ts
-- [ ] 02-06-doctor-extensions-PLAN.md — probeAuth + probeTokenFreshness (offline-safe); CHECK_NAMES extended to 5; Gate E added (only token-store.ts may reference oauth/oauth2/token)
+- [x] 02-06-doctor-extensions-PLAN.md — probeAuth + probeTokenFreshness (offline-safe); CHECK_NAMES extended to 5; Gate E added (only token-store.ts may reference oauth/oauth2/token)
 - [x] 02-07-sanitizer-fixtures-PLAN.md — sanitize.test.ts F6 positional matrix + F7 D-20 OAuth-cause-chain fixture; ZERO production-code changes (Phase 1 SECRET_KEY_NAMES already covers code+client_secret)
 - [ ] 02-08-cross-process-integration-PLAN.md — tests/integration/auth-concurrency.test.ts (10 forked children + real HTTP mock; AUTH-05 load-bearing); CI matrix expanded to macos+ubuntu (ubuntu sets FORCE_FILE_STORE=1)
 **UI hint**: no

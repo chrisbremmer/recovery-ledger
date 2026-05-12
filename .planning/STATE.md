@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-current_plan: 7
+current_plan: 8
 status: executing
-last_updated: "2026-05-12T23:15:23.470Z"
+last_updated: "2026-05-12T23:26:46.134Z"
 progress:
   total_phases: 5
   completed_phases: 1
   total_plans: 14
-  completed_plans: 12
-  percent: 86
+  completed_plans: 13
+  percent: 93
 ---
 
 # State: Recovery Ledger
@@ -26,16 +26,16 @@ progress:
 
 ## Current Position
 
-**Current Plan:** 7
+**Current Plan:** 8
 **Total Plans in Phase:** 8
 Phase: 02 (oauth-token-store-single-flight-refresh) — EXECUTING
-Plan: 7 of 8
+Plan: 8 of 8
 
 - **Milestone:** v1
 - **Phase:** 2
 - **Plan:** 02-05-cli-shims-PLAN.md (complete) — `recovery-ledger init` (AUTH-01) bootstraps config.json mode 0600 with D-06 env-var precedence + D-02 verbatim instructions + atomic temp-and-rename + Zod validation via canonical ConfigSchema. `recovery-ledger auth` (AUTH-02) reads config.json, runs Plan 02-03's runOAuth, persists Tokens via Plan 02-02's tokenStore.write, prints `Authorization complete.`. Both files import canonical ConfigSchema + D13_SCOPES from Plan 02-01's schema.ts (DRY-fix per PLAN-05-DRY-VIOLATION). Gate C in scripts/ci-grep-gates.sh broadened from doctor.ts to src/cli/commands/**/*.ts. AUTH_EXIT_CODES covers all six FROZEN AuthError kinds with duck-type dispatch (vi.resetModules cross-module class identity workaround). 23 unit tests green; full suite 206/206 across 17 files.
 - **Status:** Ready to execute
-- **Progress:** [█████████░] 86%
+- **Progress:** [█████████░] 93%
 
 ```
 [████░░░░░░░░░░░░░░░░] 1 / 5 phases complete (6 / 6 plans complete in Phase 1)
@@ -56,6 +56,7 @@ Plan: 7 of 8
 | Phase 02 P03 | 4m 28s | 1 tasks | 2 files |
 | Phase 02 P04 | 3m 3s | 1 tasks | 3 files |
 | Phase 02 P05 | 4m 57s | 1 tasks | 7 files |
+| Phase 02-oauth-token-store-single-flight-refresh P06 | 6m 1s | - tasks | - files |
 
 ### Plan Execution History
 
@@ -145,6 +146,10 @@ Plan: 7 of 8
 - [Phase ?]: [Phase 02] Plan 02-05 decision: Gate C in scripts/ci-grep-gates.sh broadened from src/cli/commands/doctor.ts to src/cli/commands/**/*.ts via regex anchored at the directory prefix — ADR-0001 MCP-stdout-purity preserved because src/cli/commands/ is not reachable from src/mcp/.
 - [Phase ?]: [Phase 02] Plan 02-05 deviation (Rule 1): fixed Plan 02-01 latent bug in errors.ts — AuthError constructor never stored init.detail on instance. Plan 02-01 test 11 was permissive enough to hide it; Plan 02-05 A-04 forced the port number into assertion which surfaced it. Fix: readonly detail field; FROZEN 6-kind union preserved.
 - [Phase ?]: [Phase 02] Plan 02-05 deviation (Rule 3): Biome auto-fixed import-sort/line-collapse via npm run format. No semantic change.
+- [Phase ?]: Plan 02-06: Gate E uses per-line grep exclusion to skip *.test.ts files (mirrors Gate B + Gate D filtering shape).
+- [Phase ?]: Plan 02-06: Token-freshness boundary at delta === REFRESH_BUFFER_MS (5min) belongs to warn (not pass) — symmetric with token-store.ts strict-greater-than pass arm.
+- [Phase ?]: Plan 02-06: Type-system-as-forcing-function for offline-safety — AuthProbeDeps + TokenFreshnessProbeDeps expose ONLY read functions, no refresh seam.
+- [Phase ?]: Plan 02-06: Doc-comment plan-grep-criterion drift (3rd occurrence in Phase 2 after 02-01 process.env, 02-02 process.stdout.write); recommend a learnings.md entry.
 
 ### Open Todos
 
