@@ -265,7 +265,26 @@ export function createTokenStore(opts: TokenStoreOptions = {}): TokenStore {
     try {
       // Re-read after acquiring lock — a sibling process may have refreshed
       // while we were waiting. If so, we are done (RESEARCH lines 380-385).
-      const fresh = await read();
+      //
+      // WR-02: read() can throw refresh_failed on parse/Zod failure (e.g., an
+      // external tool dropped a malformed blob in place — `cat > tokens.json`,
+      // an editor save, a backup-restore). That is NOT the same failure mode
+      // as "WHOOP rejected the refresh request" and conflating them produces
+      // a confusing remediation message ("token refresh failed" when the
+      // actual problem is unrecoverable on-disk state). Catch read failures
+      // here, log for diagnostic visibility, treat as null, and let the fall-
+      // through use the pre-lock `stale` snapshot (which is still in memory
+      // from this process's earlier successful read). If `stale` is also null,
+      // callRefreshEndpoint will throw `auth_missing` ("re-run init") — the
+      // correct remediation for an unrecoverable token-store state.
+      let fresh: Tokens | null;
+      try {
+        fresh = await read();
+      } catch (readErr) {
+        logger.warn({ event: 'tokens_reread_failed_inside_lock' });
+        fresh = null;
+        void readErr;
+      }
       if (fresh !== null && fresh.expiresAt > now() + REFRESH_BUFFER_MS) {
         logger.debug({ event: 'refresh_skipped_sibling' });
         return fresh;
@@ -275,7 +294,8 @@ export function createTokenStore(opts: TokenStoreOptions = {}): TokenStore {
       // and replaced it on disk); `stale` is the pre-lock snapshot and is the
       // exact token WHOOP would reject as a token-family-revocation event per
       // ADR-0002 §Context. Falling back to `stale` only when `fresh` is null
-      // (file vanished or storage-mode marker cleared between snapshots).
+      // (file vanished, storage-mode marker cleared, or the WR-02 parse-error
+      // path swallowed a malformed on-disk blob).
       const next = await callRefreshEndpoint(fresh ?? stale);
       // GATE 3: atomic write (inside `write()` for the file backend).
       await write(next);

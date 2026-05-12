@@ -697,6 +697,40 @@ describe('cross-process lock', () => {
     expect(body?.get('refresh_token')).not.toBe('rt-original-stale');
   });
 
+  test('L-03b (WR-02 regression): malformed on-disk tokens inside lock do NOT raise refresh_failed; fall through to pre-lock stale snapshot', async () => {
+    // WR-02: a malformed token blob written by an external tool (an editor
+    // save, a backup-restore) makes `read()` throw a ZodError → AuthError
+    // wrapper. Pre-fix: that error escapes from inside the lock and the user
+    // sees `refresh_failed` ("token refresh failed — re-auth"), which is
+    // misleading. Post-fix: the read inside the lock catches the error,
+    // treats it as null, falls through to callRefreshEndpoint(stale) — the
+    // pre-lock snapshot is still valid and the refresh succeeds.
+    const kr = installKeyringMock();
+    const now = Date.UTC(2026, 4, 12, 0, 0, 0);
+    // Pre-lock: valid stale token in memory (read() succeeded once before
+    // the lock was acquired). We seed via the keyring mock.
+    seedExpiredKeyringToken(kr, now);
+
+    // Inside the lock: a sibling (or external corruption) replaces the
+    // keyring blob with garbage. read() throws.
+    installLockfileMock({
+      onLockAcquired: () => {
+        kr.store.set('recovery-ledger:whoop', '{not valid json');
+      },
+    });
+
+    const mod = await loadTokenStore();
+    const store = mod.createTokenStore({ paths, now: () => now });
+    await writeFile(paths.storageModeFile, 'keychain\n', { mode: 0o600 });
+
+    // Should succeed using the pre-lock stale snapshot, NOT throw refresh_failed
+    // on the parse error.
+    const at = await store.getValidAccessToken();
+    // Default fixture access_token is 'at-1'.
+    expect(at).toBe('at-1');
+    expect(helper.getRefreshHitCount()).toBe(1);
+  });
+
   test('L-04 (CR-02 regression): refresh body omits `scope` so the AS retains originally-granted scope', async () => {
     // CR-02 / RFC 6749 §6: sending `scope: 'offline'` on refresh asks the AS
     // to narrow the token to just the offline scope, dropping the seven read
