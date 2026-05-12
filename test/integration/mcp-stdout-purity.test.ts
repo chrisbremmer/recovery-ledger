@@ -154,12 +154,17 @@ describe('MCP stdout purity (dist smoke)', () => {
     expect(stdout).not.toMatch(/Authorization:/i);
     expect(stdout).not.toMatch(/eyJ[A-Za-z0-9_-]{4,}\./);
 
-    // ASSERTION 3 (Pitfall 7) — the tools/call response (id: 3) has a result,
-    // not an error. A protocol mismatch surfaces here as a clear failure
-    // rather than passing silently on JSON-RPC validity alone.
+    // ASSERTION 3 (Pitfall 7) — the tools/call response (id: 3) has a NON-NULL
+    // result with the expected content payload, and no error. MR-39: the
+    // pre-fix `toHaveProperty('result')` passes for `{ result: null }`, which
+    // is a protocol violation the test would silently miss. Assert result is
+    // defined, non-null, and carries a `content` array — the actual whoop_doctor
+    // response shape.
     const toolCallResponse = frames.find((f) => f.id === 3);
     expect(toolCallResponse, 'no JSON-RPC frame with id=3 (tools/call) found').toBeDefined();
-    expect(toolCallResponse).toHaveProperty('result');
+    expect(toolCallResponse?.result).toBeDefined();
+    expect(toolCallResponse?.result).not.toBeNull();
+    expect(toolCallResponse?.result).toHaveProperty('content');
     expect(toolCallResponse).not.toHaveProperty('error');
 
     // ASSERTION 4 — graceful close (clean exit or SIGTERM-on-stdin-close).
