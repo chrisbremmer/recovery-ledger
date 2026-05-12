@@ -1,0 +1,622 @@
+// Unit coverage for the load-bearing token-store module (ADR-0002 three-layer
+// single-flight gate + dual keyring/file backends + atomic temp-and-rename
+// write).
+//
+// AUTH-05 unit half lives here (D-23.1, load-bearing per D-24):
+//   "10 parallel callers to getValidAccessToken() with an expired token
+//    produce exactly one POST to the WHOOP token endpoint, and all 10
+//    callers receive the same access_token string."
+// The cross-process integration half ships in Plan 02-08.
+//
+// Test harness shape (PATTERNS Reference §`src/cli/commands/doctor.test.ts`
+// lines 64-87): per-test `vi.resetModules()` + `vi.doMock('@napi-rs/keyring')
+// + vi.doMock('proper-lockfile')` + dynamic `await import('./token-store.js')`
+// so each test exercises an isolated `createTokenStore` factory call —
+// the module-level `inFlightRefresh` lives INSIDE `createTokenStore`, so
+// each `createTokenStore()` invocation gives a fresh gate.
+//
+// MSW intercepts `fetch` for the WHOOP token endpoint (RESEARCH §Test-Mechanism
+// Recipes lines 962-994); the shared `createWhoopOauthHelper()` from
+// `tests/helpers/msw-whoop-oauth.ts` is the single source for the URL +
+// per-call hit counter.
+
+import { mkdtemp, readFile, rm, stat, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, test, vi } from 'vitest';
+import {
+  createWhoopOauthHelper,
+  WHOOP_TOKEN_URL,
+  type WhoopOauthHelper,
+} from '../../../tests/helpers/msw-whoop-oauth.js';
+import { resolvePaths, type ResolvedPaths } from '../config/paths.js';
+
+// -----------------------------------------------------------------------------
+// Shared harness state. The MSW server is reused across the whole test file
+// (per the helper's caller-owned-lifecycle contract); the hit counter is reset
+// in `beforeEach`. Each test creates its own tmpdir + ResolvedPaths so writes
+// land under an isolated tree.
+// -----------------------------------------------------------------------------
+
+let helper: WhoopOauthHelper;
+let tmpDir: string;
+let paths: ResolvedPaths;
+
+beforeAll(() => {
+  helper = createWhoopOauthHelper();
+  helper.server.listen({ onUnhandledRequest: 'error' });
+});
+
+afterAll(() => {
+  helper.server.close();
+});
+
+beforeEach(async () => {
+  helper.resetRefreshHitCount();
+  tmpDir = await mkdtemp(join(tmpdir(), 'rl-token-store-'));
+  paths = resolvePaths({ RECOVERY_LEDGER_HOME: tmpDir });
+});
+
+afterEach(async () => {
+  await rm(tmpDir, { recursive: true, force: true });
+  vi.resetModules();
+  vi.doUnmock('@napi-rs/keyring');
+  vi.doUnmock('proper-lockfile');
+  delete process.env.RECOVERY_LEDGER_FORCE_FILE_STORE;
+});
+
+// -----------------------------------------------------------------------------
+// Mock helpers. Each test installs `vi.doMock` for `@napi-rs/keyring` and
+// `proper-lockfile` BEFORE the dynamic import of `./token-store.js`. The mocks
+// return spy-able state via closures so individual tests can assert call
+// counts and arguments.
+// -----------------------------------------------------------------------------
+
+interface KeyringMock {
+  setPasswordSpy: ReturnType<typeof vi.fn>;
+  getPasswordSpy: ReturnType<typeof vi.fn>;
+  deletePasswordSpy: ReturnType<typeof vi.fn>;
+  store: Map<string, string>;
+}
+
+interface KeyringMockOptions {
+  setThrows?: boolean;
+  /** Force getPassword to return a value different from what was written.
+   *  Triggers Pitfall F (defense-in-depth: setPassword succeeds but the
+   *  read-back blob mismatches) so the test can verify the fallback arm. */
+  getMismatch?: boolean;
+}
+
+function installKeyringMock(opts: KeyringMockOptions = {}): KeyringMock {
+  const store = new Map<string, string>();
+  const setPasswordSpy = vi.fn((service: string, account: string, password: string) => {
+    if (opts.setThrows) {
+      throw new Error('synthetic keyring failure');
+    }
+    store.set(`${service}:${account}`, password);
+  });
+  const getPasswordSpy = vi.fn((service: string, account: string): string | null => {
+    if (opts.getMismatch) {
+      return 'mismatched-blob';
+    }
+    return store.get(`${service}:${account}`) ?? null;
+  });
+  const deletePasswordSpy = vi.fn((service: string, account: string): boolean => {
+    return store.delete(`${service}:${account}`);
+  });
+
+  vi.doMock('@napi-rs/keyring', () => ({
+    Entry: class {
+      private service: string;
+      private account: string;
+      constructor(service: string, account: string) {
+        this.service = service;
+        this.account = account;
+      }
+      setPassword(password: string): void {
+        setPasswordSpy(this.service, this.account, password);
+      }
+      getPassword(): string | null {
+        return getPasswordSpy(this.service, this.account);
+      }
+      deletePassword(): boolean {
+        return deletePasswordSpy(this.service, this.account);
+      }
+    },
+  }));
+
+  return { setPasswordSpy, getPasswordSpy, deletePasswordSpy, store };
+}
+
+interface LockfileMock {
+  lockSpy: ReturnType<typeof vi.fn>;
+  releaseSpy: ReturnType<typeof vi.fn>;
+}
+
+interface LockfileMockOptions {
+  /** Side-effect hook invoked AFTER lock acquired but BEFORE returning the
+   *  release function. Used by L-02 to simulate "a sibling refreshed during
+   *  the lock acquisition" — the side effect writes a fresh token to the
+   *  file backend so the implementation's re-read inside the lock sees it. */
+  onLockAcquired?: () => Promise<void> | void;
+}
+
+function installLockfileMock(opts: LockfileMockOptions = {}): LockfileMock {
+  const releaseSpy = vi.fn(async () => {
+    // no-op — the test never persists a real lockfile
+  });
+  const lockSpy = vi.fn(async (_file: string, _options: unknown) => {
+    if (opts.onLockAcquired) {
+      await opts.onLockAcquired();
+    }
+    return releaseSpy;
+  });
+
+  vi.doMock('proper-lockfile', () => ({
+    lock: lockSpy,
+    default: { lock: lockSpy },
+  }));
+
+  return { lockSpy, releaseSpy };
+}
+
+/**
+ * Dynamically import the token-store module after the per-test mocks are
+ * installed. Returns the freshly-evaluated module so each test exercises an
+ * isolated module-load and an isolated `inFlightRefresh` closure.
+ */
+async function loadTokenStore(): Promise<typeof import('./token-store.js')> {
+  return import('./token-store.js');
+}
+
+// Seed an expired token in the keyring-mock store (the default backend) so
+// `getValidAccessToken()` triggers a refresh. The helper writes through the
+// store map directly so the test does not depend on the file-write path being
+// implemented yet during the RED phase.
+function seedExpiredKeyringToken(kr: KeyringMock, now: number): void {
+  const expired = {
+    accessToken: 'old-access-token',
+    refreshToken: 'old-refresh-token',
+    tokenType: 'bearer' as const,
+    scope: 'offline read:recovery',
+    obtainedAt: now - 3600_000,
+    expiresAt: now - 1000,
+  };
+  kr.store.set('recovery-ledger:whoop', JSON.stringify(expired));
+}
+
+// =============================================================================
+// describe('single-flight concurrency') — AUTH-05 unit-half
+// =============================================================================
+
+describe('single-flight concurrency', () => {
+  test('C-01: 10 parallel getValidAccessToken() calls trigger exactly one POST', async () => {
+    const kr = installKeyringMock();
+    installLockfileMock();
+    const now = Date.UTC(2026, 4, 12, 0, 0, 0);
+    seedExpiredKeyringToken(kr, now);
+
+    const mod = await loadTokenStore();
+    const store = mod.createTokenStore({
+      paths,
+      now: () => now,
+    });
+    // Seed storage-mode cache directly so the read path skips the keyring
+    // probe and goes straight to keychain.
+    await writeFile(paths.storageModeFile, 'keychain\n', { mode: 0o600 });
+
+    const results = await Promise.all(
+      Array.from({ length: 10 }, () => store.getValidAccessToken()),
+    );
+
+    expect(helper.getRefreshHitCount()).toBe(1);
+    expect(results).toHaveLength(10);
+  });
+
+  test('C-02: all 10 callers receive the same fresh access_token string', async () => {
+    const kr = installKeyringMock();
+    installLockfileMock();
+    const now = Date.UTC(2026, 4, 12, 0, 0, 0);
+    seedExpiredKeyringToken(kr, now);
+
+    const mod = await loadTokenStore();
+    const store = mod.createTokenStore({
+      paths,
+      now: () => now,
+    });
+    await writeFile(paths.storageModeFile, 'keychain\n', { mode: 0o600 });
+
+    const results = await Promise.all(
+      Array.from({ length: 10 }, () => store.getValidAccessToken()),
+    );
+
+    expect(new Set(results).size).toBe(1);
+    // The fixture's at-1 is the default response from the MSW helper.
+    expect(results[0]).toBe('at-1');
+  });
+
+  test('C-03: second call after refresh completes does NOT trigger a second POST', async () => {
+    const kr = installKeyringMock();
+    installLockfileMock();
+    const now = Date.UTC(2026, 4, 12, 0, 0, 0);
+    seedExpiredKeyringToken(kr, now);
+
+    const mod = await loadTokenStore();
+    const store = mod.createTokenStore({
+      paths,
+      now: () => now,
+    });
+    await writeFile(paths.storageModeFile, 'keychain\n', { mode: 0o600 });
+
+    // First wave triggers refresh.
+    await store.getValidAccessToken();
+    expect(helper.getRefreshHitCount()).toBe(1);
+
+    // Stored token now expires at now + 3600s; well outside the 5-min buffer.
+    const second = await store.getValidAccessToken();
+
+    expect(helper.getRefreshHitCount()).toBe(1);
+    expect(second).toBe('at-1');
+  });
+});
+
+// =============================================================================
+// describe('refresh trigger') — D-14 5-min preemptive
+// =============================================================================
+
+describe('refresh trigger', () => {
+  test('T-01: expiresAt = now + 4min triggers refresh (within 5-min buffer)', async () => {
+    const kr = installKeyringMock();
+    installLockfileMock();
+    const now = Date.UTC(2026, 4, 12, 0, 0, 0);
+    kr.store.set(
+      'recovery-ledger:whoop',
+      JSON.stringify({
+        accessToken: 'soon-to-expire',
+        refreshToken: 'rt',
+        tokenType: 'bearer',
+        scope: 'offline',
+        obtainedAt: now - 56 * 60 * 1000,
+        expiresAt: now + 4 * 60 * 1000,
+      }),
+    );
+
+    const mod = await loadTokenStore();
+    const store = mod.createTokenStore({ paths, now: () => now });
+    await writeFile(paths.storageModeFile, 'keychain\n', { mode: 0o600 });
+
+    await store.getValidAccessToken();
+    expect(helper.getRefreshHitCount()).toBe(1);
+  });
+
+  test('T-02: expiresAt = now + 10min returns cached, no refresh', async () => {
+    const kr = installKeyringMock();
+    installLockfileMock();
+    const now = Date.UTC(2026, 4, 12, 0, 0, 0);
+    kr.store.set(
+      'recovery-ledger:whoop',
+      JSON.stringify({
+        accessToken: 'still-fresh',
+        refreshToken: 'rt',
+        tokenType: 'bearer',
+        scope: 'offline',
+        obtainedAt: now - 50 * 60 * 1000,
+        expiresAt: now + 10 * 60 * 1000,
+      }),
+    );
+
+    const mod = await loadTokenStore();
+    const store = mod.createTokenStore({ paths, now: () => now });
+    await writeFile(paths.storageModeFile, 'keychain\n', { mode: 0o600 });
+
+    const at = await store.getValidAccessToken();
+
+    expect(helper.getRefreshHitCount()).toBe(0);
+    expect(at).toBe('still-fresh');
+  });
+
+  test('T-03: expiresAt = now - 1s (expired) triggers refresh', async () => {
+    const kr = installKeyringMock();
+    installLockfileMock();
+    const now = Date.UTC(2026, 4, 12, 0, 0, 0);
+    seedExpiredKeyringToken(kr, now);
+
+    const mod = await loadTokenStore();
+    const store = mod.createTokenStore({ paths, now: () => now });
+    await writeFile(paths.storageModeFile, 'keychain\n', { mode: 0o600 });
+
+    await store.getValidAccessToken();
+    expect(helper.getRefreshHitCount()).toBe(1);
+  });
+});
+
+// =============================================================================
+// describe('atomic write') — D-23.c temp-and-rename
+// =============================================================================
+
+describe('atomic write', () => {
+  test('A-01: after write(), tokens.json mode is 0600 and tokens.json.tmp does not exist', async () => {
+    installKeyringMock();
+    installLockfileMock();
+    process.env.RECOVERY_LEDGER_FORCE_FILE_STORE = '1';
+
+    const mod = await loadTokenStore();
+    const now = Date.UTC(2026, 4, 12, 0, 0, 0);
+    const store = mod.createTokenStore({ paths, now: () => now });
+    const tokens: import('./token-store.js').Tokens = {
+      accessToken: 'at-x',
+      refreshToken: 'rt-x',
+      tokenType: 'bearer',
+      scope: 'offline',
+      obtainedAt: now,
+      expiresAt: now + 3600_000,
+    };
+
+    await store.write(tokens);
+
+    // Final file exists with mode 0600.
+    const main = await stat(paths.tokensFile);
+    expect(main.mode & 0o777).toBe(0o600);
+    // Tmp file no longer exists (it was renamed).
+    await expect(stat(`${paths.tokensFile}.tmp`)).rejects.toMatchObject({ code: 'ENOENT' });
+  });
+
+  test('A-02: written blob round-trips through read() to the same object', async () => {
+    installKeyringMock();
+    installLockfileMock();
+    process.env.RECOVERY_LEDGER_FORCE_FILE_STORE = '1';
+
+    const mod = await loadTokenStore();
+    const now = Date.UTC(2026, 4, 12, 0, 0, 0);
+    const store = mod.createTokenStore({ paths, now: () => now });
+    const tokens: import('./token-store.js').Tokens = {
+      accessToken: 'at-y',
+      refreshToken: 'rt-y',
+      tokenType: 'bearer',
+      scope: 'offline read:recovery',
+      obtainedAt: now,
+      expiresAt: now + 3600_000,
+    };
+
+    await store.write(tokens);
+    const back = await store.read();
+
+    expect(back).toEqual(tokens);
+    // The on-disk JSON is parseable as the same shape.
+    const raw = await readFile(paths.tokensFile, 'utf8');
+    expect(JSON.parse(raw)).toEqual(tokens);
+  });
+});
+
+// =============================================================================
+// describe('backend fallback') — D-04/D-05 storage-mode cache
+// =============================================================================
+
+describe('backend fallback', () => {
+  test('B-01: keyring write success → storage-mode cache = "keychain"', async () => {
+    const kr = installKeyringMock();
+    installLockfileMock();
+
+    const mod = await loadTokenStore();
+    const now = Date.UTC(2026, 4, 12, 0, 0, 0);
+    const store = mod.createTokenStore({ paths, now: () => now });
+    const tokens: import('./token-store.js').Tokens = {
+      accessToken: 'at-k',
+      refreshToken: 'rt-k',
+      tokenType: 'bearer',
+      scope: 'offline',
+      obtainedAt: now,
+      expiresAt: now + 3600_000,
+    };
+
+    await store.write(tokens);
+
+    expect(kr.setPasswordSpy).toHaveBeenCalled();
+    const mode = (await readFile(paths.storageModeFile, 'utf8')).trim();
+    expect(mode).toBe('keychain');
+  });
+
+  test('B-02: keyring setPassword throws → falls back to file backend', async () => {
+    installKeyringMock({ setThrows: true });
+    installLockfileMock();
+
+    const mod = await loadTokenStore();
+    const now = Date.UTC(2026, 4, 12, 0, 0, 0);
+    const store = mod.createTokenStore({ paths, now: () => now });
+    const tokens: import('./token-store.js').Tokens = {
+      accessToken: 'at-f',
+      refreshToken: 'rt-f',
+      tokenType: 'bearer',
+      scope: 'offline',
+      obtainedAt: now,
+      expiresAt: now + 3600_000,
+    };
+
+    await store.write(tokens);
+
+    const mode = (await readFile(paths.storageModeFile, 'utf8')).trim();
+    expect(mode).toBe('file');
+    const raw = await readFile(paths.tokensFile, 'utf8');
+    expect(JSON.parse(raw)).toEqual(tokens);
+  });
+
+  test('B-03: RECOVERY_LEDGER_FORCE_FILE_STORE=1 (D-25) skips keyring entirely', async () => {
+    const kr = installKeyringMock();
+    installLockfileMock();
+    process.env.RECOVERY_LEDGER_FORCE_FILE_STORE = '1';
+
+    const mod = await loadTokenStore();
+    const now = Date.UTC(2026, 4, 12, 0, 0, 0);
+    const store = mod.createTokenStore({ paths, now: () => now });
+    const tokens: import('./token-store.js').Tokens = {
+      accessToken: 'at-force',
+      refreshToken: 'rt-force',
+      tokenType: 'bearer',
+      scope: 'offline',
+      obtainedAt: now,
+      expiresAt: now + 3600_000,
+    };
+
+    await store.write(tokens);
+
+    expect(kr.setPasswordSpy).not.toHaveBeenCalled();
+    const mode = (await readFile(paths.storageModeFile, 'utf8')).trim();
+    expect(mode).toBe('file');
+  });
+
+  test('B-04: Pitfall F — setPassword succeeds but getPassword mismatch → file fallback', async () => {
+    installKeyringMock({ getMismatch: true });
+    installLockfileMock();
+
+    const mod = await loadTokenStore();
+    const now = Date.UTC(2026, 4, 12, 0, 0, 0);
+    const store = mod.createTokenStore({ paths, now: () => now });
+    const tokens: import('./token-store.js').Tokens = {
+      accessToken: 'at-pf',
+      refreshToken: 'rt-pf',
+      tokenType: 'bearer',
+      scope: 'offline',
+      obtainedAt: now,
+      expiresAt: now + 3600_000,
+    };
+
+    await store.write(tokens);
+
+    const mode = (await readFile(paths.storageModeFile, 'utf8')).trim();
+    expect(mode).toBe('file');
+    const raw = await readFile(paths.tokensFile, 'utf8');
+    expect(JSON.parse(raw)).toEqual(tokens);
+  });
+});
+
+// =============================================================================
+// describe('refresh errors') — D-15 + Pitfall A
+// =============================================================================
+
+describe('refresh errors', () => {
+  test('E-01: MSW 400 invalid_grant rejects with AuthError{kind: refresh_failed}', async () => {
+    const kr = installKeyringMock();
+    installLockfileMock();
+    const now = Date.UTC(2026, 4, 12, 0, 0, 0);
+    seedExpiredKeyringToken(kr, now);
+
+    helper.setNextResponse({ error: 'invalid_grant', error_description: 'refresh token reused' }, 400);
+
+    const mod = await loadTokenStore();
+    const { AuthError } = await import('./errors.js');
+    const store = mod.createTokenStore({ paths, now: () => now });
+    await writeFile(paths.storageModeFile, 'keychain\n', { mode: 0o600 });
+
+    await expect(store.getValidAccessToken()).rejects.toThrow(AuthError);
+    await expect(store.getValidAccessToken()).rejects.toMatchObject({ kind: 'refresh_failed' });
+  });
+
+  test('E-02: failed refresh does NOT retry (retry budget = 0 per D-15)', async () => {
+    const kr = installKeyringMock();
+    installLockfileMock();
+    const now = Date.UTC(2026, 4, 12, 0, 0, 0);
+    seedExpiredKeyringToken(kr, now);
+
+    helper.setNextResponse({ error: 'invalid_grant' }, 400);
+
+    const mod = await loadTokenStore();
+    const store = mod.createTokenStore({ paths, now: () => now });
+    await writeFile(paths.storageModeFile, 'keychain\n', { mode: 0o600 });
+
+    await expect(store.getValidAccessToken()).rejects.toThrow();
+    expect(helper.getRefreshHitCount()).toBe(1);
+  });
+
+  test('E-03: AuthError.message does NOT contain refresh-token or access-token strings', async () => {
+    const kr = installKeyringMock();
+    installLockfileMock();
+    const now = Date.UTC(2026, 4, 12, 0, 0, 0);
+    kr.store.set(
+      'recovery-ledger:whoop',
+      JSON.stringify({
+        accessToken: 'secret-access-fingerprint',
+        refreshToken: 'secret-refresh-fingerprint',
+        tokenType: 'bearer',
+        scope: 'offline',
+        obtainedAt: now - 3600_000,
+        expiresAt: now - 1000,
+      }),
+    );
+    helper.setNextResponse({ error: 'invalid_grant' }, 400);
+
+    const mod = await loadTokenStore();
+    const store = mod.createTokenStore({ paths, now: () => now });
+    await writeFile(paths.storageModeFile, 'keychain\n', { mode: 0o600 });
+
+    try {
+      await store.getValidAccessToken();
+      throw new Error('expected getValidAccessToken to reject');
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      expect(msg).not.toContain('secret-access-fingerprint');
+      expect(msg).not.toContain('secret-refresh-fingerprint');
+    }
+  });
+});
+
+// =============================================================================
+// describe('cross-process lock') — proper-lockfile options + re-read arm
+// =============================================================================
+
+describe('cross-process lock', () => {
+  test('L-01: lockfile.lock is called with the documented options', async () => {
+    const kr = installKeyringMock();
+    const lf = installLockfileMock();
+    const now = Date.UTC(2026, 4, 12, 0, 0, 0);
+    seedExpiredKeyringToken(kr, now);
+
+    const mod = await loadTokenStore();
+    const store = mod.createTokenStore({ paths, now: () => now });
+    await writeFile(paths.storageModeFile, 'keychain\n', { mode: 0o600 });
+
+    await store.getValidAccessToken();
+
+    expect(lf.lockSpy).toHaveBeenCalled();
+    const [lockedPath, options] = lf.lockSpy.mock.calls[0]!;
+    expect(lockedPath).toBe(paths.tokensLockFile);
+    expect(options).toMatchObject({
+      retries: { retries: 10, factor: 1.2, minTimeout: 50 },
+      stale: 5000,
+    });
+  });
+
+  test('L-02: sibling refresh during lock acquisition is observed; no POST fired', async () => {
+    const kr = installKeyringMock();
+    const now = Date.UTC(2026, 4, 12, 0, 0, 0);
+    seedExpiredKeyringToken(kr, now);
+
+    // Hook: while the lock is being acquired (after the in-process gate but
+    // before our re-read), write a fresh token to the keyring backing store.
+    // The implementation's post-lock re-read should see the fresh token and
+    // skip the POST.
+    installLockfileMock({
+      onLockAcquired: () => {
+        kr.store.set(
+          'recovery-ledger:whoop',
+          JSON.stringify({
+            accessToken: 'sibling-refreshed',
+            refreshToken: 'rt-sibling',
+            tokenType: 'bearer',
+            scope: 'offline',
+            obtainedAt: now,
+            expiresAt: now + 3600_000,
+          }),
+        );
+      },
+    });
+
+    const mod = await loadTokenStore();
+    const store = mod.createTokenStore({ paths, now: () => now });
+    await writeFile(paths.storageModeFile, 'keychain\n', { mode: 0o600 });
+
+    const at = await store.getValidAccessToken();
+
+    expect(at).toBe('sibling-refreshed');
+    expect(helper.getRefreshHitCount()).toBe(0);
+  });
+});
