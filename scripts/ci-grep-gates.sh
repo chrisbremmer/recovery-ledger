@@ -26,6 +26,13 @@ GREP="${GREP:-grep}"
 export LC_ALL=C
 
 # Shared exclusions for repo-wide scans (Gate A).
+#
+# `--exclude-dir=test` (singular) was previously misspelled as `tests`, which
+# silently scanned the real test/ directory. Fixed via WR-02. Keep both forms
+# so a future `tests/` directory (e.g., consumer-side packaging tests) is also
+# skipped without a script change. Documented intent: test files are
+# treated as not user-facing copy and therefore exempt from the tone-words
+# rule. If that policy ever changes, remove both exclusions and audit.
 REPO_EXCLUDES=(
   --exclude-dir=.git
   --exclude-dir=.planning
@@ -33,6 +40,7 @@ REPO_EXCLUDES=(
   --exclude-dir=dist
   --exclude-dir=coverage
   --exclude-dir=.worktrees
+  --exclude-dir=test
   --exclude-dir=tests
   --exclude=CLAUDE.md
   --exclude=ci-grep-gates.sh
