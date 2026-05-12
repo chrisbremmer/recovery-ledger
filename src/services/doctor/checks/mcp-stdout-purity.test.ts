@@ -70,6 +70,23 @@ process.stdin.on('data', () => {});
 setTimeout(() => process.exit(0), 2000);
 `;
 
+// MR-38: emits a non-JSON-RPC byte sequence on stdout before any JSON-RPC
+// frames. The probe must catch this as a transport corruption — a real
+// MCP server with a stray console.log would surface as `non-JSON-RPC byte
+// on stdout: ...`. Without test coverage the parse-error arm of the
+// probe could silently regress and the integration test (which lives
+// downstream of dist build) would not isolate it.
+const NON_JSON_STUB = `
+import { writeSync } from 'node:fs';
+// One non-JSON line then valid frames. The non-JSON line should trip the
+// JSON.parse arm in the probe and yield 'fail' with a 'non-JSON-RPC byte'
+// detail.
+writeSync(1, 'hello world (this is not JSON-RPC)\\n');
+writeSync(1, JSON.stringify({ jsonrpc: '2.0', id: 1, result: {} }) + '\\n');
+process.stdin.on('data', () => {});
+setTimeout(() => process.exit(0), 2000);
+`;
+
 let workDir: string;
 
 beforeAll(async () => {
@@ -115,6 +132,18 @@ describe('probeMcpStdoutPurity — CR-05 frame validation', () => {
     const result = await probeMcpStdoutPurity({ mcpEntry: stub });
     expect(result.status).toBe('pass');
     expect(result.detail).toMatch(/JSON-RPC stream valid \(\d+ frames\)/);
+  });
+
+  // MR-38: a non-JSON-RPC byte on stdout (a stray console.log, a banner,
+  // any byte not enclosed in a valid `{"jsonrpc":"2.0",...}\n` frame) must
+  // surface as a 'fail' result with a 'non-JSON-RPC byte' detail. This
+  // is the parse-error arm in the probe; without coverage a regression
+  // could silently flip it to 'pass'.
+  test('returns fail when subprocess emits non-JSON bytes on stdout (MR-38)', async () => {
+    const stub = await writeStub('nonjson', NON_JSON_STUB);
+    const result = await probeMcpStdoutPurity({ mcpEntry: stub });
+    expect(result.status).toBe('fail');
+    expect(result.detail).toMatch(/non-JSON-RPC byte/);
   });
 
   test('CR-01 skip-subprocess path returns pass without spawning anything', async () => {
