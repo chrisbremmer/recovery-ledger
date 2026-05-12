@@ -20,6 +20,7 @@ import { spawn } from 'node:child_process';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { DoctorCheck } from '../index.js';
+import { CHECK_NAMES } from './check-names.js';
 import { JSONRPC_FIXTURES } from './fixtures.js';
 
 // Resolve `mcp.mjs` as a sibling of this compiled module. `tsup` bundles
@@ -112,7 +113,7 @@ export interface ProbeOptions {
 export async function probeMcpStdoutPurity(opts: ProbeOptions = {}): Promise<DoctorCheck> {
   if (opts.skipSubprocess) {
     return {
-      name: 'mcp_stdout_purity',
+      name: CHECK_NAMES.MCP_STDOUT_PURITY,
       status: 'pass',
       detail: 'skipped (running inside MCP transport)',
     };
@@ -188,7 +189,7 @@ export async function probeMcpStdoutPurity(opts: ProbeOptions = {}): Promise<Doc
     child.stdin.on('error', (err: NodeJS.ErrnoException) => {
       if (err.code === 'EPIPE') return;
       finalise({
-        name: 'mcp_stdout_purity',
+        name: CHECK_NAMES.MCP_STDOUT_PURITY,
         status: 'fail',
         detail: `stdin error: ${err.code ?? err.message}`,
       });
@@ -196,7 +197,7 @@ export async function probeMcpStdoutPurity(opts: ProbeOptions = {}): Promise<Doc
 
     child.on('error', (err) => {
       finalise({
-        name: 'mcp_stdout_purity',
+        name: CHECK_NAMES.MCP_STDOUT_PURITY,
         status: 'fail',
         detail: `failed to spawn ${mcpEntry}: ${err.message}`,
       });
@@ -206,7 +207,7 @@ export async function probeMcpStdoutPurity(opts: ProbeOptions = {}): Promise<Doc
       if (settled) return;
       if (code !== null && code !== 0) {
         finalise({
-          name: 'mcp_stdout_purity',
+          name: CHECK_NAMES.MCP_STDOUT_PURITY,
           status: 'fail',
           detail: `${mcpEntry} exited with code ${code} before stream validation`,
         });
@@ -225,7 +226,7 @@ export async function probeMcpStdoutPurity(opts: ProbeOptions = {}): Promise<Doc
             // the async 'error' event; the try/catch here catches the
             // synchronous throw and surfaces a clean fail result.
             finalise({
-              name: 'mcp_stdout_purity',
+              name: CHECK_NAMES.MCP_STDOUT_PURITY,
               status: 'fail',
               detail: `stdin write failed: ${err instanceof Error ? err.message : String(err)}`,
             });
@@ -243,7 +244,7 @@ export async function probeMcpStdoutPurity(opts: ProbeOptions = {}): Promise<Doc
         // child died before emitting anything.
         if (lines.length === 0) {
           finalise({
-            name: 'mcp_stdout_purity',
+            name: CHECK_NAMES.MCP_STDOUT_PURITY,
             status: 'fail',
             detail: 'subprocess emitted no stdout frames before drain elapsed',
           });
@@ -257,7 +258,7 @@ export async function probeMcpStdoutPurity(opts: ProbeOptions = {}): Promise<Doc
             parsed = JSON.parse(line);
           } catch {
             finalise({
-              name: 'mcp_stdout_purity',
+              name: CHECK_NAMES.MCP_STDOUT_PURITY,
               status: 'fail',
               detail: `non-JSON-RPC byte on stdout: ${line.slice(0, 120)}`,
             });
@@ -265,7 +266,7 @@ export async function probeMcpStdoutPurity(opts: ProbeOptions = {}): Promise<Doc
           }
           if (!isJsonRpcMessage(parsed)) {
             finalise({
-              name: 'mcp_stdout_purity',
+              name: CHECK_NAMES.MCP_STDOUT_PURITY,
               status: 'fail',
               detail: `non-JSON-RPC frame on stdout: ${line.slice(0, 120)}`,
             });
@@ -285,7 +286,7 @@ export async function probeMcpStdoutPurity(opts: ProbeOptions = {}): Promise<Doc
         const toolCallResp = parsedFrames.find((f) => f.id === REQUIRED_RESPONSE_ID);
         if (!toolCallResp) {
           finalise({
-            name: 'mcp_stdout_purity',
+            name: CHECK_NAMES.MCP_STDOUT_PURITY,
             status: 'fail',
             detail: `tools/call response (id=${REQUIRED_RESPONSE_ID}) missing — ${lines.length} frames observed`,
           });
@@ -293,7 +294,7 @@ export async function probeMcpStdoutPurity(opts: ProbeOptions = {}): Promise<Doc
         }
         if ('error' in toolCallResp || !('result' in toolCallResp)) {
           finalise({
-            name: 'mcp_stdout_purity',
+            name: CHECK_NAMES.MCP_STDOUT_PURITY,
             status: 'fail',
             detail: `tools/call response (id=${REQUIRED_RESPONSE_ID}) errored or missing result`,
           });
@@ -301,13 +302,13 @@ export async function probeMcpStdoutPurity(opts: ProbeOptions = {}): Promise<Doc
         }
 
         finalise({
-          name: 'mcp_stdout_purity',
+          name: CHECK_NAMES.MCP_STDOUT_PURITY,
           status: 'pass',
           detail: `JSON-RPC stream valid (${lines.length} frames)`,
         });
       } catch (err) {
         finalise({
-          name: 'mcp_stdout_purity',
+          name: CHECK_NAMES.MCP_STDOUT_PURITY,
           status: 'fail',
           detail: `subprocess driver error: ${err instanceof Error ? err.message : String(err)}`,
         });

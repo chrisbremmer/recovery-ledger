@@ -16,6 +16,7 @@
 // inner MCP → whoop_doctor tool → runDoctor → ... The flag terminates the
 // chain at the first inner runDoctor invocation.
 
+import { CHECK_NAMES } from './checks/check-names.js';
 import { probeMcpStdoutPurity } from './checks/mcp-stdout-purity.js';
 import { probeBetterSqlite3, probeKeyring } from './checks/native-modules.js';
 
@@ -75,7 +76,14 @@ export function deriveOverall(checks: ReadonlyArray<DoctorCheck>): DoctorResult[
 // rather than a structured `fail` check). Each rejection is synthesized into
 // a DoctorCheck with status: 'fail' so the failing probe still appears in
 // the user-facing output with a useful detail string.
-const PROBE_NAMES = ['better_sqlite3_load', 'napi_keyring_load', 'mcp_stdout_purity'] as const;
+// MR-36: positional names mirror the Promise.allSettled probe order below
+// (probeBetterSqlite3, probeKeyring, probeMcpStdoutPurity). Reference the
+// canonical CHECK_NAMES so a rename in one place propagates here.
+const PROBE_NAMES = [
+  CHECK_NAMES.BETTER_SQLITE3_LOAD,
+  CHECK_NAMES.NAPI_KEYRING_LOAD,
+  CHECK_NAMES.MCP_STDOUT_PURITY,
+] as const;
 
 export async function runDoctor(opts: RunDoctorOptions = {}): Promise<DoctorResult> {
   // `RL_INSIDE_MCP=1` is set on the spawned MCP subprocess in

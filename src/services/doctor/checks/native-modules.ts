@@ -8,6 +8,7 @@
 // failure mode this probe catches.
 
 import type { DoctorCheck } from '../index.js';
+import { CHECK_NAMES } from './check-names.js';
 
 export async function probeBetterSqlite3(): Promise<DoctorCheck> {
   try {
@@ -17,10 +18,14 @@ export async function probeBetterSqlite3(): Promise<DoctorCheck> {
     // loaded under the current ABI.
     const db = new mod.default(':memory:');
     db.close();
-    return { name: 'better_sqlite3_load', status: 'pass', detail: 'native binding loaded' };
+    return {
+      name: CHECK_NAMES.BETTER_SQLITE3_LOAD,
+      status: 'pass',
+      detail: 'native binding loaded',
+    };
   } catch (err) {
     return {
-      name: 'better_sqlite3_load',
+      name: CHECK_NAMES.BETTER_SQLITE3_LOAD,
       status: 'fail',
       detail: `failed to load: ${err instanceof Error ? err.message : String(err)} — try \`npm rebuild better-sqlite3\``,
     };
@@ -34,10 +39,14 @@ export async function probeKeyring(): Promise<DoctorCheck> {
     // loaded. The constructor does not issue keychain syscalls; those happen
     // only on `.setPassword()` / `.getPassword()`.
     new mod.Entry('recovery-ledger', 'doctor-probe');
-    return { name: 'napi_keyring_load', status: 'pass', detail: 'native binding loaded' };
+    return {
+      name: CHECK_NAMES.NAPI_KEYRING_LOAD,
+      status: 'pass',
+      detail: 'native binding loaded',
+    };
   } catch (err) {
     return {
-      name: 'napi_keyring_load',
+      name: CHECK_NAMES.NAPI_KEYRING_LOAD,
       status: 'fail',
       detail: `failed to load: ${err instanceof Error ? err.message : String(err)}`,
     };

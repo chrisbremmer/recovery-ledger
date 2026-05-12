@@ -5,6 +5,7 @@
 // by Plan 06's integration test.
 
 import { describe, expect, test, vi } from 'vitest';
+import { CHECK_NAMES } from './checks/check-names.js';
 import { type DoctorCheck, deriveOverall, runDoctor } from './index.js';
 
 const stub = (name: string, status: DoctorCheck['status']): DoctorCheck => ({
@@ -141,6 +142,22 @@ describe('runDoctor — CR-01 skipSubprocessChecks contract', () => {
     } finally {
       vi.doUnmock('./checks/native-modules.js');
       vi.resetModules();
+    }
+  });
+
+  // MR-36 — every probe surfaces under its canonical CHECK_NAMES literal.
+  // A rename in CHECK_NAMES propagates to every consumer; this test catches
+  // a probe that hardcoded the old string after a rename.
+  test('MR-36 — runDoctor() result includes all three canonical CHECK_NAMES', async () => {
+    const result = await runDoctor({ skipSubprocessChecks: true });
+    const names = result.checks.map((c) => c.name);
+    expect(names).toContain(CHECK_NAMES.BETTER_SQLITE3_LOAD);
+    expect(names).toContain(CHECK_NAMES.NAPI_KEYRING_LOAD);
+    expect(names).toContain(CHECK_NAMES.MCP_STDOUT_PURITY);
+    // No stray probe names that lost their CHECK_NAMES reference.
+    const canonical = new Set<string>(Object.values(CHECK_NAMES));
+    for (const name of names) {
+      expect(canonical.has(name)).toBe(true);
     }
   });
 
