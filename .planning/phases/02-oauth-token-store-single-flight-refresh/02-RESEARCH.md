@@ -853,32 +853,39 @@ export async function probeAuth(): Promise<DoctorCheck> {
 | A9 | `redirect_port` default of 4321 (D-01) does not conflict with common dev-tool defaults. Quick survey: 4321 is used by some Vite legacy configs and a few obscure servers; not a frequent collision. | Pitfall G | If it collides, user reconfigures via `init`. The error surfaces clearly via `EADDRINUSE`. |
 | A10 | The cross-process integration test (D-23.2) can be deterministically structured with `pool: 'forks'` + a shared MSW server in the parent that both child processes hit. **The exact pattern is non-trivial.** | Test approach + Validation Architecture | If MSW cannot intercept fetch across spawned Node processes (it intercepts via `fetch` patching, which is per-process), each child needs its own MSW handler that COUNTS via a shared IPC channel back to the parent. Mitigation: use a real HTTP server bound to `127.0.0.1:<port>` for the integration test (not MSW) and have both children hit that — see Validation Architecture §Cross-Process Test. |
 
-## Open Questions
+## Open Questions (RESOLVED)
+
+> Each question carries both a `Recommendation:` (researcher's original guidance) and a `RESOLVED:` line added during plan-checker revision iteration 1, pinning how the current 8-plan set resolves, defers, or accepts the gap.
 
 1. **WHOOP scope-string vocabulary (A2 / D-13)**
    - What we know: WHOOP docs name only `offline` explicitly; reasonable inference from API conventions and ARCHITECTURE.md gives the six read scopes.
    - What's unclear: Whether `read:body_measurement` is the correct spelling, or `read:measurements`, or bundled into something else.
    - Recommendation: Before Phase 2 implementation, fetch `developer.whoop.com/api/` and grep for `scope` / `Authorization` / `read:` mentions per endpoint reference. If unable to confirm offline, plan for the loopback failure HTML to surface the rejected scope verbatim, and add a one-time `init`-time integration probe (against a fresh test app) as a Phase 5 hardening task.
+   - RESOLVED: Plan 02-03 (revision iteration 1, per checker BLOCKER 4 / OPEN-Q-01) implements a narrowed OAuth error-code response policy: the callback handler now RENDERS the verbatim `error_description` (after sanitize+escapeHtml) for `invalid_scope`, `invalid_request`, `unsupported_response_type` — so a D-13 scope-vocabulary mismatch surfaces WHOOP's exact rejection message to the user. Opaque error codes (`server_error`, `access_denied`, `unauthorized_client`, `temporarily_unavailable`, default) STRIP the description as defense-in-depth. Plan 02-03 tests OE-01..09 verify both arms, including the explicit BLOCKER 4 acceptance fixture `?error=invalid_scope&error_description=foo` → failureHtml contains `foo`. The Phase 5 hardening probe remains as a follow-up task but is no longer load-bearing for first-run UX.
 
 2. **PKCE support (A1 / D-12)**
    - What we know: PKCE is not documented at `developer.whoop.com/docs/developing/oauth/` (verified 2026-05-12).
    - What's unclear: Whether WHOOP silently accepts PKCE params on a confidential-client request (harmless extra), or rejects with `invalid_request`.
    - Recommendation: Ship PKCE OFF by default. The 32-byte CSRF state (D-11) plus the loopback's `127.0.0.1` binding cover the practical CSRF surface for a confidential client. Add a manual probe to the Phase 5 install guide ("test if WHOOP rejects code_challenge=..."); if it doesn't, future hardening can flip the flag.
+   - RESOLVED: Plan 02-03 ships `usePkce: false` as the default on the `RunOAuthOptions` interface (the recommendation accepted as-is). The `usePkce: true` path is implemented and unit-tested (Test U-03, X-04 in Plan 02-03) so a future hardening pass can flip the default with one config change. The Phase 5 manual probe is deferred and not load-bearing for Phase 2 ship.
 
 3. **Cross-process integration-test mechanics (A10)**
    - What we know: MSW intercepts `fetch` via per-process patching. Spawning two child processes means two MSW setups.
    - What's unclear: Whether a shared-MSW-in-parent + handler-in-each-child + IPC counter would work, or whether the cleaner path is a real `http.createServer` mock that both children hit.
    - Recommendation: Use a real loopback HTTP server in the parent for the integration test (bound to a random `127.0.0.1:0` port). The parent owns the counter; both children fetch the parent's URL via a `WHOOP_TOKEN_URL_OVERRIDE` env var. The unit-level test (D-23.1) uses MSW; the cross-process integration test uses the real mini-server. (Both tests are fixture-only with respect to real WHOOP per ADR-0006.)
+   - RESOLVED: Plan 02-08 implements exactly the recommendation: parent `http.createServer` bound to `127.0.0.1:0` + 10 `fork()`ed children + `WHOOP_TOKEN_URL` env override (Plan 02-02 reads it via `process.env.WHOOP_TOKEN_URL ?? '<canonical>'` at module load). MSW is used at the unit level (Plan 02-02's token-store.test.ts) per D-23.1. Plan 02-08's Wave-0 build-dep verification (added in revision iteration 1 per checker WARNING PLAN-08-BUILD-DEP) ensures `dist/infrastructure/whoop/token-store.mjs` exists before children fork.
 
 4. **Sanitizer test fixture for OAuth errors (D-20)**
    - What we know: D-20 specifies a fixture: `OAuth callback failed` with `code=eyJ...` and `client_secret=hunter2` in cause chain.
    - What's unclear: Where the fixture lives — inline in `sanitize.test.ts` or as a JSON file?
    - Recommendation: Inline as a string literal in the test file. The fixture is one Error chain; making it a JSON file adds indirection without coverage gain. Phase 1's sanitize.test.ts already uses inline fixtures (verified by file structure).
+   - RESOLVED: Plan 02-07 implements the recommendation verbatim: the D-20 fixture is appended as an inline `describe('F7'...)` block in `src/mcp/sanitize.test.ts`. No JSON file is created. Plan 02-07 also adds the F6 positional matrix and three negative cases, and explicitly attests to D-18 (register.ts unchanged) in must_haves.truths.
 
 5. **Should `init` write `storage-mode` immediately, or only `auth`?**
    - What we know: D-05 says `auth` writes `storage-mode` "on first successful token persist."
    - What's unclear: Whether `init` should write a default `storage-mode` of "unknown" or omit the file entirely.
    - Recommendation: Omit. `auth` writes it on first success. `doctor`'s `auth` check treats "file absent" as "no auth yet" which is correct behavior pre-auth. Keeps `init` purely about config and not about runtime state.
+   - RESOLVED: Plan 02-05 implements the recommendation: `runInitCommand` does NOT write `storage-mode`. Plan 02-02's `tokenStore.write` is the only writer (Test B-01..04 in Plan 02-02 verifies). Plan 02-06's `probeAuth` treats the absent file as `'fail'` with detail `'no tokens — run \`recovery-ledger auth\`'` (Test AU-01).
 
 ## Environment Availability
 
