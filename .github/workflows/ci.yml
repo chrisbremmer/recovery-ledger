@@ -1,0 +1,51 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+# Avoid queueing redundant runs on push spam. Cancel in-flight runs on the same
+# ref when a new commit arrives; the latest commit is the one we care about.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  ci:
+    # macOS-latest per D-12 — matches the documented setup target. Linux
+    # fallback (libsecret-less keychain → file with chmod 600) lands in
+    # Phase 2 alongside the keyring code. Windows is permanently out of scope.
+    runs-on: macos-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      # Build MUST precede test — the integration test in
+      # test/integration/mcp-stdout-purity.test.ts spawns `dist/mcp.mjs` as a
+      # subprocess (Pattern 5(b) caveat + Pitfall 7).
+      - name: Build
+        run: npm run build
+
+      - name: Test
+        run: npm run test
+
+      # Single entrypoint for all three D-04 / D-09 grep gates (tone words +
+      # emoji, console.* outside src/cli/**, process.stdout.write outside
+      # src/cli/commands/doctor.ts). Lives in scripts/ so developers can run
+      # the same gates locally.
+      - name: Grep gates
+        run: bash scripts/ci-grep-gates.sh
