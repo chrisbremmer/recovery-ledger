@@ -43,7 +43,11 @@ export const PATTERNS: ReadonlyArray<{ pattern: RegExp; replacement: string }> =
   //    formatter that injects a ZWSP between `Bearer` and the token cannot
   //    bypass the rule.
   {
-    pattern: /Authorization:[\s ]*Bearer[\s ​‌‍⁠⁣﻿]+[^\s,;]+/gi,
+    // Alternation (not a char class) for the zero-width sequence \u2014 Biome's
+    // noMisleadingCharacterClass rule rejects ZWJ inside a class because it
+    // can form joined emoji; alternation is the documented escape hatch.
+    pattern:
+      /Authorization:[\s ]*Bearer(?:\s|\u00A0|\u200B|\u200C|\u200D|\u2060|\u2063|\uFEFF)+[^\s,;]+/gi,
     replacement: 'Authorization: Bearer <redacted>',
   },
   // 2. JSON token-key values — keep the key, redact the value via `$1`
@@ -133,7 +137,10 @@ export const PATTERNS: ReadonlyArray<{ pattern: RegExp; replacement: string }> =
   //    enough to avoid stripping the literal word `Bearer` followed by a
   //    short non-secret identifier in prose.
   {
-    pattern: /Bearer[\s ​‌‍⁠⁣﻿]+[A-Za-z0-9._\-+/=]{10,}/gi,
+    // Alternation (not a char class) for the zero-width sequence \u2014 Biome's
+    // noMisleadingCharacterClass rule rejects ZWJ inside a class.
+    pattern:
+      /Bearer(?:\s|\u00A0|\u200B|\u200C|\u200D|\u2060|\u2063|\uFEFF)+[A-Za-z0-9._\-+/=]{10,}/gi,
     replacement: 'Bearer <redacted>',
   },
 ];

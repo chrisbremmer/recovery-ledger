@@ -10,49 +10,56 @@
 // handler register() registers, then invoke it with synthetic args and
 // inspect the returned CallToolResult. No transport, no SDK plumbing.
 
+import type { McpServer, ToolCallback } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import { describe, expect, test } from 'vitest';
 import { register } from './register.js';
 
-// Minimal mock — register() only calls `server.registerTool(name, config, wrapped)`.
-// We capture (name, config, wrapped) and forget everything else the SDK does.
+type Wrapped = (...args: unknown[]) => Promise<CallToolResult>;
+
 interface CapturedRegistration {
   name: string;
   config: unknown;
-  wrapped: (...args: unknown[]) => Promise<CallToolResult>;
+  wrapped: Wrapped;
 }
 
-function makeMockServer(): { server: unknown; captured: CapturedRegistration[] } {
+// Minimal mock — register() only calls `server.registerTool(name, config, wrapped)`.
+// We capture (name, config, wrapped) and forget everything else the SDK does.
+// The double-cast through `unknown` is justified: McpServer is a concrete class
+// with many private fields; constructing one solely to wire registerTool would
+// pull in transport plumbing this test deliberately avoids.
+function makeMockServer(): { server: McpServer; captured: CapturedRegistration[] } {
   const captured: CapturedRegistration[] = [];
-  const server = {
-    registerTool: (name: string, config: unknown, wrapped: unknown) => {
-      captured.push({
-        name,
-        config,
-        wrapped: wrapped as (...a: unknown[]) => Promise<CallToolResult>,
-      });
+  const mock = {
+    registerTool: (name: string, config: unknown, wrapped: unknown): void => {
+      captured.push({ name, config, wrapped: wrapped as Wrapped });
     },
   };
-  return { server, captured };
+  return { server: mock as unknown as McpServer, captured };
+}
+
+// The handler signature register() accepts is ToolCallback<ZodRawShape>; for
+// tests we cast through `unknown` so the inner functions can return whatever
+// shape the test scenario requires (a throw, a partial CallToolResult, etc.).
+type AnyToolHandler = (...a: unknown[]) => Promise<unknown>;
+function asHandler<I extends Record<string, never>>(fn: AnyToolHandler): ToolCallback<I> {
+  return fn as unknown as ToolCallback<I>;
 }
 
 describe('register() — MR-23 sanitization wrapper', () => {
   test('thrown error is sanitized + isError=true on return', async () => {
     const { server, captured } = makeMockServer();
     register(
-      // biome-ignore lint/suspicious/noExplicitAny: minimal mock for unit test
-      server as any,
+      server,
       'throws_tool',
       { description: 'throws a Bearer token', inputSchema: {} },
-      // biome-ignore lint/suspicious/noExplicitAny: minimal mock for unit test
-      (async () => {
+      asHandler(async () => {
         throw new Error('Authorization: Bearer fake_token_1234567890');
-      }) as any,
+      }),
     );
 
     expect(captured).toHaveLength(1);
     const reg = captured[0];
-    expect(reg).toBeDefined();
     if (!reg) throw new Error('unreachable');
 
     const result = await reg.wrapped({}, {});
@@ -68,14 +75,12 @@ describe('register() — MR-23 sanitization wrapper', () => {
   test('thrown error with bare Bearer in message is redacted', async () => {
     const { server, captured } = makeMockServer();
     register(
-      // biome-ignore lint/suspicious/noExplicitAny: minimal mock for unit test
-      server as any,
+      server,
       'bare_bearer_tool',
       { description: 'throws bare Bearer', inputSchema: {} },
-      // biome-ignore lint/suspicious/noExplicitAny: minimal mock for unit test
-      (async () => {
+      asHandler(async () => {
         throw new Error('Bearer fake_bare_token_xxxxxxxx');
-      }) as any,
+      }),
     );
 
     const reg = captured[0];
@@ -96,14 +101,12 @@ describe('register() — MR-23 sanitization wrapper', () => {
   test('MR-12: success-path content[].text is sanitized', async () => {
     const { server, captured } = makeMockServer();
     register(
-      // biome-ignore lint/suspicious/noExplicitAny: minimal mock for unit test
-      server as any,
+      server,
       'leaky_success_tool',
       { description: 'returns a token in text', inputSchema: {} },
-      // biome-ignore lint/suspicious/noExplicitAny: minimal mock for unit test
-      (async () => ({
+      asHandler(async () => ({
         content: [{ type: 'text', text: 'Bearer fake_token_1234567890 leaked here' }],
-      })) as any,
+      })),
     );
 
     const reg = captured[0];
@@ -121,12 +124,10 @@ describe('register() — MR-23 sanitization wrapper', () => {
   test('MR-12: success-path structuredContent string leaves are sanitized', async () => {
     const { server, captured } = makeMockServer();
     register(
-      // biome-ignore lint/suspicious/noExplicitAny: minimal mock for unit test
-      server as any,
+      server,
       'leaky_structured_tool',
       { description: 'returns a token in structuredContent', inputSchema: {} },
-      // biome-ignore lint/suspicious/noExplicitAny: minimal mock for unit test
-      (async () => ({
+      asHandler(async () => ({
         content: [{ type: 'text', text: 'ok' }],
         structuredContent: {
           overall: 'fail',
@@ -138,7 +139,7 @@ describe('register() — MR-23 sanitization wrapper', () => {
             },
           ],
         },
-      })) as any,
+      })),
     );
 
     const reg = captured[0];
@@ -156,14 +157,12 @@ describe('register() — MR-23 sanitization wrapper', () => {
   test('MR-12: success-path with no structuredContent passes through unchanged', async () => {
     const { server, captured } = makeMockServer();
     register(
-      // biome-ignore lint/suspicious/noExplicitAny: minimal mock for unit test
-      server as any,
+      server,
       'clean_tool',
       { description: 'clean return', inputSchema: {} },
-      // biome-ignore lint/suspicious/noExplicitAny: minimal mock for unit test
-      (async () => ({
+      asHandler(async () => ({
         content: [{ type: 'text', text: 'nothing sensitive' }],
-      })) as any,
+      })),
     );
 
     const reg = captured[0];

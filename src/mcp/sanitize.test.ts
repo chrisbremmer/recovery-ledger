@@ -211,7 +211,7 @@ describe('sanitize patterns', () => {
   // logger payloads. Without it, `{ access_token: 'abc' }` leaks the
   // value verbatim because the quoted-JSON pattern (#2) requires
   // double-quoted keys AND double-quoted values.
-  test('P2c+ redacts util.inspect-style { access_token: \'abc\' } (MR-03)', () => {
+  test("P2c+ redacts util.inspect-style { access_token: 'abc' } (MR-03)", () => {
     const out = sanitize("error: { access_token: 'abc123xyz' }");
     expect(out).toContain('access_token=<redacted>');
     expect(out).not.toContain('abc123xyz');
