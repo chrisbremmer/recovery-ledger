@@ -53,6 +53,13 @@ const TOOL_DESCRIPTION = [
 ].join(' ');
 
 export function registerWhoopDoctor(server: McpServer, services: Services): void {
+  // MR-35: `inputSchema: {}` declares zero arguments — the whoop_doctor
+  // tool is a zero-arg invocation. Any future argument MUST be added as
+  // an OPTIONAL Zod field. A required field would silently break existing
+  // MCP clients (Claude Code, future agents) that call the tool with no
+  // arguments — the SDK's schema validator would reject the call with a
+  // schema error that bypasses the register() try/catch (MR-13 advisory
+  // applies here too).
   register(server, 'whoop_doctor', { description: TOOL_DESCRIPTION, inputSchema: {} }, async () => {
     const result = await services.runDoctor({ skipSubprocessChecks: true });
     return {

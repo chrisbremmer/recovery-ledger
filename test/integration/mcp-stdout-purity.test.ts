@@ -96,6 +96,14 @@ describe('MCP stdout purity (dist smoke)', () => {
     // Response-driven wait: track ids as they arrive so the test can resolve
     // as soon as the id=3 (tools/call) response is observed rather than
     // sleeping for a fixed budget (WR-03).
+    //
+    // MR-29: this resolves on FIRST observed id=3 frame and then teardown
+    // closes stdin and waits for child close. Full-stdout purity is
+    // asserted after child close, not when the id=3 frame arrives — so
+    // the contract is "the id=3 response happened AND the child shut down
+    // cleanly," not "every frame the child intends to emit was observed
+    // before the resolve." A theoretical late stray byte after id=3 but
+    // before SIGTERM would still be caught by the post-close assertions.
     const idsSeen = new Set<unknown>();
     let toolsCallResolve: (() => void) | null = null;
     const toolsCallSeen = new Promise<void>((resolve) => {

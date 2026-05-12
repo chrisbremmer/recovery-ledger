@@ -25,12 +25,27 @@ import { probeBetterSqlite3, probeKeyring } from './checks/native-modules.js';
 
 export interface DoctorCheck {
   name: string;
+  /**
+   * Three-status union. INTENTIONALLY CLOSED (MR-21): a future sub-status
+   * (e.g., `skipped`, `unknown`, `degraded`) must be added to this type
+   * AND to `DOCTOR_EXIT_CODES` in src/cli/commands/doctor.ts so the
+   * shell-level contract stays in sync. The exhaustive switch in
+   * `deriveOverall` will fail to compile if a new variant is added
+   * without updating the precedence rule — that compile error is the
+   * forcing function.
+   */
   status: 'pass' | 'warn' | 'fail';
   detail: string;
 }
 
 export interface DoctorResult {
   checks: DoctorCheck[];
+  /**
+   * Three-status union. INTENTIONALLY CLOSED (MR-21): same extensibility
+   * rule as `DoctorCheck.status`. The CLI exit-code map
+   * (`DOCTOR_EXIT_CODES`) and the MR-22 --help block both rely on this
+   * shape; a fourth status would need to land in all three places.
+   */
   overall: 'pass' | 'warn' | 'fail';
 }
 
