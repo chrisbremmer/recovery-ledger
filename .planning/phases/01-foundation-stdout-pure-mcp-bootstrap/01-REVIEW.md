@@ -37,7 +37,13 @@ findings:
   warning: 7
   info: 5
   total: 17
-status: issues_found
+status: partially_resolved
+resolved_at: 2026-05-12
+resolved_by: claude (gsd-code-fixer)
+resolved_findings:
+  critical: 5
+  warning: 7
+  info: 1  # IN-02 subsumed by CR-02; IN-01, IN-03, IN-04, IN-05 remain open
 ---
 
 # Phase 1: Code Review Report
@@ -496,3 +502,111 @@ Optional now, populated later — no Phase 1 work needed beyond reserving the sl
 _Reviewed: 2026-05-12_
 _Reviewer: Claude (gsd-code-reviewer)_
 _Depth: standard_
+
+---
+
+## Resolution Notes (2026-05-12)
+
+All 5 Critical (CR-01..05) and all 7 Warning (WR-01..07) findings fixed. One
+Info finding (IN-02) was naturally subsumed by CR-02's fix; the remaining
+four Info findings (IN-01, IN-03, IN-04, IN-05) are deferred per the
+review-fix scope (`critical_warning` tier).
+
+Full local pipeline verified green after every commit:
+`npm run lint && npx tsc --noEmit && npm run build && npm run test &&
+bash scripts/ci-grep-gates.sh`. Test count grew from 30 → 63 (regression
+guards added for CR-01, CR-05, WR-01, WR-05, WR-06).
+
+### Critical
+
+- **CR-01 — recursive MCP subprocess respawn** — `423f6af` and `d80a357`.
+  Added `RunDoctorOptions.skipSubprocessChecks` flag (set by the
+  `whoop_doctor` tool handler) plus `RL_INSIDE_MCP=1` env fallback. The
+  probe injects the env var into spawned children, terminating the
+  recursion at depth 1. Regression guard: a synchronous unit test asserts
+  the skip arm returns the literal "skipped (running inside MCP transport)"
+  detail in <500ms (a real probe needs ≥1.1s).
+
+- **CR-02 — doctor fails outside repo root** — `801400a`. Vendored the four
+  JSON-RPC fixtures as TS constants in
+  `src/services/doctor/checks/fixtures.ts`. Resolved `dist/mcp.mjs` via
+  `import.meta.url` as a sibling of the compiled module (tsup flattens to
+  `dist/<name>.mjs`). Verified: `cd /tmp && node <repo>/dist/cli.mjs
+  doctor` now reports `overall: pass` end-to-end.
+
+- **CR-03 — sanitizer misses OAuth wire shapes** — `e1af258`. Added two
+  patterns (2a URL query parameters, 2b form-encoded body fields) to the
+  D-07 catalog. `PATTERNS.length` contract bumps from 4 to 6. Added
+  positive + negative unit tests plus D-10 fixture F5/F6 for the two new
+  wire shapes.
+
+- **CR-04 — bare-Bearer redaction case-sensitive** — `423f6af`. Added `i`
+  flag to Pattern 4. Tests cover lowercase/uppercase/mixed-case bare
+  Bearer.
+
+- **CR-05 — subprocess check passes on incomplete frames** — `d80a357`.
+  Empty stream → fail. Missing id=3 → fail with detail. id=3 with `error`
+  or no `result` → fail. Four stub-MCP regression tests in
+  `mcp-stdout-purity.test.ts` exercise each failure mode plus the happy
+  path via an `@internal setMcpEntryForTesting` hook.
+
+### Warning
+
+- **WR-01 — dev-path logger never tested** — `8784c0d`. Refactored
+  `logger.ts` to expose `LoggerEnv` / `ResolvedLoggerOptions` /
+  `resolveLoggerOptions(env)` / `createLogger(env)`. Production singleton
+  is `createLogger(process.env)`. Added 6 tests covering both dev and prod
+  arms, including the load-bearing
+  `expect(opts.transport.options.destination).toBe(2)` regression guard.
+
+- **WR-02 — `tests` exclude-dir typo** — `5c69fc9`. Added
+  `--exclude-dir=test` (singular) and kept `tests` for forward
+  compatibility. Documented policy in a comment.
+
+- **WR-03 — fragile 1500ms drain** — `d7c495f`. Replaced fixed
+  `setTimeout(1500)` with response-driven wait keyed on the id=3 frame's
+  arrival; 5000ms circuit-breaker as ceiling. Surfaces a clear timeout
+  diagnostic rather than a silent missing-id-3 assertion.
+
+- **WR-04 — stdin EPIPE unhandled** — `83d3435`. Attached a no-op `error`
+  listener to `child.stdin` and wrapped each `write()` in try/catch with
+  `finalise({ status: 'fail' })` on synchronous throw.
+
+- **WR-05 — `as unknown as` double-cast** — `9c77125`. Replaced with a
+  `toStructuredContent(result)` helper that runs `JSON.parse(JSON.stringify(result))`.
+  Round-trip validates JSON serializability at runtime and produces the
+  exact shape MCP transmits. Regression guard test asserts deep equality
+  on round-trip.
+
+- **WR-06 — exit code conflates warn/pass** — `180f3b6`. Exported a frozen
+  `DOCTOR_EXIT_CODES` map: pass=0, warn=2, fail=1. Five tests cover each
+  code, distinctness, and the freeze invariant.
+
+- **WR-07 — unreachable try/catch in logger test** — `8784c0d`. Dropped
+  the catch wrapper; native vitest diff is more informative.
+
+### Info — deferred
+
+- **IN-01** — JSON re-escape edge case. Not exercised by Phase 1 errors;
+  Phase 2's `fetch`-error chain may hit it. Tagged for follow-up.
+- **IN-02** — error-message absolute path. Naturally subsumed by CR-02's
+  `import.meta.url` resolution; `mcpEntry` is now absolute in all
+  failure-detail strings.
+- **IN-03** — register.ts wrapper does not sanitize handler-returned
+  `isError: true`. Phase 1 has no live leak (only tool is whoop_doctor,
+  never returns isError manually). Phase 4 to address.
+- **IN-04** — no per-check `durationMs` field. Reserved-slot work for
+  Phase 5 / DOC-02; not blocking.
+- **IN-05** — tsup `dts` not emitted. Private package; defer until an
+  external consumer of types appears.
+
+### Test growth
+
+- Phase 1 pre-review: 30 tests
+- Phase 1 post-fix: 63 tests (+33)
+- Net: 5 new regression-guard contracts (CR-01 skip-arm, CR-05 four
+  failure modes, WR-01 dev arm, WR-05 JSON round-trip, WR-06 exit codes)
+- All previous tests still pass; no behavior regressions.
+
+_Resolution: 2026-05-12_
+_Fixer: Claude (gsd-code-fixer)_
