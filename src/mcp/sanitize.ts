@@ -124,8 +124,16 @@ export const PATTERNS: ReadonlyArray<{ pattern: RegExp; replacement: string }> =
   //    normalizes whitespace into NBSP can break sanitization silently. We
   //    treat any of these as the same kind of "gap between Bearer and token"
   //    that a real Authorization header could legitimately contain.
+  //
+  //    MR-26: value class extended to include `+`, `/`, `=` so standard
+  //    base64 tokens (not just base64url) are matched. WHOOP uses base64url
+  //    for its access tokens, but Phase 2 may surface OAuth tokens from
+  //    upstreams that use std base64 in body excerpts. Minimum length
+  //    remains 10 chars — short enough to catch a 12-char API key, long
+  //    enough to avoid stripping the literal word `Bearer` followed by a
+  //    short non-secret identifier in prose.
   {
-    pattern: /Bearer[\s ​‌‍⁠⁣﻿]+[A-Za-z0-9._-]{10,}/gi,
+    pattern: /Bearer[\s ​‌‍⁠⁣﻿]+[A-Za-z0-9._\-+/=]{10,}/gi,
     replacement: 'Bearer <redacted>',
   },
 ];

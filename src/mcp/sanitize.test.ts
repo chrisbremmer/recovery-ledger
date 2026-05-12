@@ -300,6 +300,18 @@ describe('sanitize patterns', () => {
     expect(out).toContain('Authorization: Bearer <redacted>');
     expect(out).not.toContain('abcdef1234567890');
   });
+
+  // MR-26 — Pattern 4 value class extended to include `+`, `/`, `=` so
+  // std-base64 tokens (not just base64url) are caught. A WHOOP-style
+  // base64url token (`A-Za-z0-9_-`) was already covered; the std-base64
+  // case (`A-Za-z0-9+/=`) is the additional surface.
+  test('P4+ redacts std-base64 Bearer token containing + / and = (MR-26)', () => {
+    expect(sanitize('Bearer aB1+cD2/eF3=gH4i')).toBe('Bearer <redacted>');
+  });
+
+  test('P4+ redacts std-base64 token with trailing = padding (MR-26)', () => {
+    expect(sanitize('Bearer aGVsbG8gd29ybGQ==')).toBe('Bearer <redacted>');
+  });
 });
 
 describe('serializeError cause chain', () => {
