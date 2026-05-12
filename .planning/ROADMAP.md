@@ -44,7 +44,7 @@
   3. OAuth tokens are stored via `@napi-rs/keyring` when available, falling back to a `chmod 600` file when no keychain backend is present; `doctor` reports `auth: keychain` vs `auth: file` so regressions are visible.
   4. A grep of the entire log directory, stderr capture, and any MCP tool error return after an induced WHOOP 401/500 surface yields zero matches for `Bearer`, the JWT shape, or the `Authorization` substring.
 **Plans**: 8 plans
-- [ ] 02-01-wave0-infra-PLAN.md — Install proper-lockfile/open/msw deps + paths.ts + errors.ts (AuthError) + MSW WHOOP helper + OAuth test fixtures
+- [x] 02-01-wave0-infra-PLAN.md — Install proper-lockfile/open/msw deps + paths.ts + errors.ts (AuthError) + MSW WHOOP helper + OAuth test fixtures
 - [ ] 02-02-token-store-PLAN.md — Three-layer single-flight gate (in-process Promise + proper-lockfile + atomic write); keyring + file backends; AUTH-05 unit-half concurrency test
 - [ ] 02-03-oauth-round-trip-PLAN.md — buildAuthorizeUrl + listenForCallback (127.0.0.1 loopback + D-09 HTML pages) + exchangeCode + runOAuth; AuthError gets `auth_port_in_use` kind
 - [ ] 02-04-refresh-orchestrator-PLAN.md — callWithAuth() 401-reactive retry orchestrator (budget=1); services barrel exports refreshOrchestrator
@@ -97,7 +97,7 @@
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Foundation & Stdout-Pure MCP Bootstrap | 6/6 | Complete | 2026-05-12 |
-| 2. OAuth, Token Store & Single-Flight Refresh | 0/8 | Planned | - |
+| 2. OAuth, Token Store & Single-Flight Refresh | 1/8 | In Progress|  |
 | 3. Data Model, DB Layer & Sync Loop | 0/? | Not started | - |
 | 4. Domain Math, Reviews, Decision Ledger & MCP Surface | 0/? | Not started | - |
 | 5. Doctor Polish, Install Guide & <20-Minute Setup Validation | 0/? | Not started | - |
@@ -125,4 +125,4 @@ Concerns originate in the phase where the first vulnerable code is introduced; t
 
 ---
 *Roadmap created: 2026-05-11*
-*Last updated: 2026-05-12 — Plan 01-06 complete (CI workflow + integration test) — Phase 1 closed; all seven FND-* requirements CI-enforced. Phase 2 planned with 8 plans across 5 waves.*
+*Last updated: 2026-05-12 — Plan 02-01 complete (Wave-0 infra: paths.ts + schema.ts + 6-kind AuthError union + MSW helper + OAuth fixtures + 4 npm deps). 7 / 14 plans complete (50%).*

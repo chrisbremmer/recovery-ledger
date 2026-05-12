@@ -2,20 +2,20 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-current_plan: 1
+current_plan: 2
 status: executing
-last_updated: "2026-05-12T22:01:19.772Z"
+last_updated: "2026-05-12T22:23:46.313Z"
 progress:
   total_phases: 5
   completed_phases: 1
   total_plans: 14
-  completed_plans: 6
-  percent: 43
+  completed_plans: 7
+  percent: 50
 ---
 
 # State: Recovery Ledger
 
-**Last updated:** 2026-05-12 — completed Plan 01-06 (CI integration test + GitHub Actions workflow) — Phase 1 closed.
+**Last updated:** 2026-05-12 — completed Plan 02-01 (Wave-0 infra: paths.ts, schema.ts, errors.ts; MSW helper; OAuth fixtures; 4 npm deps installed; 16 unit tests green).
 **Mode:** yolo
 **Granularity:** standard
 
@@ -26,16 +26,16 @@ progress:
 
 ## Current Position
 
-**Current Plan:** 1
+**Current Plan:** 2
 **Total Plans in Phase:** 8
 Phase: 02 (oauth-token-store-single-flight-refresh) — EXECUTING
-Plan: 1 of 8
+Plan: 2 of 8
 
 - **Milestone:** v1
 - **Phase:** 2
-- **Plan:** 01-06-ci-integration-PLAN.md (complete) — GitHub Actions workflow + dist/mcp.mjs subprocess round-trip integration test landed.
-- **Status:** Executing Phase 02
-- **Progress:** [██████████] 100%
+- **Plan:** 02-01-wave0-infra-PLAN.md (complete) — Wave-0 infrastructure for Phase 2: paths.ts (5-path resolver + singleton), schema.ts (canonical ConfigSchema + D13_SCOPES), errors.ts (6-kind AuthError union, FROZEN), MSW helper (per-call hit counter), three OAuth fixtures, four npm deps.
+- **Status:** Ready to execute Plan 02-02 (token-store)
+- **Progress:** [█████░░░░░] 50%
 
 ```
 [████░░░░░░░░░░░░░░░░] 1 / 5 phases complete (6 / 6 plans complete in Phase 1)
@@ -48,9 +48,9 @@ Plan: 1 of 8
 | Phases planned | 5 |
 | Phases complete | 1 |
 | v1 requirements mapped | 49 / 49 |
-| v1 requirements complete | 7 / 49 |
-| Plans drafted | 6 (Phase 1) |
-| Plans complete | 6 |
+| v1 requirements complete | 12 / 49 |
+| Plans drafted | 6 (Phase 1) + 8 (Phase 2) |
+| Plans complete | 7 |
 
 ### Plan Execution History
 
@@ -62,6 +62,7 @@ Plan: 1 of 8
 | 01-04-sanitizer-lint | 3m 17s | 2 | 2 | Complete (2026-05-12) |
 | 01-05-cli-doctor   | 5m 18s | 3 | 15 | Complete (2026-05-12) |
 | 01-06-ci-integration | 4m 22s | 2 | 2 | Complete (2026-05-12) |
+| 02-01-wave0-infra | 5m 17s | 2 | 12 | Complete (2026-05-12) |
 
 ## Accumulated Context
 
@@ -98,6 +99,12 @@ Plan: 1 of 8
 - **[Phase 01] Plan 01-06 decision:** integration test does NOT import probeMcpStdoutPurity — it asserts against raw stdout bytes directly so a bug in the probe's framing logic is caught by a second independent eye.
 - **[Phase 01] Plan 01-06 deviation:** RESEARCH Pattern 5(b) writes `json.trim()` to stdin, but pretty-printed multi-line fixtures are silently dropped by the MCP line-delimited parser; adopted single-line collapse via `JSON.stringify(JSON.parse(body))` — same pattern as src/services/doctor/checks/mcp-stdout-purity.ts.
 - **[Phase 01] Plan 01-06 deviation (repeat from 01-05):** Vitest 4 `--reporter=basic` was removed; planner-template fix needed for the Vitest 4 pinned stack.
+- **[Phase 02] Plan 02-01 decision:** auth_port_in_use kind shipped in Wave 0 (originally Wave 2) — checker BLOCKER 1 fix keeps errors.ts stable across Plan 02-02 and Plan 02-03 same-wave consumers; AuthErrorKind FROZEN at 6 kinds.
+- **[Phase 02] Plan 02-01 decision:** canonical ConfigSchema centralized in src/infrastructure/config/schema.ts — checker WARNING PLAN-05-DRY-VIOLATION fix; init.ts and auth.ts both import single source in Plan 02-05.
+- **[Phase 02] Plan 02-01 decision:** WHOOP_TOKEN_URL hard-coded inside tests/helpers/msw-whoop-oauth.ts as single source for the phase — T-02.01-04 mitigation prevents a future test from accidentally pointing MSW at a different host.
+- **[Phase 02] Plan 02-01 deviation:** Biome formatter auto-fixed paths.ts configDir line-split and errors.ts super(...) collapse (Rule 3 — blocking format).
+- **[Phase 02] Plan 02-01 deviation:** rewrote paths.ts doc-comment mentions of process.env to 'env-global' so plan acceptance grep returns exactly the single export line (Rule 1 — comment regression).
+- **[Phase 02] Plan 02-01 deviation:** ran npm run build to rebuild stale dist/mcp.mjs (gitignored) before full-suite verify — pre-existing precondition, not Plan 02-01 regression; planner-template note worth recording.
 
 ### Open Todos
 
@@ -120,11 +127,11 @@ None.
 
 ### Last Session Summary
 
-Executed Plan 01-06 (CI integration — closes Phase 1). Shipped 2 created files across two task commits. Created: `test/integration/mcp-stdout-purity.test.ts` (124 lines — spawns `dist/mcp.mjs`, drives the four-fixture JSON-RPC sequence, asserts every stdout line parses as JSON-RPC 2.0, asserts no `Bearer/Authorization/eyJ` substrings, asserts the id=3 tools/call response carries `result` not `error`, exit code ≤ 0). Created: `.github/workflows/ci.yml` (51 lines — single `macos-latest` job, Node 22, `actions/checkout@v4` + `actions/setup-node@v4` with npm cache, steps `npm ci → lint → build → test → bash scripts/ci-grep-gates.sh` in that exact order, concurrency block cancels in-flight runs on the same ref). Full local pipeline green: `npm ci → npm run lint → npm run build → npm run test → bash scripts/ci-grep-gates.sh` — 30 tests / 6 files, 2.49s; integration test alone 2.32s. Three Rule 1 deviations all auto-fixed before commit: (1) pretty-printed multi-line fixtures silently dropped by MCP line-delimited parser → adopted `JSON.stringify(JSON.parse(body))` collapse pattern; (2) final drain too short for the inner mcp_stdout_purity subprocess (~1.1s round-trip) → bumped to 1500ms; (3) plan's verify command uses Vitest-4-removed `--reporter=basic` → substituted default reporter (second occurrence — worth a planner-template fix). Commits: `fa9bc52` (test — integration test), `354ed7c` (chore — CI workflow). Phase 1 closed: all seven FND-* requirements now CI-enforced (see `01-06-SUMMARY.md` § "Phase 1 Completion Status" for the mapping table). Ready for verifier sign-off; first post-merge GitHub Actions run on `main` is the final acceptance gate.
+Executed Plan 02-01 (Wave-0 infrastructure for Phase 2). Shipped 10 created files + 2 modified across three task commits (Task 1 + Task 2 RED + Task 2 GREEN — TDD cycle). Installed four npm deps at pinned versions: `proper-lockfile@^4.1.2`, `open@^11.0.0` (runtime); `msw@^2.14.6`, `@types/proper-lockfile@^4.1.4` (dev). Three new TS modules with co-located unit tests (16 tests total, all green): (1) `src/infrastructure/config/paths.ts` — factory `resolvePaths(env)` + module-load `paths` singleton; five derived paths from D-03/D-06/D-07 (configFile, tokensFile, tokensLockFile, storageModeFile); throws when neither HOME nor RECOVERY_LEDGER_HOME is set. (2) `src/infrastructure/config/schema.ts` — canonical `ConfigSchema` (Zod) + `D13_SCOPES` frozen tuple + `InitConfig` type; eliminates the duplicate-schema DRY violation flagged by the planner checker (WARNING PLAN-05-DRY-VIOLATION). (3) `src/infrastructure/whoop/errors.ts` — `AuthError` discriminated union over SIX `AuthErrorKind` variants including `auth_port_in_use` (moved into Wave 0 per checker BLOCKER 1; errors.ts now FROZEN at 6 kinds across Plans 02-02 through 02-08); `formatAuthError` exhaustive switch is the MR-21 forcing function. Shared MSW helper at `tests/helpers/msw-whoop-oauth.ts` exports `createWhoopOauthHelper` with per-call hit counter + `setNextResponse` one-shot override; `WHOOP_TOKEN_URL` is the single source for the phase (T-02.01-04 mitigation). Three OAuth fixtures under `test/fixtures/oauth/`: token-200.json, token-400-invalid-grant.json, authorize-callback-state-mismatch.html. Three deviations all auto-fixed before commit: (1) Biome formatter reflows on paths.ts configDir + errors.ts super() (Rule 3 — blocking format); (2) paths.ts doc-comment mentions of `process.env` rewritten to "env-global" so plan's grep acceptance returns exactly one line (Rule 1 — comment regression); (3) ran `npm run build` to rebuild stale `dist/mcp.mjs` (gitignored) before full-suite verify — pre-existing local-machine precondition from Phase 1, NOT a Plan 02-01 regression. Planner-template note: chain `npm run build &&` ahead of full-suite verify commands. Commits: `ded9836` (chore — deps + MSW + fixtures), `dbee5a1` (test — RED), `0705a09` (feat — GREEN). Full src/infrastructure subset suite green (25 tests / 4 files); CI grep gates pass; `npm run lint` clean.
 
 ### Next Session
 
-Run the verifier agent on Phase 1 (six Plan summaries + integration test + CI workflow). Awaiting verifier sign-off before planning Phase 2 (auth). STATE.md flags two research-deepen-before-planning questions for Phase 2 — cross-process file-lock semantics for single-flight refresh + replay-on-401 contract — the orchestrator should choose deepen-research-or-skip before `/gsd-plan-phase 2`. First post-merge GitHub Actions run is the external acceptance gate (`gh run list --limit 1 --json conclusion --jq '.[0].conclusion'`); not yet runnable because CI has not been invoked.
+Execute Plan 02-02 (token-store). Wave 1+ of Phase 2 is now unblocked — paths.ts, schema.ts, errors.ts, MSW helper, and OAuth fixtures are all available for import. AuthError union is FROZEN at 6 kinds; no Wave-2 plan should mutate errors.ts. The verifier agent has not been re-run for Phase 1 yet (still pending from end of Phase 1) — orchestrator may choose to run it before continuing.
 
 ---
 *State initialized: 2026-05-11*
@@ -135,3 +142,4 @@ Run the verifier agent on Phase 1 (six Plan summaries + integration test + CI wo
 *Plan 01-04 complete: 2026-05-12 (3m 17s, 2 files)*
 *Plan 01-05 complete: 2026-05-12 (5m 18s, 15 files — 13 created + 2 modified)*
 *Plan 01-06 complete: 2026-05-12 (4m 22s, 2 files) — Phase 1 closed.*
+*Plan 02-01 complete: 2026-05-12 (5m 17s, 12 files — 10 created + 2 modified) — Phase 2 Wave 0 done.*
