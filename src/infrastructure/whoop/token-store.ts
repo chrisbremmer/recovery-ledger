@@ -190,7 +190,34 @@ export function createTokenStore(opts: TokenStoreOptions = {}): TokenStore {
     }
   }
 
+  // Public write — acquires the same cross-process lock that `doRefresh` uses,
+  // so a CLI `auth` write cannot race a concurrent MCP-server refresh. The
+  // refresh path uses `writeUnderLock` directly (the lock is already held by
+  // its enclosing scope; re-entering would deadlock).
+  //
+  // WR-03: storage-mode file is the single source of truth for backend
+  // selection. Before this fix, `runAuthCommand` called write() without
+  // acquiring the lock — a parallel doRefresh on the keychain backend could
+  // interleave its storage-mode write with the auth file-backend write and
+  // leave the marker pointing at the wrong backend.
   async function write(tokens: Tokens): Promise<void> {
+    await mkdir(resolvedPaths.configDir, { recursive: true });
+    await writeFile(resolvedPaths.tokensLockFile, '', { flag: 'a' });
+    const release = await lockfile.lock(resolvedPaths.tokensLockFile, {
+      retries: { retries: 10, factor: 1.2, minTimeout: 50 },
+      stale: 5000,
+    });
+    try {
+      await writeUnderLock(tokens);
+    } finally {
+      await release();
+    }
+  }
+
+  // Internal write — no lock acquisition. Callers MUST hold the cross-process
+  // advisory lock on `tokensLockFile` for the duration of this call (the
+  // refresh path does; the public `write` wraps this in a lock acquisition).
+  async function writeUnderLock(tokens: Tokens): Promise<void> {
     await mkdir(resolvedPaths.configDir, { recursive: true });
     const blob = JSON.stringify(tokens);
     let mode: StorageMode = 'file';
@@ -297,8 +324,10 @@ export function createTokenStore(opts: TokenStoreOptions = {}): TokenStore {
       // (file vanished, storage-mode marker cleared, or the WR-02 parse-error
       // path swallowed a malformed on-disk blob).
       const next = await callRefreshEndpoint(fresh ?? stale);
-      // GATE 3: atomic write (inside `write()` for the file backend).
-      await write(next);
+      // GATE 3: atomic write. Call writeUnderLock — the cross-process lock is
+      // already held by `doRefresh`'s outer scope; the public `write()` would
+      // try to re-acquire the same lock and deadlock.
+      await writeUnderLock(next);
       return next;
     } finally {
       await release();

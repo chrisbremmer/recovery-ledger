@@ -697,6 +697,45 @@ describe('cross-process lock', () => {
     expect(body?.get('refresh_token')).not.toBe('rt-original-stale');
   });
 
+  test('L-03a (WR-03 regression): direct `write()` acquires the cross-process lock with documented options', async () => {
+    // WR-03: the CLI `auth` completion path calls `tokenStore.write(tokens)`
+    // outside of `doRefresh`. Without the lock, a concurrent MCP-server
+    // refresh and a `recovery-ledger auth` run could interleave and leave the
+    // storage-mode marker pointing at the wrong backend. The public `write`
+    // must acquire the same lock that `doRefresh` does.
+    installKeyringMock();
+    const lf = installLockfileMock();
+    process.env.RECOVERY_LEDGER_FORCE_FILE_STORE = '1';
+
+    const mod = await loadTokenStore();
+    const now = Date.UTC(2026, 4, 12, 0, 0, 0);
+    const store = mod.createTokenStore({ paths, now: () => now });
+    const tokens: import('./token-store.js').Tokens = {
+      accessToken: 'at-wr03',
+      refreshToken: 'rt-wr03',
+      tokenType: 'bearer',
+      scope: 'offline',
+      obtainedAt: now,
+      expiresAt: now + 3600_000,
+    };
+
+    await store.write(tokens);
+
+    expect(lf.lockSpy).toHaveBeenCalled();
+    const firstCall = lf.lockSpy.mock.calls[0];
+    if (firstCall === undefined) {
+      throw new Error('lockfile.lock was not called from public write()');
+    }
+    const [lockedPath, options] = firstCall;
+    expect(lockedPath).toBe(paths.tokensLockFile);
+    expect(options).toMatchObject({
+      retries: { retries: 10, factor: 1.2, minTimeout: 50 },
+      stale: 5000,
+    });
+    // Release must have been called once (write completed cleanly).
+    expect(lf.releaseSpy).toHaveBeenCalledTimes(1);
+  });
+
   test('L-03b (WR-02 regression): malformed on-disk tokens inside lock do NOT raise refresh_failed; fall through to pre-lock stale snapshot', async () => {
     // WR-02: a malformed token blob written by an external tool (an editor
     // save, a backup-restore) makes `read()` throw a ZodError → AuthError
