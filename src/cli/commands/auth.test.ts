@@ -4,7 +4,7 @@
 // process.stdout.write per-test; vi.doMock runOAuth + tokenStore + readFile
 // for the relevant arms; RECOVERY_LEDGER_HOME points at a tmpdir.
 
-import { writeFile, mkdtemp, mkdir, rm } from 'node:fs/promises';
+import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
@@ -62,11 +62,13 @@ afterEach(async () => {
 });
 
 // Helper: seed a valid config.json under tmp/config.json so auth.ts can read it.
-async function seedConfig(overrides: Partial<{
-  clientId: string;
-  clientSecret: string;
-  redirectPort: number;
-}> = {}): Promise<void> {
+async function seedConfig(
+  overrides: Partial<{
+    clientId: string;
+    clientSecret: string;
+    redirectPort: number;
+  }> = {},
+): Promise<void> {
   await mkdir(tmp, { recursive: true });
   const config = {
     clientId: overrides.clientId ?? 'cid',

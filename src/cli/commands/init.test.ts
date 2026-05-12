@@ -7,8 +7,7 @@
 // `paths` singleton (read at module load from process.env) picks up the
 // tmpdir override.
 
-import { stat } from 'node:fs/promises';
-import { mkdtemp, readFile, rm } from 'node:fs/promises';
+import { mkdtemp, readFile, rm, stat } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';

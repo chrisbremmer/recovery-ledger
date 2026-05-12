@@ -40,6 +40,7 @@ export interface AuthErrorInit {
 
 export class AuthError extends Error {
   readonly kind: AuthErrorKind;
+  readonly detail?: string;
 
   constructor(init: AuthErrorInit) {
     // ES2022 Error cause option: only pass the second arg when cause is
@@ -47,6 +48,15 @@ export class AuthError extends Error {
     // that some serializers might inspect differently from "no cause."
     super(init.detail ?? init.kind, init.cause === undefined ? undefined : { cause: init.cause });
     this.kind = init.kind;
+    // Store `detail` on the instance so `formatAuthError` (and other
+    // consumers — Plan 02-05's auth.ts uses this to surface the colliding
+    // port number on `auth_port_in_use`) can read it back. Without this,
+    // `err.detail` was always `undefined` and the formatter fell back to
+    // 'unknown port' — Plan 02-01 latent bug, fixed in Plan 02-05 under
+    // deviation Rule 1.
+    if (init.detail !== undefined) {
+      this.detail = init.detail;
+    }
     this.name = 'AuthError';
   }
 }
