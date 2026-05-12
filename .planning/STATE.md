@@ -2,20 +2,20 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-current_plan: 4
+current_plan: 5
 status: executing
-last_updated: "2026-05-12T22:43:18.839Z"
+last_updated: "2026-05-12T22:54:52.440Z"
 progress:
   total_phases: 5
   completed_phases: 1
   total_plans: 14
-  completed_plans: 9
-  percent: 64
+  completed_plans: 10
+  percent: 71
 ---
 
 # State: Recovery Ledger
 
-**Last updated:** 2026-05-12 — completed Plan 02-02 (token-store: ADR-0002 three-layer single-flight gate; dual keyring+file backends with sticky storage-mode cache; atomic temp-and-rename write; 17 unit tests green; full suite 144/144 across 13 files).
+**Last updated:** 2026-05-12 — completed Plan 02-03 (oauth-round-trip: buildAuthorizeUrl + listenForCallback 127.0.0.1-only + exchangeCode + runOAuth; OAuth error-code response policy BLOCKER 4 / OPEN-Q-01; 30 unit tests green; full suite 174/174 across 14 files; errors.ts unchanged at 6 frozen kinds).
 **Mode:** yolo
 **Granularity:** standard
 
@@ -26,16 +26,16 @@ progress:
 
 ## Current Position
 
-**Current Plan:** 4
+**Current Plan:** 5
 **Total Plans in Phase:** 8
 Phase: 02 (oauth-token-store-single-flight-refresh) — EXECUTING
-Plan: 4 of 8
+Plan: 5 of 8
 
 - **Milestone:** v1
 - **Phase:** 2
-- **Plan:** 02-02-token-store-PLAN.md (complete) — Load-bearing token-store module: ADR-0002 three-layer single-flight gate (in-process Promise + proper-lockfile + atomic temp-and-rename), dual keyring/file backends with sticky storage-mode cache and Pitfall F roundtrip defense-in-depth, AuthError-throw refresh contract, structured-only Pino logging. 17 unit tests green covering AUTH-05 unit-half.
+- **Plan:** 02-03-oauth-round-trip-PLAN.md (complete) — OAuth Authorization-Code surface for `recovery-ledger auth`: buildAuthorizeUrl (D-13 scope + 256-bit base64url state + URL-safe clientId regex) + listenForCallback (127.0.0.1-only loopback + D-09 verbatim HTML pages + D-10 timeout + EADDRINUSE → auth_port_in_use) + exchangeCode (POST to WHOOP_TOKEN_URL + Zod passthrough) + runOAuth (full orchestration with --no-browser stderr fallback). OAuth error-code response policy (BLOCKER 4 / OPEN-Q-01): RENDER invalid_scope/invalid_request/unsupported_response_type verbatim; STRIP opaque codes. PKCE OFF by default per A1. 30 unit tests green; errors.ts FROZEN at 6 kinds.
 - **Status:** Ready to execute
-- **Progress:** [██████░░░░] 64%
+- **Progress:** [███████░░░] 71%
 
 ```
 [████░░░░░░░░░░░░░░░░] 1 / 5 phases complete (6 / 6 plans complete in Phase 1)
@@ -50,9 +50,10 @@ Plan: 4 of 8
 | v1 requirements mapped | 49 / 49 |
 | v1 requirements complete | 12 / 49 |
 | Plans drafted | 6 (Phase 1) + 8 (Phase 2) |
-| Plans complete | 9 |
+| Plans complete | 10 |
 | Phase 02 P07 | 2m 1s | 1 tasks | 1 files |
 | Phase 02 P02 | 5m 32s | 1 tasks | 2 files |
+| Phase 02 P03 | 4m 28s | 1 tasks | 2 files |
 
 ### Plan Execution History
 
@@ -67,6 +68,7 @@ Plan: 4 of 8
 | 02-01-wave0-infra | 5m 17s | 2 | 12 | Complete (2026-05-12) |
 | 02-07-sanitizer-fixtures | 2m 1s | 1 | 1 | Complete (2026-05-12) |
 | 02-02-token-store | 5m 32s | 1 | 2 | Complete (2026-05-12) |
+| 02-03-oauth-round-trip | 4m 28s | 1 | 2 | Complete (2026-05-12) |
 
 ## Accumulated Context
 
@@ -122,6 +124,13 @@ Plan: 4 of 8
 - [Phase ?]: [Phase 02] Plan 02-02 deviation: rephrased token-store.ts doc-comment process.stdout.write to direct stdout writes so plan acceptance grep returns zero matches (Rule 1 — same precedent as Plan 02-01 paths.ts process.env).
 - [Phase ?]: [Phase 02] Plan 02-02 deviation: Plan acceptance grep oauth/oauth2/token outside token-store.ts returned 1 match in src/mcp/sanitize.test.ts (Plan 02-07 fixture) — Plan 02-06 input note: Gate E must exclude test files when wiring the rule (Rule 1).
 - [Phase ?]: [Phase 02] Plan 02-02 deviation: E-01 test restructured from chained .rejects.* to single try/catch — MSW setNextResponse is one-shot and chained rejects would consume it twice (Rule 1 — test-shape correction at RED-review).
+- [Phase ?]: [Phase 02] Plan 02-03 decision: errors.ts NOT mutated — AuthError union FROZEN at 6 kinds from Wave 0; this plan consumes auth_port_in_use unchanged. Verified by git diff returning empty for errors.ts.
+- [Phase ?]: [Phase 02] Plan 02-03 decision: OAuth error-code response policy (BLOCKER 4 / OPEN-Q-01) — RENDER invalid_scope/invalid_request/unsupported_response_type error_description verbatim after sanitize+escapeHtml; STRIP server_error/access_denied/unauthorized_client/temporarily_unavailable/default. OE-09 verbatim acceptance fixture pinned.
+- [Phase ?]: [Phase 02] Plan 02-03 decision: 127.0.0.1-only loopback binding (NOT 0.0.0.0); verified by Test L-06 reading the onListening callback's address field. ASVS V9 + Threat Pattern CSRF-on-loopback.
+- [Phase ?]: [Phase 02] Plan 02-03 decision: PKCE OFF by default per A1/D-12/Pitfall I — WHOOP PKCE support unconfirmed; usePkce flag threads S256 challenge+verifier when set.
+- [Phase ?]: [Phase 02] Plan 02-03 deviation: MSW onUnhandledRequest:'bypass' (not 'error') — runOAuth tests drive real fetch against loopback 127.0.0.1 server; helper still intercepts WHOOP_TOKEN_URL only (Rule 1 test correctness).
+- [Phase ?]: [Phase 02] Plan 02-03 deviation: settled-promise wrapper pattern for L-02 + OE-01..09 tests — Vitest treats single-tick rejection gap as unhandled; .then(ok,err) wrapper attaches handler before fetch round-trip (Rule 1 test correctness).
+- [Phase ?]: [Phase 02] Plan 02-03 deviation: plan acceptance grep 'oauth/oauth2/auth ... grep -v oauth.ts' returns matches in oauth.test.ts (oauth.ts is NOT a substring of oauth.test.ts); same precedent as Plan 02-02 Gate-E. Plan 02-06 input note: must --exclude='*.test.ts' (Rule 1 plan-text drift).
 
 ### Open Todos
 
@@ -144,11 +153,11 @@ None.
 
 ### Last Session Summary
 
-Executed Plan 02-02 (token-store). Single TDD task with full RED → GREEN → REFACTOR cycle. Landed the load-bearing `src/infrastructure/whoop/token-store.ts` (~370 LOC, 8 named exports) + `token-store.test.ts` (17 tests across 6 describe blocks). Implements the verbatim ADR-0002 three-layer single-flight gate: (1) in-process `Promise<Tokens> | null` inside `createTokenStore` closure (per-instance, so tests get isolated gates without `vi.resetModules`; production singleton enforces ONE gate process-wide); (2) `proper-lockfile.lock(paths.tokensLockFile, {retries: {retries: 10, factor: 1.2, minTimeout: 50}, stale: 5000})` cross-process advisory lock with the documented options spelled verbatim; (3) atomic temp-and-rename write via `open(tmp, 'w', 0o600) → fd.writeFile → fd.sync → rename(tmp, final)`. Dual backends: `@napi-rs/keyring` primary (`Entry('recovery-ledger', 'whoop')`) + file fallback (`~/.recovery-ledger/tokens.json` mode 0o600); selection cached in `storage-mode` file at first write; `RECOVERY_LEDGER_FORCE_FILE_STORE=1` (D-25) bypass; Pitfall F defense-in-depth (`setPassword` + `getPassword` byte-equal verify, mismatch silently falls back). AuthError throw on refresh failure with `detail: 'token endpoint <status>'` only (Pitfall C — never inline body text). Zod `TokenResponseSchema.passthrough()` (Pitfall J). Structured-only Pino logging (`logger.warn({event, status})`). Five deviations all auto-fixed: two Rule-3 lint-blocking (Biome import-sort + `noNonNullAssertion`), two Rule-1 plan-text contract bugs (doc-comment `process.stdout.write` rephrase same as Plan 02-01 paths.ts `process.env`; Plan 02-07 sanitize.test.ts fixture surfaced through the Gate-E acceptance grep — Plan 02-06 input note recorded for the `--exclude='*.test.ts'` filter), and one Rule-1 test-shape correction (E-01 chained `.rejects.*` would consume MSW one-shot `setNextResponse` twice — restructured to single try/catch). Tests: 127 → 144 across 12 → 13 files; lint clean; CI grep gates clean. Commits: `696bff3` (RED), `d7820ee` (GREEN), `6e06075` (REFACTOR). Speculative `tokenFileExists` helper removed in REFACTOR (YAGNI; Plan 02-06 will own its own probe).
+Executed Plan 02-03 (oauth-round-trip). Single TDD task across RED → GREEN → REFACTOR. Landed `src/infrastructure/whoop/oauth.ts` (~452 LOC, 9 named exports: WHOOP_AUTHORIZE_URL + buildAuthorizeUrl + listenForCallback + exchangeCode + runOAuth + 4 type interfaces) + `oauth.test.ts` (~654 LOC, 30 tests). Implements OAuth Authorization-Code surface: buildAuthorizeUrl (URLSearchParams D-13 scope + 256-bit base64url state + URL-safe clientId regex validation, rejects hostile shapes); listenForCallback (127.0.0.1-only loopback bound via `server.listen(port, '127.0.0.1')`; finalise() one-shot guard mirroring `src/services/doctor/checks/mcp-stdout-purity.ts` lines 126-168 — server.close() + clearTimeout() + (resolve|reject) called exactly once; D-09 verbatim HTML pages inline as module-level constants; D-10 5-min timeout via setTimeout; EADDRINUSE → AuthError({kind: 'auth_port_in_use'}) — kind consumed from Wave 0 errors.ts unchanged); exchangeCode (POST to WHOOP_TOKEN_URL re-imported from token-store.ts; obtainedAt captured BEFORE fetch; Zod passthrough schema; non-2xx → AuthError 'refresh_failed' status-only); runOAuth (composes all three; --no-browser or no-openBrowser-callback or openBrowser-throw arms all fall back to `printAuthorizeUrlToStderr` — process.stderr.write is allowed per ADR-0001 §Decision). OAuth error-code response policy (BLOCKER 4 / OPEN-Q-01): RENDERABLE_OAUTH_ERROR_CODES = {invalid_scope, invalid_request, unsupported_response_type} render error_description verbatim after sanitize+escapeHtml; opaque codes (server_error/access_denied/unauthorized_client/temporarily_unavailable/default) strip the description; OE-09 verbatim acceptance fixture (`error=invalid_scope&error_description=foo` → body contains `foo`) pinned. PKCE OFF by default per A1/D-12; usePkce flag threads S256 challenge+verifier. Sanitize() ALWAYS runs on the render path (Test OE-08 — JWT-shaped substring inside error_description is redacted). Five deviations all auto-fixed: 2 Rule-3 blocking-lint (Biome reflow `finaliseReject(new AuthError(...))` + unused `beforeEach` import), 2 Rule-1 test-correctness (MSW `onUnhandledRequest:'bypass'` for loopback fetches; settled-promise wrapper for L-02 + OE-01..09 to satisfy Vitest's strict unhandled-rejection accounting), 1 Rule-1 plan-text drift (acceptance grep `grep -v 'oauth.ts'` does NOT filter `oauth.test.ts` — same precedent as Plan 02-02 Gate-E; Plan 02-06 input note). errors.ts unchanged (FROZEN at 6 kinds — verified by `git diff --name-only HEAD~3..HEAD -- src/infrastructure/whoop/errors.ts` returning empty); sanitize.ts / register.ts unchanged (D-18 attestation preserved). REFACTOR replaced GREEN-phase busy-wait with Promise-based listening wait + `printAuthorizeUrlToStderr` helper. Tests: 144 → 174 across 13 → 14 files; lint clean; CI grep gates clean. Commits: `dc544df` (RED — 27 tests), `da420a6` (GREEN — 30 tests pass), `3d6ea15` (REFACTOR).
 
 ### Next Session
 
-Execute Plan 02-03 (oauth-round-trip) or Plan 02-04 (refresh-orchestrator). Wave 2's token-store chokepoint is now in place: Plans 03/04/05/06/08 can `import { tokenStore, createTokenStore, REFRESH_BUFFER_MS, type Tokens } from '../infrastructure/whoop/token-store.js'` without further changes. Plan 02-06 input note recorded: when wiring Gate E in `scripts/ci-grep-gates.sh`, must `--exclude='*.test.ts'` to avoid false-positive on the Plan 02-07 `src/mcp/sanitize.test.ts` fixture (the production-module enforcement intent is intact). Plan 02-08 cross-process integration test is unblocked — the `WHOOP_TOKEN_URL` env-var seam and the `RECOVERY_LEDGER_FORCE_FILE_STORE=1` env override are both wired and unit-tested. AuthError union remains FROZEN at 6 kinds; sanitize.ts / register.ts unchanged (D-18 attestation preserved). The verifier agent has not been re-run for Phase 1 yet (still pending from end of Phase 1) — orchestrator may choose to run it before continuing.
+Execute Plan 02-04 (refresh-orchestrator) or Plan 02-05 (cli-shims). Wave 3's oauth-round-trip is now in place: Plan 02-05's `auth` CLI command can `import { runOAuth } from '../infrastructure/whoop/oauth.js'` and compose `await runOAuth({...opts, openBrowser: open})` then `await tokenStore.write(tokens)`. Plan 02-04's refresh orchestrator does NOT consume oauth.ts (refresh delegates to tokenStore.getValidAccessToken; oauth.ts is only for the initial auth-code grant). Plan 02-06 input note recorded twice now (Plan 02-02 + this plan): when wiring Gate E in `scripts/ci-grep-gates.sh`, must `--exclude='*.test.ts'` to avoid false-positive on both `src/mcp/sanitize.test.ts` (Plan 02-07 fixture) and `src/infrastructure/whoop/oauth.test.ts` (this plan's test cases). AuthError union remains FROZEN at 6 kinds; sanitize.ts / register.ts unchanged (D-18 attestation preserved across Plan 02-07 + 02-02 + this plan). The verifier agent has not been re-run for Phase 1 yet (still pending from end of Phase 1) — orchestrator may choose to run it before continuing.
 
 ---
 *State initialized: 2026-05-11*
@@ -162,3 +171,4 @@ Execute Plan 02-03 (oauth-round-trip) or Plan 02-04 (refresh-orchestrator). Wave
 *Plan 02-01 complete: 2026-05-12 (5m 17s, 12 files — 10 created + 2 modified) — Phase 2 Wave 0 done.*
 *Plan 02-07 complete: 2026-05-12 (2m 1s, 1 file — sanitizer fixtures + D-18 attestation; 12 new tests; no production-code changes).*
 *Plan 02-02 complete: 2026-05-12 (5m 32s, 2 files — token-store.ts + token-store.test.ts; 17 unit tests; ADR-0002 three-layer gate landed) — Phase 2 Wave 2 chokepoint in place.*
+*Plan 02-03 complete: 2026-05-12 (4m 28s, 2 files — oauth.ts + oauth.test.ts; 30 unit tests; OAuth Authorization-Code surface + BLOCKER 4 / OPEN-Q-01 error-code policy; errors.ts FROZEN) — Phase 2 Wave 3 round-trip in place.*
