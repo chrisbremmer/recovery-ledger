@@ -5,6 +5,32 @@
 // through `sanitize(serializeError(err))` before being returned to the MCP client.
 // See PITFALLS.md Pitfall 17 (token leakage via errors) for motivation.
 
+// MR-11 / MR-03 / MR-24: canonical list of secret-bearing key names. Patterns
+// 2, 2a, 2b, and 2c all draw from this list so a single edit lands in every
+// shape. Underscored spellings (`access_token`) only — the `i` flag handles
+// case variation, but the underscore separator is verbatim. Real-world
+// upstreams emit additional shapes (`id_token`, `session_token`, `api_key`,
+// `api_token`, `secret`, `password`, `private_key`) that the Phase 1 pattern
+// catalog did not cover. `code` belongs here for the OAuth authorization-code
+// grant body (the URL-query case is also covered in pattern 2a). Each rule
+// builds the alternation from this constant via a string-join; tests below
+// pin the alternation count and the new positive cases.
+export const SECRET_KEY_NAMES = [
+  'access_token',
+  'refresh_token',
+  'client_secret',
+  'id_token',
+  'session_token',
+  'api_key',
+  'api_token',
+  'secret',
+  'password',
+  'private_key',
+  'code',
+] as const;
+
+const SECRET_KEY_ALT = SECRET_KEY_NAMES.join('|');
+
 // Order is non-obvious and load-bearing: more-specific patterns run first so the
 // bare-Bearer rule (#4) cannot pre-empt the Authorization-header rule (#1), and
 // JSON token-key redaction (#2) runs before the bare-Bearer fallback so JSON
@@ -22,9 +48,11 @@ export const PATTERNS: ReadonlyArray<{ pattern: RegExp; replacement: string }> =
   //    seeing the value itself. The `i` flag (MR-25) matches mixed-case keys
   //    like `"AccessToken"`, `"Refresh_Token"`, etc. — some upstreams and
   //    log-formatters normalize case differently from the wire spec, and
-  //    pattern 2a/2b already carry `/gi` for the same reason.
+  //    pattern 2a/2b already carry `/gi` for the same reason. MR-11: key
+  //    list now sourced from SECRET_KEY_NAMES so the four shapes stay in
+  //    lockstep.
   {
-    pattern: /("(?:access_token|refresh_token|client_secret)"\s*:\s*")[^"]+/gi,
+    pattern: new RegExp(`("(?:${SECRET_KEY_ALT})"\\s*:\\s*")[^"]+`, 'gi'),
     replacement: '$1<redacted>',
   },
   // 2a. URL query-parameter token leaks: `?access_token=…`, `&refresh_token=…`,
@@ -34,19 +62,37 @@ export const PATTERNS: ReadonlyArray<{ pattern: RegExp; replacement: string }> =
   //     URL-encoded values. The `i` flag covers `?Access_Token=` casing seen
   //     from some upstreams.
   {
-    pattern: /([?&](?:access_token|refresh_token|code|client_secret)=)[^&\s"']+/gi,
+    pattern: new RegExp(`([?&](?:${SECRET_KEY_ALT})=)[^&\\s"']+`, 'gi'),
     replacement: '$1<redacted>',
   },
   // 2b. Form-encoded body fields: `grant_type=refresh_token&refresh_token=…`,
-  //     `&access_token=…`, `&client_secret=…`. WHOOP's OAuth token endpoint
-  //     accepts `application/x-www-form-urlencoded`; undici/native fetch
-  //     surface the request body in error messages on connection errors.
-  //     Distinct from 2a because form bodies do not require a `?`/`&` prefix
-  //     on the first key. Order: runs AFTER 2a so URL queries get their key
-  //     prefix preserved (`?access_token=` → `?access_token=<redacted>`) while
-  //     standalone body framings still redact.
+  //     `&access_token=…`, `&client_secret=…`, `code=…` (auth-code grant body
+  //     — MR-24). WHOOP's OAuth token endpoint accepts
+  //     `application/x-www-form-urlencoded`; undici/native fetch surface the
+  //     request body in error messages on connection errors. Distinct from 2a
+  //     because form bodies do not require a `?`/`&` prefix on the first key.
+  //     Order: runs AFTER 2a so URL queries get their key prefix preserved
+  //     (`?access_token=` → `?access_token=<redacted>`) while standalone body
+  //     framings still redact.
   {
-    pattern: /\b(access_token|refresh_token|client_secret)=([^&\s"']+)/gi,
+    pattern: new RegExp(`\\b(${SECRET_KEY_ALT})=([^&\\s"']+)`, 'gi'),
+    replacement: '$1=<redacted>',
+  },
+  // 2c. Unquoted / single-quoted JS literal token shapes (MR-03). Catches
+  //     `util.inspect` output (`{ access_token: 'abc' }`) and bare `key:value`
+  //     log assignments outside the form-body framing (e.g., logs that render
+  //     a config object via `Object.entries(...).map(...).join(':')`). Runs
+  //     AFTER 2/2a/2b so the more-specific quoted-JSON / URL-query / form-body
+  //     patterns hit first and preserve their key-prefix shape. The value
+  //     class must INCLUDE `&` and `<` as terminators so this pattern cannot
+  //     consume across an already-redacted `<redacted>` marker into the next
+  //     form-body field — without that guard, 2c would re-eat the
+  //     `refresh_token=<redacted>&client_secret=...` pair emitted by 2b and
+  //     drop the second field entirely. Boundary class: `'`, `"`, `,`, `&`,
+  //     `<`, `>`, whitespace, `}`, `]`. The `i` flag covers mixed-case keys
+  //     like `AccessToken:`.
+  {
+    pattern: new RegExp(`\\b(${SECRET_KEY_ALT})\\s*[:=]\\s*['"]?([^'",&<>\\s}\\]]+)`, 'gi'),
     replacement: '$1=<redacted>',
   },
   // 3. JWT shape — three base64url segments. The `[A-Za-z0-9_-]` class is

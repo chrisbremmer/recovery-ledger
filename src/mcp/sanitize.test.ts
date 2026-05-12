@@ -5,15 +5,34 @@
 // historically leak" shapes documented in 01-CONTEXT.md.
 
 import { describe, expect, test } from 'vitest';
-import { PATTERNS, sanitize, serializeError } from './sanitize.js';
+import { PATTERNS, SECRET_KEY_NAMES, sanitize, serializeError } from './sanitize.js';
 
 describe('sanitize patterns', () => {
   // Pattern catalog is the load-bearing surface; behavioral tests below pin
   // the actual redaction contract. The length assertion is a soft lower bound
   // (MR-37) — adding a new rule should not require touching this test. After
-  // CR-03: 4 base rules + 2 OAuth-wire-shape rules (URL query + form body) = 6.
-  test('PATTERNS exposes at least six ordered regex rules (D-07 + CR-03)', () => {
-    expect(PATTERNS.length).toBeGreaterThanOrEqual(6);
+  // CR-03 + MR-03: 4 base rules + 3 OAuth/JS-literal-wire-shape rules (URL
+  // query + form body + unquoted/single-quoted JS literal) = 7.
+  test('PATTERNS exposes at least seven ordered regex rules (D-07 + CR-03 + MR-03)', () => {
+    expect(PATTERNS.length).toBeGreaterThanOrEqual(7);
+  });
+
+  // MR-11: SECRET_KEY_NAMES is the single source of truth for which keys
+  // are redacted across patterns 2, 2a, 2b, and 2c. A regression that drops
+  // a key (e.g., during a refactor that re-types the array) would silently
+  // re-open a leak surface. Pin the membership.
+  test('SECRET_KEY_NAMES includes the canonical OAuth + auth-token keys (MR-11)', () => {
+    expect(SECRET_KEY_NAMES).toContain('access_token');
+    expect(SECRET_KEY_NAMES).toContain('refresh_token');
+    expect(SECRET_KEY_NAMES).toContain('client_secret');
+    expect(SECRET_KEY_NAMES).toContain('id_token');
+    expect(SECRET_KEY_NAMES).toContain('session_token');
+    expect(SECRET_KEY_NAMES).toContain('api_key');
+    expect(SECRET_KEY_NAMES).toContain('api_token');
+    expect(SECRET_KEY_NAMES).toContain('secret');
+    expect(SECRET_KEY_NAMES).toContain('password');
+    expect(SECRET_KEY_NAMES).toContain('private_key');
+    expect(SECRET_KEY_NAMES).toContain('code');
   });
 
   // Pattern 1 — Authorization: Bearer <token>
@@ -137,6 +156,84 @@ describe('sanitize patterns', () => {
     // not a leak — the value is the secret, the key is documentation.
     const input = 'the access_token field is required';
     expect(sanitize(input)).toBe(input);
+  });
+
+  // MR-24 — Pattern 2b redacts the `code` field in authorization-code grant
+  // bodies. The URL-query case (`?code=…`) is already covered by 2a; this
+  // test pins the body-form case for completeness.
+  test('P2b+ redacts code=… in authorization_code grant body (MR-24)', () => {
+    const out = sanitize('grant_type=authorization_code&code=AUTHCODE123&redirect_uri=x');
+    // grant_type is preserved (auditable), code is redacted, redirect_uri
+    // is untouched (not in SECRET_KEY_NAMES).
+    expect(out).toContain('grant_type=authorization_code');
+    expect(out).toContain('code=<redacted>');
+    expect(out).not.toContain('AUTHCODE123');
+    expect(out).toContain('redirect_uri=x');
+  });
+
+  // MR-11 — Pattern 2 covers the extended SECRET_KEY_NAMES list, not just
+  // the original three. Spot-check the additions across JSON, URL query,
+  // form body, and JS-literal shapes so a regression dropping one key is
+  // caught at the unit-test layer.
+  test('P2+ redacts JSON id_token value (MR-11)', () => {
+    const out = sanitize('{"id_token":"eyJabc"}');
+    expect(out).toContain('"id_token":"<redacted>"');
+    expect(out).not.toContain('"eyJabc"');
+  });
+
+  test('P2+ redacts JSON api_key value (MR-11)', () => {
+    const out = sanitize('{"api_key":"sk_test_abc"}');
+    expect(out).toContain('"api_key":"<redacted>"');
+    expect(out).not.toContain('sk_test_abc');
+  });
+
+  test('P2+ redacts JSON password value (MR-11)', () => {
+    const out = sanitize('{"username":"alice","password":"hunter2"}');
+    expect(out).toContain('"password":"<redacted>"');
+    expect(out).toContain('"username":"alice"');
+    expect(out).not.toContain('hunter2');
+  });
+
+  test('P2+ redacts JSON private_key value (MR-11)', () => {
+    const out = sanitize('{"private_key":"-----BEGIN-----"}');
+    expect(out).toContain('"private_key":"<redacted>"');
+    expect(out).not.toContain('BEGIN');
+  });
+
+  test('P2+ redacts JSON session_token value (MR-11)', () => {
+    const out = sanitize('{"session_token":"sess_abc"}');
+    expect(out).toContain('"session_token":"<redacted>"');
+    expect(out).not.toContain('sess_abc');
+  });
+
+  // MR-03 — Pattern 2c covers unquoted / single-quoted JS-literal shapes
+  // emitted by util.inspect, Node's default error formatter, and ad-hoc
+  // logger payloads. Without it, `{ access_token: 'abc' }` leaks the
+  // value verbatim because the quoted-JSON pattern (#2) requires
+  // double-quoted keys AND double-quoted values.
+  test('P2c+ redacts util.inspect-style { access_token: \'abc\' } (MR-03)', () => {
+    const out = sanitize("error: { access_token: 'abc123xyz' }");
+    expect(out).toContain('access_token=<redacted>');
+    expect(out).not.toContain('abc123xyz');
+  });
+
+  test('P2c+ redacts unquoted access_token=abc assignment (MR-03)', () => {
+    const out = sanitize('config: access_token=abc123xyz, other=keep');
+    expect(out).toContain('access_token=<redacted>');
+    expect(out).not.toContain('abc123xyz');
+    expect(out).toContain('other=keep');
+  });
+
+  test('P2c+ redacts util.inspect-style refresh_token field (MR-03)', () => {
+    const out = sanitize("Tokens { refresh_token: 'rt_secret_xyz' }");
+    expect(out).toContain('refresh_token=<redacted>');
+    expect(out).not.toContain('rt_secret_xyz');
+  });
+
+  test('P2c+ redacts api_key colon-separated literal (MR-03)', () => {
+    const out = sanitize('api_key: sk_abc123');
+    expect(out).toContain('api_key=<redacted>');
+    expect(out).not.toContain('sk_abc123');
   });
 
   // Pattern 3 — JWT shape (three base64url segments)
