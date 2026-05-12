@@ -4,26 +4,20 @@
 // to actually arrive. This test points the probe at deliberately-broken
 // "MCP servers" to confirm each failure mode now surfaces a `fail` result.
 //
-// Each scenario writes a tiny JS file that the probe will spawn under
-// `process.execPath` instead of `dist/mcp.mjs`, by injecting the path through
-// the same `MCP_ENTRY` resolution surface (re-spawning the module's spawn
-// call). Implementation: we cannot rebind the module-local MCP_ENTRY, so the
-// test exercises the public probe via `runDoctor` and varies behavior by
-// spawning the real bundled CLI but with a payload that prevents the
-// tools/call response (e.g., env that causes immediate exit).
-//
-// Simpler approach used below: write a tiny stub MCP server that emits
-// just the first two frames (initialize, tools/list responses) and exits
-// before responding to tools/call. Spawn it via a test-only entry resolver
-// that the probe accepts as an explicit override. The override is a private
-// surface added solely for testing — production code always uses the
-// import.meta.url-resolved sibling path.
+// Each scenario writes a tiny JS file that the probe spawns under
+// `process.execPath` by passing the path through `ProbeOptions.mcpEntry`
+// (MR-06 — replaces the previous module-level mutable
+// `mcpEntryOverride` + `setMcpEntryForTesting` setter). The mcpEntry slot
+// is an `@internal` option documented as test-only; production code never
+// sets it, so the probe falls back to the import.meta.url-resolved sibling
+// `dist/mcp.mjs`. Scoping the override per-call (instead of per-module)
+// keeps parallel test execution safe — there is no shared mutable state.
 
 import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { afterAll, beforeAll, describe, expect, test } from 'vitest';
-import { probeMcpStdoutPurity, setMcpEntryForTesting } from './mcp-stdout-purity.js';
+import { probeMcpStdoutPurity } from './mcp-stdout-purity.js';
 
 // Stub MCP "servers" — minimal Node scripts that read the four-fixture
 // handshake on stdin and respond on stdout in a controlled way. None of them
@@ -84,7 +78,6 @@ beforeAll(async () => {
 
 afterAll(async () => {
   await rm(workDir, { recursive: true, force: true });
-  setMcpEntryForTesting(null);
 });
 
 async function writeStub(name: string, body: string): Promise<string> {
@@ -96,52 +89,32 @@ async function writeStub(name: string, body: string): Promise<string> {
 describe('probeMcpStdoutPurity — CR-05 frame validation', () => {
   test('returns fail when subprocess emits zero frames (empty stream)', async () => {
     const stub = await writeStub('silent', SILENT_STUB);
-    setMcpEntryForTesting(stub);
-    try {
-      const result = await probeMcpStdoutPurity();
-      expect(result.status).toBe('fail');
-      // Either the empty-frame detail or the early-exit detail is acceptable;
-      // both surface "no valid tools/call response observed."
-      expect(result.detail).toMatch(/no stdout frames|tools\/call response|exited with code/);
-    } finally {
-      setMcpEntryForTesting(null);
-    }
+    const result = await probeMcpStdoutPurity({ mcpEntry: stub });
+    expect(result.status).toBe('fail');
+    // Either the empty-frame detail or the early-exit detail is acceptable;
+    // both surface "no valid tools/call response observed."
+    expect(result.detail).toMatch(/no stdout frames|tools\/call response|exited with code/);
   });
 
   test('returns fail when tools/call response (id=3) is missing', async () => {
     const stub = await writeStub('partial', PARTIAL_STUB);
-    setMcpEntryForTesting(stub);
-    try {
-      const result = await probeMcpStdoutPurity();
-      expect(result.status).toBe('fail');
-      expect(result.detail).toContain('tools/call response (id=3) missing');
-    } finally {
-      setMcpEntryForTesting(null);
-    }
+    const result = await probeMcpStdoutPurity({ mcpEntry: stub });
+    expect(result.status).toBe('fail');
+    expect(result.detail).toContain('tools/call response (id=3) missing');
   });
 
   test('returns fail when tools/call response carries error instead of result', async () => {
     const stub = await writeStub('error', ERROR_STUB);
-    setMcpEntryForTesting(stub);
-    try {
-      const result = await probeMcpStdoutPurity();
-      expect(result.status).toBe('fail');
-      expect(result.detail).toContain('errored or missing result');
-    } finally {
-      setMcpEntryForTesting(null);
-    }
+    const result = await probeMcpStdoutPurity({ mcpEntry: stub });
+    expect(result.status).toBe('fail');
+    expect(result.detail).toContain('errored or missing result');
   });
 
   test('returns pass when tools/call response (id=3) arrives with result', async () => {
     const stub = await writeStub('healthy', HEALTHY_STUB);
-    setMcpEntryForTesting(stub);
-    try {
-      const result = await probeMcpStdoutPurity();
-      expect(result.status).toBe('pass');
-      expect(result.detail).toMatch(/JSON-RPC stream valid \(\d+ frames\)/);
-    } finally {
-      setMcpEntryForTesting(null);
-    }
+    const result = await probeMcpStdoutPurity({ mcpEntry: stub });
+    expect(result.status).toBe('pass');
+    expect(result.detail).toMatch(/JSON-RPC stream valid \(\d+ frames\)/);
   });
 
   test('CR-01 skip-subprocess path returns pass without spawning anything', async () => {

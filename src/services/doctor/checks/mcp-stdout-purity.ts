@@ -34,21 +34,6 @@ import { JSONRPC_FIXTURES } from './fixtures.js';
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const DEFAULT_MCP_ENTRY = path.resolve(HERE, 'mcp.mjs');
 
-// Test-only override of the MCP entry path. Production code never touches
-// this; the CR-05 regression suite uses it to point the probe at deliberately-
-// broken stub MCP servers and confirm each failure mode surfaces a `fail`
-// result. `setMcpEntryForTesting(null)` restores the resolved sibling path.
-let mcpEntryOverride: string | null = null;
-
-/**
- * @internal — for unit tests in `mcp-stdout-purity.test.ts` only. Never call
- * from production code. Pass `null` to clear and restore the default
- * `import.meta.url`-resolved sibling path.
- */
-export function setMcpEntryForTesting(override: string | null): void {
-  mcpEntryOverride = override;
-}
-
 // How long to wait after each frame is written before considering the response
 // drained. 200ms covers the SDK's async response cycle for the fixtures used
 // here (initialize, tools/list, tools/call with a no-arg doctor stub) without
@@ -108,6 +93,18 @@ export interface ProbeOptions {
    * the flag unset so the subprocess check still runs end-to-end. See CR-01.
    */
   skipSubprocess?: boolean;
+  /**
+   * Test-only override of the MCP entry path. Production code never sets
+   * this; the CR-05 regression suite passes a path to a deliberately-broken
+   * stub MCP server to confirm each failure mode surfaces a `fail` result.
+   * MR-06: this used to live as a module-level mutable `mcpEntryOverride`
+   * exposed through `setMcpEntryForTesting`. That coupling made parallel
+   * tests unsafe and left a production-import path with a hidden mutable
+   * dependency. The field-on-options shape keeps the override scoped to a
+   * single probe call.
+   * @internal — for unit tests in `mcp-stdout-purity.test.ts` only.
+   */
+  mcpEntry?: string;
 }
 
 export async function probeMcpStdoutPurity(opts: ProbeOptions = {}): Promise<DoctorCheck> {
@@ -124,7 +121,7 @@ export async function probeMcpStdoutPurity(opts: ProbeOptions = {}): Promise<Doc
   // dropped by the parser. Mirrors the on-disk fixtures' wire shape.
   const frames = JSONRPC_FIXTURES.map((f) => `${JSON.stringify(f.frame)}\n`);
 
-  const mcpEntry = mcpEntryOverride ?? DEFAULT_MCP_ENTRY;
+  const mcpEntry = opts.mcpEntry ?? DEFAULT_MCP_ENTRY;
 
   return new Promise<DoctorCheck>((resolve) => {
     const child = spawn(process.execPath, [mcpEntry], {
