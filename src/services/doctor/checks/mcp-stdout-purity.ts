@@ -129,6 +129,20 @@ export async function probeMcpStdoutPurity(opts: ProbeOptions = {}): Promise<Doc
 
     let stdoutBuf = '';
     let settled = false;
+    // MR-16: SIGKILL fallback. A misbehaving child that ignores SIGTERM
+    // (e.g., a tight CPU loop, an unkillable native call, or a stub that
+    // intercepts the signal) would leave the parent waiting indefinitely
+    // on `await new Promise<number>((r) => child.on('close', …))` in the
+    // probe consumer. Schedule a SIGKILL 2s after SIGTERM and clear it on
+    // clean exit. Two seconds is more than enough for any graceful shutdown
+    // path the SDK or the stubs run.
+    let killTimer: NodeJS.Timeout | null = null;
+    child.on('exit', () => {
+      if (killTimer) {
+        clearTimeout(killTimer);
+        killTimer = null;
+      }
+    });
     const finalise = (result: DoctorCheck): void => {
       if (settled) return;
       settled = true;
@@ -137,7 +151,15 @@ export async function probeMcpStdoutPurity(opts: ProbeOptions = {}): Promise<Doc
       } catch {
         // stdin may already be closed if the child exited first.
       }
-      if (!child.killed) child.kill('SIGTERM');
+      if (!child.killed) {
+        child.kill('SIGTERM');
+        // Escalate to SIGKILL if the child has not exited within 2s.
+        killTimer = setTimeout(() => {
+          if (!child.killed) child.kill('SIGKILL');
+        }, 2000);
+        // Allow the parent process to exit even if the timer is pending.
+        killTimer.unref();
+      }
       resolve(result);
     };
 
@@ -150,10 +172,20 @@ export async function probeMcpStdoutPurity(opts: ProbeOptions = {}): Promise<Doc
     // becomes an unhandled rejection in the IIFE below. The try/catch around
     // each write() additionally converts a synchronous throw into a clean
     // `fail` result.
-    child.stdin.on('error', () => {
-      // Swallow — EPIPE / write-after-end here is recoverable; the next
-      // write iteration's writable-check + try/catch surfaces the failure
-      // through finalise() if the child has exited.
+    //
+    // MR-18: distinguish EPIPE (recoverable, expected when the child has
+    // exited mid-handshake) from every other stdin error code. The blanket
+    // swallow hid genuine OS-level write failures — ENOMEM, EFBIG, EIO,
+    // EACCES — that signal a real problem with the spawned child but would
+    // surface only as a downstream timeout. EPIPE is silently dropped; any
+    // other error finalises with a fail and the error code in the detail.
+    child.stdin.on('error', (err: NodeJS.ErrnoException) => {
+      if (err.code === 'EPIPE') return;
+      finalise({
+        name: 'mcp_stdout_purity',
+        status: 'fail',
+        detail: `stdin error: ${err.code ?? err.message}`,
+      });
     });
 
     child.on('error', (err) => {
