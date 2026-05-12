@@ -98,6 +98,110 @@ describe('runDoctorCommand — MR-08 exception path', () => {
     expect(parsed.error).toContain('synthetic runDoctor explosion');
   });
 
+  // MR-42: success-path coverage for both --text and default JSON branches.
+  // The MR-08 tests above cover the catch arm; these tests cover the happy
+  // path so a regression that mis-routed the body builder (e.g., always
+  // calling renderDoctor regardless of opts.text) surfaces in unit tests
+  // rather than waiting for an integration assertion.
+  test('MR-42 — happy path with text mode renders renderDoctor output', async () => {
+    vi.resetModules();
+    vi.doMock('../../services/doctor/index.js', () => ({
+      runDoctor: async () => ({
+        checks: [{ name: 'mock_check', status: 'pass' as const, detail: 'all good' }],
+        overall: 'pass' as const,
+      }),
+    }));
+
+    // Resolve when process.exit is invoked. The success-path tests CANNOT
+    // throw from process.exit the way the catch-arm tests do — runDoctor
+    // returns successfully, runDoctorCommand has no outer try/catch fall
+    // around the write+exit callback, so a throw from process.exit gets
+    // caught and routes to the fail branch (re-invoking exit). Instead,
+    // we capture the exit code, leave process.exit as a no-op, and let
+    // the test resolve via a promise gated on the first exit call.
+    let exitCode: number | undefined;
+    let writtenBody = '';
+    let resolveExit!: () => void;
+    const exitObserved = new Promise<void>((resolve) => {
+      resolveExit = resolve;
+    });
+    process.exit = ((code?: number) => {
+      exitCode = code;
+      resolveExit();
+      return undefined as never;
+    }) as never;
+    process.stdout.write = ((
+      chunk: string | Uint8Array,
+      cbOrEncoding?: ((err?: Error | null) => void) | string,
+      cb?: (err?: Error | null) => void,
+    ) => {
+      writtenBody += typeof chunk === 'string' ? chunk : Buffer.from(chunk).toString('utf8');
+      const finished = typeof cbOrEncoding === 'function' ? cbOrEncoding : cb;
+      if (finished) finished();
+      return true;
+    }) as typeof process.stdout.write;
+
+    const { runDoctorCommand } = await import('./doctor.js');
+    await runDoctorCommand({ text: true });
+    await exitObserved;
+    // pass exit code on a healthy result.
+    expect(exitCode).toBe(DOCTOR_EXIT_CODES.pass);
+    // text branch: renderDoctor's "[status] name — detail" line + overall trailer.
+    // The renderer is exercised end-to-end through the import, not stubbed.
+    expect(writtenBody).toContain('mock_check');
+    expect(writtenBody).toContain('all good');
+    expect(writtenBody).toContain('overall: pass');
+    // text body is NOT a JSON object — distinct from the default branch below.
+    expect(() => JSON.parse(writtenBody)).toThrow();
+  });
+
+  test('MR-42 — happy path without text option produces JSON body', async () => {
+    vi.resetModules();
+    vi.doMock('../../services/doctor/index.js', () => ({
+      runDoctor: async () => ({
+        checks: [{ name: 'mock_check', status: 'warn' as const, detail: 'minor issue' }],
+        overall: 'warn' as const,
+      }),
+    }));
+
+    let exitCode: number | undefined;
+    let writtenBody = '';
+    let resolveExit!: () => void;
+    const exitObserved = new Promise<void>((resolve) => {
+      resolveExit = resolve;
+    });
+    process.exit = ((code?: number) => {
+      exitCode = code;
+      resolveExit();
+      return undefined as never;
+    }) as never;
+    process.stdout.write = ((
+      chunk: string | Uint8Array,
+      cbOrEncoding?: ((err?: Error | null) => void) | string,
+      cb?: (err?: Error | null) => void,
+    ) => {
+      writtenBody += typeof chunk === 'string' ? chunk : Buffer.from(chunk).toString('utf8');
+      const finished = typeof cbOrEncoding === 'function' ? cbOrEncoding : cb;
+      if (finished) finished();
+      return true;
+    }) as typeof process.stdout.write;
+
+    const { runDoctorCommand } = await import('./doctor.js');
+    await runDoctorCommand({});
+    await exitObserved;
+    // warn exit code reflects MR-22's documented contract.
+    expect(exitCode).toBe(DOCTOR_EXIT_CODES.warn);
+    // JSON branch: parses as a structured object with the expected shape.
+    const parsed = JSON.parse(writtenBody) as {
+      checks: Array<{ name: string; status: string; detail: string }>;
+      overall: string;
+    };
+    expect(parsed.overall).toBe('warn');
+    expect(parsed.checks).toHaveLength(1);
+    expect(parsed.checks[0]?.name).toBe('mock_check');
+    expect(parsed.checks[0]?.status).toBe('warn');
+  });
+
   test('exception in --text mode produces a one-line [fail] body', async () => {
     vi.resetModules();
     vi.doMock('../../services/doctor/index.js', () => ({
