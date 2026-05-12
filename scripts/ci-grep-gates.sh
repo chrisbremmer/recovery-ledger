@@ -27,12 +27,20 @@ export LC_ALL=C
 
 # Shared exclusions for repo-wide scans (Gate A).
 #
-# `--exclude-dir=test` (singular) was previously misspelled as `tests`, which
-# silently scanned the real test/ directory. Fixed via WR-02. Keep both forms
-# so a future `tests/` directory (e.g., consumer-side packaging tests) is also
-# skipped without a script change. Documented intent: test files are
-# treated as not user-facing copy and therefore exempt from the tone-words
-# rule. If that policy ever changes, remove both exclusions and audit.
+# Policy (MR-04): exclude test SOURCE files (*.test.ts) but NOT the test/
+# directory wholesale. ADR-0005 (banned tone words) explicitly scopes the
+# rule to `src/formatters/`, `src/cli/`, AND `tests/fixtures/review/` — so
+# fixture JSON under test/fixtures/ must remain in scope. Excluding the
+# entire test/ directory (the WR-02 fix) silently skipped review fixtures
+# the ADR considers user-facing copy. We instead exclude only files
+# matching `*.test.ts` (the unit/integration test sources, which are not
+# user-facing copy) and let fixture files under test/fixtures/ stay in
+# scope of the gate.
+#
+# Self-exempt files: CLAUDE.md and this script (each spell the banned
+# words by necessity), plus ADR-0005 itself (the ADR is the authoritative
+# source of the rule and lists the words verbatim — same logic as the
+# CLAUDE.md self-exemption).
 REPO_EXCLUDES=(
   --exclude-dir=.git
   --exclude-dir=.planning
@@ -40,10 +48,10 @@ REPO_EXCLUDES=(
   --exclude-dir=dist
   --exclude-dir=coverage
   --exclude-dir=.worktrees
-  --exclude-dir=test
-  --exclude-dir=tests
+  --exclude='*.test.ts'
   --exclude=CLAUDE.md
   --exclude=ci-grep-gates.sh
+  --exclude=0005-banned-tone-words.md
 )
 
 # ----------------------------------------------------------------------------
