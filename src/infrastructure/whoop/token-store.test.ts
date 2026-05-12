@@ -634,4 +634,66 @@ describe('cross-process lock', () => {
     expect(at).toBe('sibling-refreshed');
     expect(helper.getRefreshHitCount()).toBe(0);
   });
+
+  test('L-03 (CR-01 regression): sibling-rotated-but-still-stale refresh_token is what we POST, not the pre-lock snapshot', async () => {
+    // CR-01 / ADR-0002 §Context: WHOOP revokes the entire token family on
+    // reuse of a stale refresh_token. If a sibling refreshes between our
+    // pre-lock snapshot and our post-lock re-read, AND the sibling's new
+    // token is itself near-expiry (e.g., short-lived test fixture), the
+    // implementation must send the SIBLING'S refresh_token, not the
+    // pre-lock one we already know is invalidated.
+    const kr = installKeyringMock();
+    const now = Date.UTC(2026, 4, 12, 0, 0, 0);
+    // Pre-lock: we hold a stale snapshot (rt-original-stale). The sibling
+    // consumes this token and replaces it with rt-sibling-also-stale; THAT
+    // new token is the only one WHOOP will still honor.
+    kr.store.set(
+      'recovery-ledger:whoop',
+      JSON.stringify({
+        accessToken: 'at-original-stale',
+        refreshToken: 'rt-original-stale',
+        tokenType: 'bearer',
+        scope: 'offline read:recovery',
+        obtainedAt: now - 3600_000,
+        expiresAt: now - 1000,
+      }),
+    );
+
+    // Hook: sibling rotates the on-disk token while we wait for the lock.
+    // Sibling's replacement is ALSO within the 5-min refresh buffer so the
+    // post-lock re-read does NOT short-circuit on the freshness check;
+    // execution falls through to callRefreshEndpoint(fresh ?? stale).
+    installLockfileMock({
+      onLockAcquired: () => {
+        kr.store.set(
+          'recovery-ledger:whoop',
+          JSON.stringify({
+            accessToken: 'at-sibling-near-expiry',
+            refreshToken: 'rt-sibling-also-stale',
+            tokenType: 'bearer',
+            scope: 'offline read:recovery',
+            obtainedAt: now - 3500_000,
+            // Within REFRESH_BUFFER_MS (5min) — fresh.expiresAt < now + 5min,
+            // so the post-lock freshness gate is NOT short-circuited.
+            expiresAt: now + 30_000,
+          }),
+        );
+      },
+    });
+
+    const mod = await loadTokenStore();
+    const store = mod.createTokenStore({ paths, now: () => now });
+    await writeFile(paths.storageModeFile, 'keychain\n', { mode: 0o600 });
+
+    await store.getValidAccessToken();
+
+    // Exactly one POST fired — and it carried the SIBLING'S refresh_token,
+    // not the pre-lock stale snapshot. Pre-fix bug: `stale ?? fresh` would
+    // have sent 'rt-original-stale' and WHOOP would have revoked the family.
+    expect(helper.getRefreshHitCount()).toBe(1);
+    const body = helper.getLastRequestBody();
+    expect(body).not.toBeNull();
+    expect(body?.get('refresh_token')).toBe('rt-sibling-also-stale');
+    expect(body?.get('refresh_token')).not.toBe('rt-original-stale');
+  });
 });

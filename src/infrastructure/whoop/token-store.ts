@@ -270,7 +270,13 @@ export function createTokenStore(opts: TokenStoreOptions = {}): TokenStore {
         logger.debug({ event: 'refresh_skipped_sibling' });
         return fresh;
       }
-      const next = await callRefreshEndpoint(stale ?? fresh);
+      // Prefer the freshest on-disk refresh_token. `fresh` carries any
+      // sibling's rotated refresh token (the sibling consumed `stale.refreshToken`
+      // and replaced it on disk); `stale` is the pre-lock snapshot and is the
+      // exact token WHOOP would reject as a token-family-revocation event per
+      // ADR-0002 §Context. Falling back to `stale` only when `fresh` is null
+      // (file vanished or storage-mode marker cleared between snapshots).
+      const next = await callRefreshEndpoint(fresh ?? stale);
       // GATE 3: atomic write (inside `write()` for the file backend).
       await write(next);
       return next;

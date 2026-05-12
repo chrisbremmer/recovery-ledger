@@ -41,6 +41,14 @@ export interface WhoopOauthHelper {
   getRefreshHitCount(): number;
   resetRefreshHitCount(): void;
   /**
+   * Returns the parsed form-body of the most recent POST to the token
+   * endpoint, or `null` if no request has been made since the last reset.
+   * Used by CR-01 regression tests to assert which `refresh_token` value
+   * was actually sent to WHOOP (the stale pre-lock snapshot vs. the
+   * sibling-replaced post-lock value).
+   */
+  getLastRequestBody(): URLSearchParams | null;
+  /**
    * Override the next single response from the token endpoint. After the
    * one-shot fires, the handler reverts to the default fixture-backed
    * response. Useful for the invalid_grant / 400 arm in oauth.test.ts and
@@ -52,9 +60,20 @@ export interface WhoopOauthHelper {
 export function createWhoopOauthHelper(): WhoopOauthHelper {
   let hitCount = 0;
   let nextResponse: NextResponse | null = null;
+  let lastRequestBody: URLSearchParams | null = null;
 
-  const handler: HttpHandler = http.post(WHOOP_TOKEN_URL, () => {
+  const handler: HttpHandler = http.post(WHOOP_TOKEN_URL, async ({ request }) => {
     hitCount += 1;
+    // Capture the form-body so tests can assert which refresh_token /
+    // client_secret / scope values landed on the wire. `request.text()`
+    // consumes the body once — we re-parse into URLSearchParams so the
+    // test API mirrors the production caller's body shape.
+    try {
+      const raw = await request.text();
+      lastRequestBody = new URLSearchParams(raw);
+    } catch {
+      lastRequestBody = null;
+    }
     if (nextResponse !== null) {
       const { body, status } = nextResponse;
       nextResponse = null;
@@ -76,7 +95,9 @@ export function createWhoopOauthHelper(): WhoopOauthHelper {
     getRefreshHitCount: () => hitCount,
     resetRefreshHitCount: () => {
       hitCount = 0;
+      lastRequestBody = null;
     },
+    getLastRequestBody: () => lastRequestBody,
     setNextResponse: (body, status = 200) => {
       nextResponse = { body, status };
     },
