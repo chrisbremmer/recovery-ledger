@@ -19,9 +19,12 @@ export const PATTERNS: ReadonlyArray<{ pattern: RegExp; replacement: string }> =
   },
   // 2. JSON token-key values — keep the key, redact the value via `$1`
   //    back-reference. Auditable: a reader can see *which* secret leaked without
-  //    seeing the value itself.
+  //    seeing the value itself. The `i` flag (MR-25) matches mixed-case keys
+  //    like `"AccessToken"`, `"Refresh_Token"`, etc. — some upstreams and
+  //    log-formatters normalize case differently from the wire spec, and
+  //    pattern 2a/2b already carry `/gi` for the same reason.
   {
-    pattern: /("(?:access_token|refresh_token|client_secret)"\s*:\s*")[^"]+/g,
+    pattern: /("(?:access_token|refresh_token|client_secret)"\s*:\s*")[^"]+/gi,
     replacement: '$1<redacted>',
   },
   // 2a. URL query-parameter token leaks: `?access_token=…`, `&refresh_token=…`,

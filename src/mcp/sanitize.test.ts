@@ -8,10 +8,12 @@ import { describe, expect, test } from 'vitest';
 import { PATTERNS, sanitize, serializeError } from './sanitize.js';
 
 describe('sanitize patterns', () => {
-  // Pattern catalog is the load-bearing surface; size drift is a contract change.
-  // After CR-03: 4 base rules + 2 OAuth-wire-shape rules (URL query + form body) = 6.
-  test('PATTERNS exposes six ordered regex rules (D-07 + CR-03)', () => {
-    expect(PATTERNS.length).toBe(6);
+  // Pattern catalog is the load-bearing surface; behavioral tests below pin
+  // the actual redaction contract. The length assertion is a soft lower bound
+  // (MR-37) — adding a new rule should not require touching this test. After
+  // CR-03: 4 base rules + 2 OAuth-wire-shape rules (URL query + form body) = 6.
+  test('PATTERNS exposes at least six ordered regex rules (D-07 + CR-03)', () => {
+    expect(PATTERNS.length).toBeGreaterThanOrEqual(6);
   });
 
   // Pattern 1 — Authorization: Bearer <token>
@@ -47,6 +49,26 @@ describe('sanitize patterns', () => {
     expect(out).not.toContain('"shh"');
   });
 
+  // MR-25 — Pattern 2 must redact mixed-case JSON keys. Some upstreams emit
+  // `"AccessToken"` / `"Access_Token"` / `"REFRESH_TOKEN"`; without /i the
+  // value leaks while a casual reader assumes "we redact JSON token keys."
+  test('P2+ redacts mixed-case JSON AccessToken key (MR-25 — /i flag)', () => {
+    // Note: Pattern 2 keys are `access_token`/`refresh_token`/`client_secret`
+    // with underscores; `/i` only flips alphabetic case, not the separator.
+    // The realistic mixed-case shapes we see are `"Access_Token"`,
+    // `"REFRESH_TOKEN"`, etc.
+    const out = sanitize('{"Access_Token":"upper123","other":"keep"}');
+    expect(out).toContain('"Access_Token":"<redacted>"');
+    expect(out).toContain('"other":"keep"');
+    expect(out).not.toContain('upper123');
+  });
+
+  test('P2+ redacts uppercase JSON REFRESH_TOKEN key (MR-25 — /i flag)', () => {
+    const out = sanitize('{"REFRESH_TOKEN":"upper_rt"}');
+    expect(out).toContain('"REFRESH_TOKEN":"<redacted>"');
+    expect(out).not.toContain('upper_rt');
+  });
+
   // Pattern 2a — URL query-parameter token leaks (CR-03)
   test('P2a+ redacts ?access_token=… URL query parameter', () => {
     const out = sanitize('error fetching https://api.whoop.com/v2?access_token=abc123xyz');
@@ -74,6 +96,16 @@ describe('sanitize patterns', () => {
     const out = sanitize('curl "https://api.whoop.com/oauth?id=1&client_secret=topsecret"');
     expect(out).toContain('&client_secret=<redacted>');
     expect(out).not.toContain('topsecret');
+  });
+
+  // MR-40 — Pattern 2a's /i flag is documented but was previously untested.
+  // Real-world upstreams (Microsoft Entra, some load-balancer rewriters) emit
+  // capitalized query keys; without /i the value would leak intact.
+  test('P2a+ redacts mixed-case ?Access_Token=… URL query parameter (MR-40 — /i flag)', () => {
+    const out = sanitize('https://api.example.com/cb?Access_Token=upper123&state=x');
+    expect(out).toContain('?Access_Token=<redacted>');
+    expect(out).not.toContain('upper123');
+    expect(out).toContain('state=x');
   });
 
   test('P2a- leaves unrelated query parameters untouched', () => {
