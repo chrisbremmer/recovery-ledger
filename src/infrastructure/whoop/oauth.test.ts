@@ -13,7 +13,7 @@
 // MSW via `createWhoopOauthHelper()` from `tests/helpers/msw-whoop-oauth.ts`.
 
 import { createServer, type Server } from 'node:http';
-import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, test, vi } from 'vitest';
+import { afterAll, afterEach, beforeAll, describe, expect, test, vi } from 'vitest';
 import {
   createWhoopOauthHelper,
   WHOOP_TOKEN_URL,
@@ -134,23 +134,26 @@ describe('listenForCallback', () => {
 
   test('L-02: state mismatch rejects with AuthError({kind: auth_state_mismatch})', async () => {
     let info: ListeningInfo | undefined;
-    const callbackPromise = listenForCallback({
+    // Wrap into a settled promise immediately — see `driveCallbackError`
+    // rationale above (avoid unhandled-rejection warnings between fetch
+    // completion and the consumer `await`).
+    const settled = listenForCallback({
       port: 0,
       expectedState: 'st',
       timeoutMs: 5000,
       onListening: (i) => {
         info = i;
       },
-    });
+    }).then(
+      (v) => ({ ok: true as const, value: v }),
+      (err: unknown) => ({ ok: false as const, err }),
+    );
     const { port } = await waitFor(() => info);
     const res = await fetch(`http://127.0.0.1:${port}/callback?code=xyz&state=wrong`);
     const body = await res.text();
-    let caught: unknown;
-    try {
-      await callbackPromise;
-    } catch (err) {
-      caught = err;
-    }
+    const result = await settled;
+    expect(result.ok).toBe(false);
+    const caught = result.ok ? undefined : result.err;
     expect(caught).toBeInstanceOf(AuthError);
     expect((caught as AuthError).kind).toBe('auth_state_mismatch');
     expect(res.status).toBe(400);
@@ -256,23 +259,27 @@ describe('listenForCallback', () => {
 
 async function driveCallbackError(query: string): Promise<{ body: string; caught: unknown }> {
   let info: ListeningInfo | undefined;
-  const promise = listenForCallback({
+  // Capture the rejection immediately into a settled-promise wrapper so the
+  // unhandled-rejection guard does not fire between the fetch completing and
+  // the `await caughtWrapper` below. Vitest treats a rejection observed after
+  // a single tick gap as unhandled even when the caller will eventually
+  // `await` the original promise.
+  const caughtWrapper = listenForCallback({
     port: 0,
     expectedState: 'st',
     timeoutMs: 5000,
     onListening: (i) => {
       info = i;
     },
-  });
+  }).then(
+    (v) => ({ ok: true as const, value: v }),
+    (err: unknown) => ({ ok: false as const, err }),
+  );
   const { port } = await waitFor(() => info);
   const res = await fetch(`http://127.0.0.1:${port}/callback?${query}`);
   const body = await res.text();
-  let caught: unknown;
-  try {
-    await promise;
-  } catch (err) {
-    caught = err;
-  }
+  const settled = await caughtWrapper;
+  const caught = settled.ok ? undefined : settled.err;
   return { body, caught };
 }
 
@@ -350,9 +357,7 @@ describe('oauth error-code response policy', () => {
     // The literal acceptance criterion from checker BLOCKER 4: a callback
     // with ?error=invalid_scope&error_description=foo must result in a
     // failureHtml body containing the substring "foo".
-    const { body } = await driveCallbackError(
-      'error=invalid_scope&error_description=foo&state=st',
-    );
+    const { body } = await driveCallbackError('error=invalid_scope&error_description=foo&state=st');
     expect(body).toContain('foo');
   });
 });
@@ -366,7 +371,7 @@ describe('exchangeCode', () => {
 
   beforeAll(() => {
     helper = createWhoopOauthHelper();
-    helper.server.listen({ onUnhandledRequest: 'error' });
+    helper.server.listen({ onUnhandledRequest: 'bypass' });
   });
 
   afterAll(() => {
@@ -443,7 +448,9 @@ describe('exchangeCode', () => {
     expect(cap.body).toContain('code=c');
     expect(cap.body).toContain('client_id=cid');
     expect(cap.body).toContain('client_secret=secret');
-    expect(cap.body).toContain(`redirect_uri=${encodeURIComponent('http://127.0.0.1:4321/callback')}`);
+    expect(cap.body).toContain(
+      `redirect_uri=${encodeURIComponent('http://127.0.0.1:4321/callback')}`,
+    );
   });
 
   test('X-04: when verifier is present, code_verifier appears in the form body', async () => {
@@ -518,7 +525,7 @@ describe('runOAuth', () => {
 
   beforeAll(() => {
     helper = createWhoopOauthHelper();
-    helper.server.listen({ onUnhandledRequest: 'error' });
+    helper.server.listen({ onUnhandledRequest: 'bypass' });
   });
 
   afterAll(() => {
