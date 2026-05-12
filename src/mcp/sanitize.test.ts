@@ -273,6 +273,33 @@ describe('sanitize patterns', () => {
   test('P4+ redacts mixed-case bare Bearer prefix', () => {
     expect(sanitize('BeArEr abcdef1234567890')).toBe('Bearer <redacted>');
   });
+
+  // MR-02 — zero-width / NBSP bypass guard. A formatter or hostile upstream
+  // that injects a zero-width codepoint between `Bearer` and the token must
+  // not bypass the sanitizer. Three positive cases cover the most common
+  // shapes:
+  //   - U+200B (zero-width space, ZWSP) — common in HTML-to-text converters
+  //   - U+00A0 (non-breaking space, NBSP) — common in pretty-printers
+  //   - U+2063 (invisible separator) — Unicode bidi-control character that
+  //     would otherwise read as zero width
+  test('P4+ redacts Bearer<ZWSP>token (MR-02 — zero-width space)', () => {
+    expect(sanitize('Bearer​abcdef1234567890')).toBe('Bearer <redacted>');
+  });
+
+  test('P4+ redacts Bearer<NBSP>token (MR-02 — non-breaking space)', () => {
+    expect(sanitize('Bearer abcdef1234567890')).toBe('Bearer <redacted>');
+  });
+
+  test('P4+ redacts Bearer<U+2063>token (MR-02 — invisible separator)', () => {
+    expect(sanitize('Bearer⁣abcdef1234567890')).toBe('Bearer <redacted>');
+  });
+
+  // The Authorization-header variant (P1) carries the same guard.
+  test('P1+ redacts Authorization: Bearer<ZWSP>token (MR-02)', () => {
+    const out = sanitize('Authorization: Bearer​abcdef1234567890');
+    expect(out).toContain('Authorization: Bearer <redacted>');
+    expect(out).not.toContain('abcdef1234567890');
+  });
 });
 
 describe('serializeError cause chain', () => {

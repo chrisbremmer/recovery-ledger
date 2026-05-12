@@ -38,9 +38,12 @@ const SECRET_KEY_ALT = SECRET_KEY_NAMES.join('|');
 export const PATTERNS: ReadonlyArray<{ pattern: RegExp; replacement: string }> = [
   // 1. Authorization header — `gi` because HTTP header names are case-insensitive
   //    but stored token case is preserved verbatim. Bounded by `[^\s,;]+` so it
-  //    stops at the first whitespace/comma/semicolon (Pitfall 8).
+  //    stops at the first whitespace/comma/semicolon (Pitfall 8). MR-02:
+  //    separator after `Bearer` extends to the zero-width / NBSP class so a
+  //    formatter that injects a ZWSP between `Bearer` and the token cannot
+  //    bypass the rule.
   {
-    pattern: /Authorization:\s*Bearer\s+[^\s,;]+/gi,
+    pattern: /Authorization:[\s ]*Bearer[\s ​‌‍⁠⁣﻿]+[^\s,;]+/gi,
     replacement: 'Authorization: Bearer <redacted>',
   },
   // 2. JSON token-key values — keep the key, redact the value via `$1`
@@ -110,8 +113,19 @@ export const PATTERNS: ReadonlyArray<{ pattern: RegExp; replacement: string }> =
   //    lowercase header values, and undici's `UND_ERR_*` body excerpts do not
   //    normalize case. Pattern 1 still pre-empts this rule for the
   //    `Authorization:` form via earlier-rule precedence.
+  //
+  //    MR-02: separator class includes zero-width Unicode codepoints (ZWSP
+  //    U+200B, ZWNJ U+200C, ZWJ U+200D, word-joiner U+2060, invisible
+  //    separator U+2063, BOM U+FEFF) AND non-breaking space (NBSP U+00A0).
+  //    Without these, a log line carrying `Bearer​<token>` slips past
+  //    the `\s+` boundary class (which only matches ASCII whitespace + a
+  //    handful of Unicode whitespace categories — NOT the zero-width set).
+  //    Threat model: a malicious upstream or a benign formatter that
+  //    normalizes whitespace into NBSP can break sanitization silently. We
+  //    treat any of these as the same kind of "gap between Bearer and token"
+  //    that a real Authorization header could legitimately contain.
   {
-    pattern: /Bearer\s+[A-Za-z0-9._-]{10,}/gi,
+    pattern: /Bearer[\s ​‌‍⁠⁣﻿]+[A-Za-z0-9._-]{10,}/gi,
     replacement: 'Bearer <redacted>',
   },
 ];
