@@ -5,7 +5,14 @@
 // for `src/cli/commands/doctor.ts`.
 
 import { renderDoctor } from '../../formatters/doctor.txt.js';
-import { type DoctorResult, runDoctor } from '../../services/doctor/index.js';
+// MR-32: route CLI invocations through the Services composition root so
+// the lite-hexagonal "CLI and MCP both consume the same Services surface"
+// pattern (CLAUDE.md §Architecture) is real instead of aspirational. The
+// MCP tool handler in src/mcp/tools/whoop-doctor.ts already calls
+// `services.runDoctor(...)`; bringing the CLI in line means a future
+// Phase 2 DB/HTTP injection lands in one place (createServices) instead
+// of both transport shims.
+import { createServices, type DoctorResult } from '../../services/index.js';
 
 // WR-06: exit-code map honors all three D-06 statuses. Reserved now per
 // DOC-02 ("doctor emits structured exit codes that map to documented
@@ -21,7 +28,8 @@ export const DOCTOR_EXIT_CODES: Readonly<Record<DoctorResult['overall'], number>
 
 export async function runDoctorCommand(opts: { text?: boolean }): Promise<void> {
   try {
-    const result = await runDoctor();
+    const services = createServices();
+    const result = await services.runDoctor();
     const body = opts.text ? renderDoctor(result) : JSON.stringify(result, null, 2);
     // MR-05: pass exit as the write callback so slow pipe consumers (e.g.,
     // `recovery-ledger doctor | (sleep 0.5; cat)`) get the full buffered
