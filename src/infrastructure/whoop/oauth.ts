@@ -385,13 +385,24 @@ function generatePkce(): PkceMaterial {
   return { verifier, challenge };
 }
 
+function printAuthorizeUrlToStderr(url: string): void {
+  process.stderr.write(`Open this URL in your browser to authorize:\n${url}\n`);
+}
+
 export async function runOAuth(opts: RunOAuthOptions): Promise<Tokens> {
   const state = randomBytes(32).toString('base64url');
   const pkce = opts.usePkce === true ? generatePkce() : null;
   const timeoutMs = opts.timeoutMs ?? DEFAULT_TIMEOUT_MS;
   const fetchFn = opts.fetch ?? globalThis.fetch;
 
-  let listenerInfo: { port: number; address: string } | null = null;
+  // Resolve `listening` once the loopback server reports back via
+  // `onListening`. listenForCallback's contract guarantees the callback
+  // fires exactly once before the server accepts requests; the Promise
+  // shape eliminates the previous busy-wait.
+  let resolveListening: (info: { port: number; address: string }) => void = () => undefined;
+  const listening = new Promise<{ port: number; address: string }>((r) => {
+    resolveListening = r;
+  });
 
   // Start the loopback server FIRST — it must be listening before the
   // browser hits the redirect URL.
@@ -400,16 +411,12 @@ export async function runOAuth(opts: RunOAuthOptions): Promise<Tokens> {
     expectedState: state,
     timeoutMs,
     onListening: (info) => {
-      listenerInfo = info;
+      resolveListening(info);
       opts.onListening?.(info);
     },
   });
 
-  // Wait for the server to be listening before computing the redirect URI.
-  while (listenerInfo === null) {
-    await new Promise((r) => setTimeout(r, 5));
-  }
-  const info: { port: number; address: string } = listenerInfo;
+  const info = await listening;
   const redirectUri = `http://127.0.0.1:${info.port}/callback`;
   const authorizeUrl = buildAuthorizeUrl({
     clientId: opts.clientId,
@@ -420,19 +427,17 @@ export async function runOAuth(opts: RunOAuthOptions): Promise<Tokens> {
   });
 
   // Browser-open arm or stderr-print fallback.
-  if (opts.noBrowser === true) {
-    process.stderr.write(`Open this URL in your browser to authorize:\n${authorizeUrl}\n`);
-  } else if (opts.openBrowser !== undefined) {
+  if (opts.noBrowser === true || opts.openBrowser === undefined) {
+    printAuthorizeUrlToStderr(authorizeUrl);
+  } else {
     try {
       await opts.openBrowser(authorizeUrl);
     } catch {
-      // Fall back to stderr print — same as --no-browser path.
-      process.stderr.write(`Open this URL in your browser to authorize:\n${authorizeUrl}\n`);
+      // Fall back to stderr print — same as --no-browser path. The
+      // listenForCallback timer is still running, so the user has the
+      // full D-10 budget to copy the URL into a browser.
+      printAuthorizeUrlToStderr(authorizeUrl);
     }
-  } else {
-    // No openBrowser provided and noBrowser not set — print to stderr by
-    // default (production callers in Plan 02-05 will pass openBrowser).
-    process.stderr.write(`Open this URL in your browser to authorize:\n${authorizeUrl}\n`);
   }
 
   const { code } = await callbackPromise;
