@@ -26,10 +26,9 @@ import { join } from 'node:path';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, test, vi } from 'vitest';
 import {
   createWhoopOauthHelper,
-  WHOOP_TOKEN_URL,
   type WhoopOauthHelper,
 } from '../../../tests/helpers/msw-whoop-oauth.js';
-import { resolvePaths, type ResolvedPaths } from '../config/paths.js';
+import { type ResolvedPaths, resolvePaths } from '../config/paths.js';
 
 // -----------------------------------------------------------------------------
 // Shared harness state. The MSW server is reused across the whole test file
@@ -500,15 +499,27 @@ describe('refresh errors', () => {
     const now = Date.UTC(2026, 4, 12, 0, 0, 0);
     seedExpiredKeyringToken(kr, now);
 
-    helper.setNextResponse({ error: 'invalid_grant', error_description: 'refresh token reused' }, 400);
+    helper.setNextResponse(
+      { error: 'invalid_grant', error_description: 'refresh token reused' },
+      400,
+    );
 
     const mod = await loadTokenStore();
     const { AuthError } = await import('./errors.js');
     const store = mod.createTokenStore({ paths, now: () => now });
     await writeFile(paths.storageModeFile, 'keychain\n', { mode: 0o600 });
 
-    await expect(store.getValidAccessToken()).rejects.toThrow(AuthError);
-    await expect(store.getValidAccessToken()).rejects.toMatchObject({ kind: 'refresh_failed' });
+    // Single call → single rejection. Combine both assertions on one promise
+    // so the MSW helper's one-shot `setNextResponse` (which auto-resets after
+    // the first hit) is not consumed twice.
+    let caught: unknown;
+    try {
+      await store.getValidAccessToken();
+    } catch (err) {
+      caught = err;
+    }
+    expect(caught).toBeInstanceOf(AuthError);
+    expect((caught as { kind: string }).kind).toBe('refresh_failed');
   });
 
   test('E-02: failed refresh does NOT retry (retry budget = 0 per D-15)', async () => {
@@ -577,7 +588,11 @@ describe('cross-process lock', () => {
     await store.getValidAccessToken();
 
     expect(lf.lockSpy).toHaveBeenCalled();
-    const [lockedPath, options] = lf.lockSpy.mock.calls[0]!;
+    const firstCall = lf.lockSpy.mock.calls[0];
+    if (firstCall === undefined) {
+      throw new Error('lockfile.lock was not called');
+    }
+    const [lockedPath, options] = firstCall;
     expect(lockedPath).toBe(paths.tokensLockFile);
     expect(options).toMatchObject({
       retries: { retries: 10, factor: 1.2, minTimeout: 50 },
