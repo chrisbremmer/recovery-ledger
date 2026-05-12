@@ -9,8 +9,9 @@ import { PATTERNS, sanitize, serializeError } from './sanitize.js';
 
 describe('sanitize patterns', () => {
   // Pattern catalog is the load-bearing surface; size drift is a contract change.
-  test('PATTERNS exposes four ordered regex rules (D-07)', () => {
-    expect(PATTERNS.length).toBe(4);
+  // After CR-03: 4 base rules + 2 OAuth-wire-shape rules (URL query + form body) = 6.
+  test('PATTERNS exposes six ordered regex rules (D-07 + CR-03)', () => {
+    expect(PATTERNS.length).toBe(6);
   });
 
   // Pattern 1 — Authorization: Bearer <token>
@@ -44,6 +45,66 @@ describe('sanitize patterns', () => {
     const out = sanitize('{"client_secret":"shh"}');
     expect(out).toContain('"client_secret":"<redacted>"');
     expect(out).not.toContain('"shh"');
+  });
+
+  // Pattern 2a — URL query-parameter token leaks (CR-03)
+  test('P2a+ redacts ?access_token=… URL query parameter', () => {
+    const out = sanitize('error fetching https://api.whoop.com/v2?access_token=abc123xyz');
+    expect(out).toContain('?access_token=<redacted>');
+    expect(out).not.toContain('abc123xyz');
+  });
+
+  test('P2a+ redacts &refresh_token=… URL query parameter after another param', () => {
+    const out = sanitize('https://example.com/cb?state=foo&refresh_token=secret_rt&x=1');
+    expect(out).toContain('&refresh_token=<redacted>');
+    expect(out).not.toContain('secret_rt');
+    // Sibling non-secret parameters are preserved.
+    expect(out).toContain('state=foo');
+    expect(out).toContain('&x=1');
+  });
+
+  test('P2a+ redacts ?code=… OAuth authorization-code query parameter', () => {
+    const out = sanitize('redirect https://app.example.com/cb?code=AUTHCODE123&state=s');
+    expect(out).toContain('?code=<redacted>');
+    expect(out).not.toContain('AUTHCODE123');
+    expect(out).toContain('state=s');
+  });
+
+  test('P2a+ redacts &client_secret=… URL query parameter', () => {
+    const out = sanitize('curl "https://api.whoop.com/oauth?id=1&client_secret=topsecret"');
+    expect(out).toContain('&client_secret=<redacted>');
+    expect(out).not.toContain('topsecret');
+  });
+
+  test('P2a- leaves unrelated query parameters untouched', () => {
+    const input = 'https://example.com/api?state=foo&name=bar';
+    expect(sanitize(input)).toBe(input);
+  });
+
+  // Pattern 2b — Form-encoded OAuth body fields (CR-03)
+  test('P2b+ redacts grant_type=refresh_token&refresh_token=… form body', () => {
+    const input = 'POST body: grant_type=refresh_token&refresh_token=abc123&client_secret=xyz';
+    const out = sanitize(input);
+    // Both token-bearing fields redacted; non-secret grant_type preserved.
+    expect(out).toContain('grant_type=refresh_token');
+    expect(out).toContain('refresh_token=<redacted>');
+    expect(out).toContain('client_secret=<redacted>');
+    expect(out).not.toContain('abc123');
+    expect(out).not.toContain('xyz');
+  });
+
+  test('P2b+ redacts access_token in form-encoded body framing (no ?/& prefix)', () => {
+    const out = sanitize('body=access_token=mytoken123&expires_in=3600');
+    expect(out).toContain('access_token=<redacted>');
+    expect(out).toContain('expires_in=3600');
+    expect(out).not.toContain('mytoken123');
+  });
+
+  test('P2b- leaves bare key names without =value unchanged', () => {
+    // The word "access_token" appearing in prose without a `=value` suffix is
+    // not a leak — the value is the secret, the key is documentation.
+    const input = 'the access_token field is required';
+    expect(sanitize(input)).toBe(input);
   });
 
   // Pattern 3 — JWT shape (three base64url segments)
@@ -180,5 +241,30 @@ describe('D-10 fixtures (errors that historically leak)', () => {
     const out = sanitize(serializeError(err));
     expect(out).not.toContain('Bearer eyJ');
     expect(out).not.toMatch(/eyJ[A-Za-z0-9_-]+\.eyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+/);
+  });
+
+  // F5 — OAuth refresh form body surfaced via fetch/undici error (CR-03).
+  // Reproduces the shape Phase 2's refresh flow will emit on a connection
+  // error: the request body is included verbatim in the error message.
+  test('F5 redacts grant_type=refresh_token form body in an undici-shaped error', () => {
+    const err = new Error(
+      'UND_ERR_CONNECT_TIMEOUT — request body: grant_type=refresh_token&refresh_token=rt_secret&client_secret=cs_secret',
+    );
+    const out = sanitize(serializeError(err));
+    expect(out).not.toContain('rt_secret');
+    expect(out).not.toContain('cs_secret');
+    expect(out).toContain('refresh_token=<redacted>');
+    expect(out).toContain('client_secret=<redacted>');
+    // The non-secret grant_type=refresh_token marker survives — auditable.
+    expect(out).toContain('grant_type=refresh_token');
+  });
+
+  // F6 — access_token in a URL query parameter (CR-03). Verifies the
+  // canonical case from the review.
+  test('F6 redacts ?access_token=… in a URL surfaced via error', () => {
+    const err = new Error('error fetching https://api.whoop.com/v2?access_token=abc123xyz');
+    const out = sanitize(serializeError(err));
+    expect(out).not.toContain('abc123xyz');
+    expect(out).toContain('?access_token=<redacted>');
   });
 });

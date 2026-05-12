@@ -24,6 +24,28 @@ export const PATTERNS: ReadonlyArray<{ pattern: RegExp; replacement: string }> =
     pattern: /("(?:access_token|refresh_token|client_secret)"\s*:\s*")[^"]+/g,
     replacement: '$1<redacted>',
   },
+  // 2a. URL query-parameter token leaks: `?access_token=…`, `&refresh_token=…`,
+  //     `&code=…`, `&client_secret=…`. WHOOP OAuth callbacks and any logged
+  //     fetch URL or redirect can carry these verbatim (PITFALLS.md Pitfall 17,
+  //     AUTH-06). Stops at `&`, whitespace, or quote — same boundary class as
+  //     URL-encoded values. The `i` flag covers `?Access_Token=` casing seen
+  //     from some upstreams.
+  {
+    pattern: /([?&](?:access_token|refresh_token|code|client_secret)=)[^&\s"']+/gi,
+    replacement: '$1<redacted>',
+  },
+  // 2b. Form-encoded body fields: `grant_type=refresh_token&refresh_token=…`,
+  //     `&access_token=…`, `&client_secret=…`. WHOOP's OAuth token endpoint
+  //     accepts `application/x-www-form-urlencoded`; undici/native fetch
+  //     surface the request body in error messages on connection errors.
+  //     Distinct from 2a because form bodies do not require a `?`/`&` prefix
+  //     on the first key. Order: runs AFTER 2a so URL queries get their key
+  //     prefix preserved (`?access_token=` → `?access_token=<redacted>`) while
+  //     standalone body framings still redact.
+  {
+    pattern: /\b(access_token|refresh_token|client_secret)=([^&\s"']+)/gi,
+    replacement: '$1=<redacted>',
+  },
   // 3. JWT shape — three base64url segments. The `[A-Za-z0-9_-]` class is
   //    deliberate: `+`, `/`, `=` are NOT base64url and a token containing them
   //    is malformed. Minimum-length guards on each segment avoid false positives
