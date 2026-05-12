@@ -22,11 +22,21 @@
 
 import { readFile } from 'node:fs/promises';
 import open from 'open';
+import { z } from 'zod';
 import { paths } from '../../infrastructure/config/paths.js';
 import { ConfigSchema } from '../../infrastructure/config/schema.js';
 import { AuthError, formatAuthError } from '../../infrastructure/whoop/errors.js';
 import { runOAuth } from '../../infrastructure/whoop/oauth.js';
 import { tokenStore } from '../../infrastructure/whoop/token-store.js';
+// Cross-layer import: src/mcp/sanitize.ts is the single source of truth for
+// secret-bearing pattern redaction (D-07 / Pitfall 17). CR-04: a Zod or
+// JSON.parse error raised inside the outer try wraps the offending value
+// verbatim in its message; running `String(err)` through `sanitize()` is the
+// last line of defense before that string lands on the user's terminal. The
+// same cross-layer dependency exists in src/infrastructure/whoop/oauth.ts;
+// relocating sanitize to src/infrastructure/observability/ is tracked as
+// deferred work (PLAN-03-CROSS-LAYER).
+import { sanitize } from '../../mcp/sanitize.js';
 
 export const AUTH_EXIT_CODES: Readonly<Record<string, number>> = Object.freeze({
   success: 0,
@@ -57,7 +67,28 @@ export async function runAuthCommand(opts: {
       }
       throw err;
     }
-    const config = ConfigSchema.parse(JSON.parse(configText));
+    // Parse + Zod-validate config.json. ZodError's default formatter embeds
+    // offending values (clientSecret, clientId) verbatim in error messages
+    // (CR-04 / Pitfall 17). Map both shapes — ZodError and JSON.parse
+    // SyntaxError — to a field-names-only remediation message mirroring
+    // init.ts:94. NEVER let the raw err.message reach process.stdout.write:
+    // the user pastes terminal output into bug reports and agent contexts.
+    let config: z.infer<typeof ConfigSchema>;
+    try {
+      config = ConfigSchema.parse(JSON.parse(configText));
+    } catch (parseErr) {
+      const fields =
+        parseErr instanceof z.ZodError
+          ? parseErr.issues.map((i) => i.path.join('.')).join(', ')
+          : 'config.json (not valid JSON)';
+      process.stdout.write(
+        `Invalid config (fields: ${fields}). Run \`recovery-ledger init\` to repair.\n`,
+        () => {
+          process.exit(AUTH_EXIT_CODES.auth_missing);
+        },
+      );
+      return;
+    }
 
     // D-06 env-var precedence.
     const clientId = process.env.WHOOP_CLIENT_ID ?? config.clientId;
@@ -99,9 +130,14 @@ export async function runAuthCommand(opts: {
       });
       return;
     }
-    // Non-AuthError — never expose stack; use String(err) for a one-line
-    // intelligible message.
-    process.stdout.write(`auth failed: ${String(err)}\n`, () => {
+    // Non-AuthError — never expose stack; route String(err) through the
+    // shared sanitizer (CR-04) so any token / client_secret / Bearer pattern
+    // that leaked into err.message (e.g., from a future undici error body
+    // surfacing) is redacted before the message lands on stdout. The
+    // ZodError leak path (CR-04 primary) is already prefiltered above; the
+    // sanitizer here is defense-in-depth against future non-AuthError shapes
+    // that carry secret-bearing strings.
+    process.stdout.write(`auth failed: ${sanitize(String(err))}\n`, () => {
       process.exit(1);
     });
   }

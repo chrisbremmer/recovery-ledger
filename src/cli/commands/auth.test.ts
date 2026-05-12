@@ -265,6 +265,65 @@ describe('runAuthCommand', () => {
     expect(src).not.toMatch(/z\.object\(/);
   });
 
+  test('A-11 (CR-04 regression): ZodError-bearing config does NOT leak field VALUES to stdout (field NAMES only)', async () => {
+    // CR-04: ZodError.message embeds offending values verbatim. Seed a
+    // config.json with a clearly-fingerprinted clientSecret that fails
+    // validation (empty string fails `.min(1)` in the canonical schema).
+    // Pre-fix: the outer `String(err)` arm printed the full ZodError including
+    // every field's invalid value. Post-fix: the parse arm runs first,
+    // prints field names only, and exits 1 before the outer arm sees it.
+    await mkdir(tmp, { recursive: true });
+    const fingerprint = 'SECRET-FINGERPRINT-DO-NOT-LEAK';
+    const corrupt = {
+      clientId: '',
+      // Embed the fingerprint where a default ZodError would echo it. The
+      // CANONICAL ConfigSchema requires `clientSecret` to be a string of
+      // length >= 1; an empty string is what triggers the leak, but a
+      // value-bearing field that fails a different check (e.g., redirectPort
+      // not a number) is what surfaces the value in the ZodError text. We
+      // use redirectPort here because that path embeds the actual bad value.
+      clientSecret: fingerprint,
+      redirectPort: 'not-a-number',
+      scopes: [],
+    };
+    await writeFile(join(tmp, 'config.json'), JSON.stringify(corrupt), { mode: 0o600 });
+    mockRunOAuth(async () => syntheticTokens);
+    mockTokenStoreWrite();
+    vi.resetModules();
+    const { runAuthCommand } = await import('./auth.js');
+    await runAuthCommand({ noBrowser: true });
+
+    expect(exitCode).toBe(1);
+    // The fingerprint must not appear anywhere in stdout.
+    expect(writtenBody).not.toContain(fingerprint);
+    // Field names ARE surfaced (auditable: user knows WHICH field broke).
+    expect(writtenBody).toContain('Invalid config');
+    expect(writtenBody).toContain('recovery-ledger init');
+  });
+
+  test('A-12 (CR-04 regression): malformed JSON triggers field-names-only path, no raw parse-error echo', async () => {
+    // JSON.parse SyntaxError messages do not typically embed the full input,
+    // but the message often quotes the offending substring. The parse arm
+    // catches both ZodError AND SyntaxError; assert neither shape leaks to
+    // stdout.
+    await mkdir(tmp, { recursive: true });
+    const fingerprint = 'SYNTAX-FINGERPRINT-DO-NOT-LEAK';
+    // Inject the fingerprint inside an unterminated string so it lands in
+    // SyntaxError's "Unexpected end of JSON input near '…'" message on some
+    // Node versions.
+    const malformed = `{ "clientId": "${fingerprint}`;
+    await writeFile(join(tmp, 'config.json'), malformed, { mode: 0o600 });
+    mockRunOAuth(async () => syntheticTokens);
+    mockTokenStoreWrite();
+    vi.resetModules();
+    const { runAuthCommand } = await import('./auth.js');
+    await runAuthCommand({ noBrowser: true });
+
+    expect(exitCode).toBe(1);
+    expect(writtenBody).not.toContain(fingerprint);
+    expect(writtenBody).toContain('Invalid config');
+  });
+
   test('AUTH_EXIT_CODES is frozen and covers all six AuthError kinds', async () => {
     vi.resetModules();
     const { AUTH_EXIT_CODES } = await import('./auth.js');
