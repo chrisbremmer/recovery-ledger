@@ -31,7 +31,22 @@ import { JSONRPC_FIXTURES } from './fixtures.js';
 // clear absolute-path failure (IN-02) rather than the misleading cwd-relative
 // message it had before.
 const HERE = path.dirname(fileURLToPath(import.meta.url));
-const MCP_ENTRY = path.resolve(HERE, 'mcp.mjs');
+const DEFAULT_MCP_ENTRY = path.resolve(HERE, 'mcp.mjs');
+
+// Test-only override of the MCP entry path. Production code never touches
+// this; the CR-05 regression suite uses it to point the probe at deliberately-
+// broken stub MCP servers and confirm each failure mode surfaces a `fail`
+// result. `setMcpEntryForTesting(null)` restores the resolved sibling path.
+let mcpEntryOverride: string | null = null;
+
+/**
+ * @internal — for unit tests in `mcp-stdout-purity.test.ts` only. Never call
+ * from production code. Pass `null` to clear and restore the default
+ * `import.meta.url`-resolved sibling path.
+ */
+export function setMcpEntryForTesting(override: string | null): void {
+  mcpEntryOverride = override;
+}
 
 // How long to wait after each frame is written before considering the response
 // drained. 200ms covers the SDK's async response cycle for the fixtures used
@@ -40,6 +55,14 @@ const MCP_ENTRY = path.resolve(HERE, 'mcp.mjs');
 // if real workloads ever need more headroom.
 const FRAME_SETTLE_MS = 200;
 const FINAL_DRAIN_MS = 300;
+
+// Required response id from the tools/call frame (whoop-doctor-call fixture).
+// `notifications/initialized` has no response, so the four-fixture handshake
+// produces three responses: id=1 (initialize), id=2 (tools/list), id=3
+// (tools/call:whoop_doctor). The pass arm requires id=3 explicitly — a child
+// that died before emitting it, or one whose tools/call returned an error,
+// must NOT report pass (CR-05).
+const REQUIRED_RESPONSE_ID = 3;
 
 interface JsonRpcMessage {
   jsonrpc: string;
@@ -54,15 +77,40 @@ function isJsonRpcMessage(value: unknown): value is JsonRpcMessage {
   );
 }
 
-export async function probeMcpStdoutPurity(): Promise<DoctorCheck> {
+export interface ProbeOptions {
+  /**
+   * When the doctor service runs from inside the MCP server (the
+   * `whoop_doctor` tool handler delegates to `runDoctor()`), spawning another
+   * `dist/mcp.mjs` to drive the same fixtures would recurse forever — the
+   * grandchild's `whoop_doctor` would itself spawn a great-grandchild. The
+   * MCP entry point sets `RL_INSIDE_MCP=1`; the probe substitutes a static
+   * informational result instead of spawning. The CLI doctor command leaves
+   * the flag unset so the subprocess check still runs end-to-end. See CR-01.
+   */
+  skipSubprocess?: boolean;
+}
+
+export async function probeMcpStdoutPurity(opts: ProbeOptions = {}): Promise<DoctorCheck> {
+  if (opts.skipSubprocess) {
+    return {
+      name: 'mcp_stdout_purity',
+      status: 'pass',
+      detail: 'skipped (running inside MCP transport)',
+    };
+  }
+
   // Canonicalize each fixture frame to single-line JSON-RPC framing. The MCP
   // stdio transport is strictly line-delimited; multi-line frames are silently
   // dropped by the parser. Mirrors the on-disk fixtures' wire shape.
   const frames = JSONRPC_FIXTURES.map((f) => `${JSON.stringify(f.frame)}\n`);
 
+  const mcpEntry = mcpEntryOverride ?? DEFAULT_MCP_ENTRY;
+
   return new Promise<DoctorCheck>((resolve) => {
-    const child = spawn(process.execPath, [MCP_ENTRY], {
-      env: { ...process.env, NODE_ENV: 'production' },
+    const child = spawn(process.execPath, [mcpEntry], {
+      // Inject RL_INSIDE_MCP=1 into the child so its `whoop_doctor` handler
+      // skips its own subprocess check — terminates the recursion at depth 1.
+      env: { ...process.env, NODE_ENV: 'production', RL_INSIDE_MCP: '1' },
       stdio: ['pipe', 'pipe', 'pipe'],
     });
 
@@ -88,7 +136,7 @@ export async function probeMcpStdoutPurity(): Promise<DoctorCheck> {
       finalise({
         name: 'mcp_stdout_purity',
         status: 'fail',
-        detail: `failed to spawn ${MCP_ENTRY}: ${err.message}`,
+        detail: `failed to spawn ${mcpEntry}: ${err.message}`,
       });
     });
 
@@ -98,7 +146,7 @@ export async function probeMcpStdoutPurity(): Promise<DoctorCheck> {
         finalise({
           name: 'mcp_stdout_purity',
           status: 'fail',
-          detail: `${MCP_ENTRY} exited with code ${code} before stream validation`,
+          detail: `${mcpEntry} exited with code ${code} before stream validation`,
         });
       }
     });
@@ -114,6 +162,21 @@ export async function probeMcpStdoutPurity(): Promise<DoctorCheck> {
         await new Promise((r) => setTimeout(r, FINAL_DRAIN_MS));
 
         const lines = stdoutBuf.split('\n').filter((l) => l.length > 0);
+
+        // CR-05: an empty stream must NOT pass — the check exists to prove
+        // valid frames arrived, not to confirm the child stayed silent. The
+        // previous implementation reported `pass — (0 frames)` whenever the
+        // child died before emitting anything.
+        if (lines.length === 0) {
+          finalise({
+            name: 'mcp_stdout_purity',
+            status: 'fail',
+            detail: 'subprocess emitted no stdout frames before drain elapsed',
+          });
+          return;
+        }
+
+        const parsedFrames: Array<Record<string, unknown>> = [];
         for (const line of lines) {
           let parsed: unknown;
           try {
@@ -134,6 +197,29 @@ export async function probeMcpStdoutPurity(): Promise<DoctorCheck> {
             });
             return;
           }
+          parsedFrames.push(parsed as unknown as Record<string, unknown>);
+        }
+
+        // CR-05: explicit assertion that the tools/call response (id=3)
+        // arrived AND carries a `result`, not an `error`. Without this the
+        // check passed whenever any frames arrived — even when the actual
+        // tool-call response was missing.
+        const toolCallResp = parsedFrames.find((f) => f.id === REQUIRED_RESPONSE_ID);
+        if (!toolCallResp) {
+          finalise({
+            name: 'mcp_stdout_purity',
+            status: 'fail',
+            detail: `tools/call response (id=${REQUIRED_RESPONSE_ID}) missing — ${lines.length} frames observed`,
+          });
+          return;
+        }
+        if ('error' in toolCallResp || !('result' in toolCallResp)) {
+          finalise({
+            name: 'mcp_stdout_purity',
+            status: 'fail',
+            detail: `tools/call response (id=${REQUIRED_RESPONSE_ID}) errored or missing result`,
+          });
+          return;
         }
 
         finalise({

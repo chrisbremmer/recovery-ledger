@@ -7,7 +7,7 @@
 
 import { runDoctor } from './doctor/index.js';
 
-export type { DoctorCheck, DoctorResult } from './doctor/index.js';
+export type { DoctorCheck, DoctorResult, RunDoctorOptions } from './doctor/index.js';
 
 export interface Services {
   runDoctor: typeof runDoctor;
