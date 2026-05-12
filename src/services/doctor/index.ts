@@ -52,8 +52,7 @@ export async function runDoctor(opts: RunDoctorOptions = {}): Promise<DoctorResu
   // probeMcpStdoutPurity; either signal (explicit opts or env) suppresses the
   // recursive subprocess check. Belt-and-suspenders: callers that forget to
   // pass the option still get safe behavior when the env var is present.
-  const skipSubprocess =
-    opts.skipSubprocessChecks === true || process.env.RL_INSIDE_MCP === '1';
+  const skipSubprocess = opts.skipSubprocessChecks === true || process.env.RL_INSIDE_MCP === '1';
   const checks = await Promise.all([
     probeBetterSqlite3(),
     probeKeyring(),
