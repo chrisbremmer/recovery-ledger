@@ -9,7 +9,7 @@ Requirements for the initial release. Each maps to roadmap phases.
 
 ### Foundation
 
-- [ ] **FND-01**: Bootstrapped TypeScript repo (Node 22 LTS, ESM, tsup build, tsx dev) with Biome lint/format and Vitest test runner configured
+- [x] **FND-01**: Bootstrapped TypeScript repo (Node 22 LTS, ESM, tsup build, tsx dev) with Biome lint/format and Vitest test runner configured
 - [ ] **FND-02**: Empty CLI entry point (`recovery-ledger`) registered via `bin` and runnable via `npx recovery-ledger`
 - [ ] **FND-03**: Empty MCP stdio server entry point (`recovery-ledger-mcp`) using `@modelcontextprotocol/sdk` and stdio transport
 - [ ] **FND-04**: Pino logger configured to write exclusively to stderr (never stdout) with a CI-enforced assertion that the MCP server's stdout contains only valid JSON-RPC frames under fixture load
@@ -125,7 +125,7 @@ Explicitly excluded. Gated behind the hard scope guardrail in PROJECT.md (≥ 12
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| FND-01 | Phase 1 | Pending |
+| FND-01 | Phase 1 | Complete (Plan 01-01, 2026-05-12) |
 | FND-02 | Phase 1 | Pending |
 | FND-03 | Phase 1 | Pending |
 | FND-04 | Phase 1 | Pending |
@@ -180,7 +180,8 @@ Explicitly excluded. Gated behind the hard scope guardrail in PROJECT.md (≥ 12
 - v1 requirements: 49 total
 - Mapped to phases: 49
 - Unmapped: 0 ✓
+- Complete: 1 / 49 (FND-01)
 
 ---
 *Requirements defined: 2026-05-11*
-*Last updated: 2026-05-11 after initial definition*
+*Last updated: 2026-05-12 — FND-01 complete via Plan 01-01*
