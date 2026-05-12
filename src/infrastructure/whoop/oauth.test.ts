@@ -251,6 +251,65 @@ describe('listenForCallback', () => {
     await fetch(`http://127.0.0.1:${ready.port}/callback?code=xyz&state=st`);
     await callbackPromise;
   });
+
+  test('L-07 (WR-01 regression): non-GET methods on /callback are refused with 405 and DO NOT resolve the flow', async () => {
+    // WR-01 defense-in-depth: only GET /callback resolves the OAuth flow. A
+    // POST to /callback with valid-looking code+state must NOT resolve, even
+    // if the attacker guessed the state value (the state is 256 bits so this
+    // is impractical, but the layered defense is the contract).
+    let info: ListeningInfo | undefined;
+    const callbackPromise = listenForCallback({
+      port: 0,
+      expectedState: 'st',
+      timeoutMs: 200,
+      onListening: (i) => {
+        info = i;
+      },
+    });
+    const { port } = await waitFor(() => info);
+    const res = await fetch(`http://127.0.0.1:${port}/callback?code=xyz&state=st`, {
+      method: 'POST',
+    });
+    expect(res.status).toBe(405);
+
+    // The flow should NOT have resolved on the POST. The timeout (200ms)
+    // should fire instead, producing AuthError(auth_timeout). If the WR-01
+    // fix regressed, the promise would resolve with code 'xyz'.
+    let caught: unknown;
+    try {
+      await callbackPromise;
+    } catch (err) {
+      caught = err;
+    }
+    expect(caught).toBeInstanceOf(AuthError);
+    expect((caught as AuthError).kind).toBe('auth_timeout');
+  });
+
+  test('L-08 (WR-01 regression): unknown paths return 404 and DO NOT resolve the flow', async () => {
+    let info: ListeningInfo | undefined;
+    const callbackPromise = listenForCallback({
+      port: 0,
+      expectedState: 'st',
+      timeoutMs: 200,
+      onListening: (i) => {
+        info = i;
+      },
+    });
+    const { port } = await waitFor(() => info);
+    // Attacker probes the loopback port at any path that isn't /callback —
+    // the state-mismatch check is no longer the sole filter.
+    const res = await fetch(`http://127.0.0.1:${port}/literally-anything?code=xyz&state=st`);
+    expect(res.status).toBe(404);
+
+    let caught: unknown;
+    try {
+      await callbackPromise;
+    } catch (err) {
+      caught = err;
+    }
+    expect(caught).toBeInstanceOf(AuthError);
+    expect((caught as AuthError).kind).toBe('auth_timeout');
+  });
 });
 
 // ---------------------------------------------------------------------------

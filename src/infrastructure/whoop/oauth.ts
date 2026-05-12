@@ -191,6 +191,32 @@ const CallbackQuerySchema = z.object({
 export function listenForCallback(opts: ListenForCallbackOptions): Promise<{ code: string }> {
   return new Promise<{ code: string }>((resolve, reject) => {
     const server = createServer((req, res) => {
+      // WR-01 defense-in-depth: only `GET /callback` resolves the OAuth flow.
+      // A local-process scanner that hits the loopback port (`curl
+      // http://127.0.0.1:4321/`, a POST from a stray service) would otherwise
+      // drive the state-mismatch check as the SOLE filter. The 256-bit
+      // `state` makes a guess-and-hit attack impractical, but the loopback
+      // server should refuse to consider non-callback URLs at all. Method/path
+      // mismatches return a plain status and DO NOT settle the promise — the
+      // 5-minute window stays open for a legitimate browser redirect.
+      if (req.method !== 'GET') {
+        res.writeHead(405, { 'content-type': 'text/plain; charset=utf-8' });
+        res.end('method not allowed');
+        return;
+      }
+      let pathname: string;
+      try {
+        pathname = new URL(req.url ?? '/', 'http://127.0.0.1').pathname;
+      } catch {
+        res.writeHead(400, { 'content-type': 'text/plain; charset=utf-8' });
+        res.end('bad request');
+        return;
+      }
+      if (pathname !== '/callback') {
+        res.writeHead(404, { 'content-type': 'text/plain; charset=utf-8' });
+        res.end('not found');
+        return;
+      }
       handleCallback(req, res, opts.expectedState, finaliseResolve, finaliseReject);
     });
 
