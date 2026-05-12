@@ -197,9 +197,17 @@ describe('MCP stdout purity (dist smoke)', () => {
     }
 
     // ASSERTION 2 (D-10) — sanitizer integration: no token-shaped strings.
-    expect(stdout).not.toMatch(/Bearer\s/);
-    expect(stdout).not.toMatch(/Authorization:/i);
-    expect(stdout).not.toMatch(/eyJ[A-Za-z0-9_-]{4,}\./);
+    // MR-10: regexes use negative lookaheads so the sanitizer's `<redacted>`
+    // marker (which itself contains "Bearer " when emitted from pattern 1/4)
+    // is permitted. Without the lookahead, a future Phase 2 tool that
+    // legitimately includes `Bearer <redacted>` or `Authorization: Bearer
+    // <redacted>` in its rendered output would false-fail this assertion.
+    // The JWT regex is also tightened to require a full three-segment shape
+    // so a partial `eyJ` prefix in unrelated text (e.g., a comment or a
+    // base64-encoded label) is not flagged.
+    expect(stdout).not.toMatch(/Bearer\s+(?!<redacted>)[A-Za-z0-9._-]/);
+    expect(stdout).not.toMatch(/Authorization:\s*Bearer\s+(?!<redacted>)/i);
+    expect(stdout).not.toMatch(/eyJ[A-Za-z0-9_-]{4,}\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}/);
 
     // ASSERTION 3 (Pitfall 7) — the tools/call response (id: 3) has a NON-NULL
     // result with the expected content payload, and no error. MR-39: the

@@ -136,8 +136,12 @@ rm -f /tmp/gate-c.$$
 # ----------------------------------------------------------------------------
 REGISTER_TOOL_RE='\bserver\.registerTool\s*\('
 
+# Test sources are exempt — register.test.ts must reference the method
+# name in prose to describe the contract under test. The chokepoint
+# applies to production tool modules, not their unit tests.
 if "$GREP" -rEn "$REGISTER_TOOL_RE" --include='*.ts' src/mcp/ 2>/dev/null \
    | "$GREP" -Ev '^src/mcp/register\.ts:' \
+   | "$GREP" -Ev '\.test\.ts:' \
    > /tmp/gate-d.$$; then
   if [ -s /tmp/gate-d.$$ ]; then
     echo "::error::Gate D — server.registerTool outside src/mcp/register.ts:"
