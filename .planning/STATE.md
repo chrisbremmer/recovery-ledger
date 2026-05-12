@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 current_plan: 6
-status: planning
+status: ready_to_plan
 last_updated: "2026-05-12T18:25:00.581Z"
 progress:
   total_phases: 5
-  completed_phases: 1
+  completed_phases: 2
   total_plans: 6
   completed_plans: 6
-  percent: 100
+  percent: 40
 ---
 
 # State: Recovery Ledger
@@ -26,15 +26,15 @@ progress:
 
 ## Current Position
 
-**Current Plan:** 6
+**Current Plan:** Not started
 **Total Plans in Phase:** 6
 Phase: 01 (foundation-stdout-pure-mcp-bootstrap) — COMPLETE
 Plan: 6 of 6
 
 - **Milestone:** v1
-- **Phase:** 1 — Foundation & Stdout-Pure MCP Bootstrap (COMPLETE — awaiting verifier sign-off)
+- **Phase:** 2
 - **Plan:** 01-06-ci-integration-PLAN.md (complete) — GitHub Actions workflow + dist/mcp.mjs subprocess round-trip integration test landed.
-- **Status:** Phase 1 complete; ready for verification then Phase 2 planning
+- **Status:** Ready to plan
 - **Progress:** [██████████] 100%
 
 ```
