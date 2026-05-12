@@ -2,9 +2,10 @@
 //
 // This file is the ONLY place in the codebase that calls `server.registerTool`.
 // Every tool definition in `src/mcp/tools/` must register through this wrapper so
-// the try/catch/sanitize contract applies uniformly. The Plan 04 grep gate
-// (`grep -rEn "server\.registerTool" src/mcp/ | grep -v "src/mcp/register.ts"`)
-// enforces this at CI time.
+// the try/catch/sanitize contract applies uniformly. The MR-01 grep gate
+// (`scripts/ci-grep-gates.sh` Gate D — `\bserver\.registerTool\s*\(` across
+// src/mcp/**/*.ts with src/mcp/register.ts as the sole exception) enforces
+// this at CI time.
 //
 // SDK import path resolved from RESEARCH Open Question 4: STACK.md pins
 // `@modelcontextprotocol/sdk/server/mcp.js`. The SDK's `./*` wildcard exports

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# CI grep gates — three rules that Biome cannot catch on its own.
+# CI grep gates — four rules that Biome cannot catch on its own.
 #
 # Gate A: banned tone words (CLAUDE.md "Critical Rules" list) — banned in code,
 #         tests, formatters, configs, and docs other than the rule definitions
@@ -9,6 +9,10 @@
 #         and test files (CLAUDE.md §Critical Rules — MCP stdout purity).
 # Gate C: process.stdout.write — banned outside src/cli/commands/doctor.ts
 #         (the one CLI output point per 01-CONTEXT.md D-04 + D-11).
+# Gate D: server.registerTool — banned outside src/mcp/register.ts (D-09 — the
+#         one chokepoint where the try/catch/sanitize wrapper applies). Any
+#         direct call from a tool module would bypass the sanitizer and risk
+#         leaking secrets through MCP error responses (PITFALLS.md Pitfall 17).
 #
 # Exit-code semantics (Pitfall 10): grep returns 0 on match (= violation found).
 # Each gate inverts that: if grep -rEn matches, the gate prints ::error:: and
@@ -121,6 +125,28 @@ if "$GREP" -rEn "$STDOUT_RE" --include='*.ts' src/ 2>/dev/null \
   fi
 fi
 rm -f /tmp/gate-c.$$
+
+# ----------------------------------------------------------------------------
+# Gate D — server.registerTool outside src/mcp/register.ts. D-09 + MR-01:
+# every MCP tool registration must funnel through the register() wrapper so
+# the try/catch/sanitize contract applies uniformly. A direct call from a
+# tool module would bypass the sanitizer and risk leaking secrets through
+# error responses. register.ts itself is the sole site allowed to call
+# `server.registerTool(...)`; this gate enforces that contract at CI time.
+# ----------------------------------------------------------------------------
+REGISTER_TOOL_RE='\bserver\.registerTool\s*\('
+
+if "$GREP" -rEn "$REGISTER_TOOL_RE" --include='*.ts' src/mcp/ 2>/dev/null \
+   | "$GREP" -Ev '^src/mcp/register\.ts:' \
+   > /tmp/gate-d.$$; then
+  if [ -s /tmp/gate-d.$$ ]; then
+    echo "::error::Gate D — server.registerTool outside src/mcp/register.ts:"
+    cat /tmp/gate-d.$$
+    rm -f /tmp/gate-d.$$
+    exit 1
+  fi
+fi
+rm -f /tmp/gate-d.$$
 
 echo "All grep gates passed."
 exit 0
