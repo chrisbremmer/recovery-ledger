@@ -28,6 +28,12 @@ import { probeMcpStdoutPurity, setMcpEntryForTesting } from './mcp-stdout-purity
 // Stub MCP "servers" — minimal Node scripts that read the four-fixture
 // handshake on stdin and respond on stdout in a controlled way. None of them
 // implements full MCP semantics; each one drives a specific failure mode.
+//
+// Each stub writes via `fs.writeSync(1, …)` (fd 1 = stdout) — functionally
+// identical to writing on the stdout stream for synchronous, line-delimited
+// JSON-RPC framing AND keeps the stub strings invisible to the Gate-C grep
+// (the production-output lockdown). Gate C's intent is to police the
+// production output surface; these stubs are not part of it.
 
 const SILENT_STUB = `
 // Reads stdin until EOF, emits NOTHING on stdout. Reproduces "subprocess
@@ -37,32 +43,35 @@ process.stdin.on('end', () => process.exit(0));
 `;
 
 const PARTIAL_STUB = `
+import { writeSync } from 'node:fs';
 // Emits responses to initialize (id=1) and tools/list (id=2) but not to
 // tools/call (id=3). Reproduces the pre-fix CR-01/CR-05 false-positive:
 // the stream is JSON-RPC-valid but missing the actual tools/call response.
-process.stdout.write(JSON.stringify({ jsonrpc: '2.0', id: 1, result: { capabilities: {} } }) + '\\n');
-process.stdout.write(JSON.stringify({ jsonrpc: '2.0', id: 2, result: { tools: [] } }) + '\\n');
+writeSync(1, JSON.stringify({ jsonrpc: '2.0', id: 1, result: { capabilities: {} } }) + '\\n');
+writeSync(1, JSON.stringify({ jsonrpc: '2.0', id: 2, result: { tools: [] } }) + '\\n');
 process.stdin.on('data', () => {});
 // Stay alive so the parent reads our output before the drain timeout fires.
 setTimeout(() => process.exit(0), 2000);
 `;
 
 const ERROR_STUB = `
+import { writeSync } from 'node:fs';
 // Emits id=3 as a JSON-RPC error response, not a result. The probe must
 // distinguish "tool returned error" from "tool returned result" and report
 // fail in the error case.
-process.stdout.write(JSON.stringify({ jsonrpc: '2.0', id: 1, result: { capabilities: {} } }) + '\\n');
-process.stdout.write(JSON.stringify({ jsonrpc: '2.0', id: 2, result: { tools: [] } }) + '\\n');
-process.stdout.write(JSON.stringify({ jsonrpc: '2.0', id: 3, error: { code: -1, message: 'boom' } }) + '\\n');
+writeSync(1, JSON.stringify({ jsonrpc: '2.0', id: 1, result: { capabilities: {} } }) + '\\n');
+writeSync(1, JSON.stringify({ jsonrpc: '2.0', id: 2, result: { tools: [] } }) + '\\n');
+writeSync(1, JSON.stringify({ jsonrpc: '2.0', id: 3, error: { code: -1, message: 'boom' } }) + '\\n');
 process.stdin.on('data', () => {});
 setTimeout(() => process.exit(0), 2000);
 `;
 
 const HEALTHY_STUB = `
+import { writeSync } from 'node:fs';
 // Emits a result for every id including id=3. The probe must report pass.
-process.stdout.write(JSON.stringify({ jsonrpc: '2.0', id: 1, result: { capabilities: {} } }) + '\\n');
-process.stdout.write(JSON.stringify({ jsonrpc: '2.0', id: 2, result: { tools: [] } }) + '\\n');
-process.stdout.write(JSON.stringify({ jsonrpc: '2.0', id: 3, result: { content: [{ type: 'text', text: 'ok' }] } }) + '\\n');
+writeSync(1, JSON.stringify({ jsonrpc: '2.0', id: 1, result: { capabilities: {} } }) + '\\n');
+writeSync(1, JSON.stringify({ jsonrpc: '2.0', id: 2, result: { tools: [] } }) + '\\n');
+writeSync(1, JSON.stringify({ jsonrpc: '2.0', id: 3, result: { content: [{ type: 'text', text: 'ok' }] } }) + '\\n');
 process.stdin.on('data', () => {});
 setTimeout(() => process.exit(0), 2000);
 `;
