@@ -29,7 +29,7 @@
 - [x] 01-01-bootstrap-PLAN.md — Bootstrap npm + TS strict + tsup + Vitest + Biome config files (FND-01) — completed 2026-05-12 (3m 32s, 9 files)
 - [x] 01-02-logger-PLAN.md — Pino stderr-only logger + programmatic destination assertion (FND-04 unit half) — completed 2026-05-12 (4m 56s, 2 src files + 1 modified config)
 - [x] 01-03-mcp-skeleton-PLAN.md — MCP stdio server + register() wrapper + sanitize.ts + whoop_doctor shim (FND-03, FND-06)
-- [ ] 01-04-sanitizer-lint-PLAN.md — Sanitizer unit tests + scripts/ci-grep-gates.sh (FND-05, FND-06)
+- [x] 01-04-sanitizer-lint-PLAN.md — Sanitizer unit tests + scripts/ci-grep-gates.sh (FND-05, FND-06)
 - [ ] 01-05-cli-doctor-PLAN.md — Commander CLI + real runDoctor() + three checks + formatter (FND-02, FND-03, FND-07)
 - [ ] 01-06-ci-integration-PLAN.md — Subprocess round-trip test + macOS-latest GitHub Actions workflow (FND-01..07 cross-cut)
 **UI hint**: no

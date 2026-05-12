@@ -2,20 +2,20 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-current_plan: 2
+current_plan: 4
 status: executing
-last_updated: "2026-05-12T17:53:06.423Z"
+last_updated: "2026-05-12T18:00:52.173Z"
 progress:
   total_phases: 5
   completed_phases: 0
   total_plans: 6
-  completed_plans: 3
-  percent: 50
+  completed_plans: 4
+  percent: 67
 ---
 
 # State: Recovery Ledger
 
-**Last updated:** 2026-05-12 — completed Plan 01-03 (MCP stdio skeleton + register wrapper + sanitizer + whoop_doctor shim)
+**Last updated:** 2026-05-12 — completed Plan 01-04 (sanitizer unit tests + CI grep gates)
 **Mode:** yolo
 **Granularity:** standard
 
@@ -26,19 +26,19 @@ progress:
 
 ## Current Position
 
-**Current Plan:** 3
+**Current Plan:** 4
 **Total Plans in Phase:** 6
 Phase: 01 (foundation-stdout-pure-mcp-bootstrap) — EXECUTING
-Plan: 3 of 6 (01-01 through 01-03 complete; 01-04 next)
+Plan: 4 of 6
 
 - **Milestone:** v1
 - **Phase:** 1 — Foundation & Stdout-Pure MCP Bootstrap
-- **Plan:** 01-04-sanitizer-lint-PLAN.md (next) — sanitizer unit tests + lint enforcement gates (FND-05, FND-06 test coverage)
+- **Plan:** 01-05-cli-doctor-PLAN.md (next) — CLI Commander wiring + real doctor service (FND-07)
 - **Status:** Ready to execute
-- **Progress:** [█████░░░░░] 50%
+- **Progress:** [███████░░░] 67%
 
 ```
-[█░░░░░░░░░░░░░░░░░░░] 0 / 5 phases complete (3 / 6 plans complete in Phase 1)
+[█░░░░░░░░░░░░░░░░░░░] 0 / 5 phases complete (4 / 6 plans complete in Phase 1)
 ```
 
 ## Performance Metrics
@@ -48,9 +48,9 @@ Plan: 3 of 6 (01-01 through 01-03 complete; 01-04 next)
 | Phases planned | 5 |
 | Phases complete | 0 |
 | v1 requirements mapped | 49 / 49 |
-| v1 requirements complete | 4 / 49 |
+| v1 requirements complete | 5 / 49 |
 | Plans drafted | 6 (Phase 1) |
-| Plans complete | 3 |
+| Plans complete | 4 |
 
 ### Plan Execution History
 
@@ -59,6 +59,7 @@ Plan: 3 of 6 (01-01 through 01-03 complete; 01-04 next)
 | 01-01-bootstrap   | 3m 32s | 2 | 9 | Complete (2026-05-12) |
 | 01-02-logger      | 4m 56s | 2 | 3 | Complete (2026-05-12) |
 | 01-03-mcp-skeleton | 4m 42s | 3 | 6 | Complete (2026-05-12) |
+| 01-04-sanitizer-lint | 3m 17s | 2 | 2 | Complete (2026-05-12) |
 
 ## Accumulated Context
 
@@ -82,11 +83,15 @@ Plan: 3 of 6 (01-01 through 01-03 complete; 01-04 next)
 - **[Phase 01] Plan 01-03 decision:** Open Question 4 RESOLVED — `@modelcontextprotocol/sdk/server/mcp.js` import path works on SDK 1.29.0 via the `./*` wildcard exports; no fallback to `./server/index.js` needed.
 - **[Phase 01] Plan 01-03 deviation:** register() handler typed as SDK's `ToolCallback<I>` instead of RESEARCH verbatim — SDK 1.29 stricter `CallToolResult` shape (`structuredContent: Record<string, unknown>`) and per-Args branching callback signature required the precise SDK type.
 - **[Phase 01] Plan 01-03 decision:** Services interface contract locked early — `runDoctor: () => Promise<DoctorResult>`; DoctorResult shape per D-06. Plan 05's real `createServices()` will overwrite the stub without changing the contract.
+- **[Phase 01] Plan 01-04 decision:** adopted user's prompt-level gate set (tone words + emoji / console.* outside src/cli and tests / process.stdout.write outside src/cli/commands/doctor.ts) over the plan's verbatim set — stricter and more directly aligned with CLAUDE.md Critical Rules.
+- **[Phase 01] Plan 01-04 decision:** byte-level emoji detection via LC_ALL=C plus 4-byte UTF-8 prefix range — portable across BSD and GNU grep without `-P` (GNU-only).
+- **[Phase 01] Plan 01-04 decision:** cause-walker depth-8 cap pinned in both directions — `at most 9 split segments` plus `exactly 8 cause segments` on a 10-deep chain — drift in either direction breaks the suite.
+- **[Phase 01] Plan 01-04 decision:** no defects discovered in Plan 03's sanitize.ts — all 20 characterization tests pass on first run; the Plan 03 implementation ships as designed.
 
 ### Open Todos
 
-- Execute Plan 01-04 (sanitizer unit tests + lint enforcement gates — FND-05, FND-06 test coverage).
-- Plans 01-05 and 01-06 remain (CLI doctor, CI + integration round-trip).
+- Execute Plan 01-05 (`01-05-cli-doctor-PLAN.md`) — real Commander wiring in `src/cli/index.ts`, `src/cli/commands/doctor.ts` (the one Gate-C-exempt CLI output point), and the real `createServices()` over `services/doctor/checks/native-modules.ts` + `services/doctor/checks/mcp-stdout-purity.ts` (FND-07).
+- Plan 01-06 remains (CI workflow + subprocess round-trip integration test for `dist/mcp.mjs`).
 - Confirm whether to deepen research before Phase 2 planning (cross-process file-lock semantics + replay-on-401 contract are research-flagged).
 - Confirm whether to deepen research before Phase 4 planning (confidence-tier thresholds, MAD scaling for small samples, FDR q-value defaults; Zod→JSON-Schema fidelity at the pinned SDK × Zod combination).
 
@@ -104,14 +109,16 @@ None.
 
 ### Last Session Summary
 
-Executed Plan 01-03 (MCP stdio skeleton + register wrapper + sanitizer + whoop_doctor shim). Shipped six source files: `src/mcp/sanitize.ts` (PATTERNS catalog with four D-07 regex in load-bearing order; `sanitize()` pipeline; `serializeError()` with WeakSet-cycle-guarded depth-8 cause-chain walker per D-08), `src/mcp/register.ts` (the ONLY caller of `server.registerTool` codebase-wide; generic over `ZodRawShape`; wraps every handler in try/catch with `sanitize(serializeError(err))` in the catch path — D-09 chokepoint), `src/mcp/tools/whoop-doctor.ts` (registers through register(); inline `renderDoctor` stub stays — Plan 05 swaps for the real formatter import), `src/mcp/index.ts` (McpServer + StdioServerTransport entry with top-level `await server.connect`), `src/services/index.ts` (Services + DoctorCheck + DoctorResult view types; createServices() stub returning `{ checks: [], overall: 'pass' }`), and `src/cli/index.ts` (one-line `export {};` stub so tsup builds both `dist/cli.mjs` and `dist/mcp.mjs`). Open Question 4 RESOLVED — `@modelcontextprotocol/sdk/server/mcp.js` import path works on SDK 1.29.0 without fallback. Two Rule 1 deviations (SDK 1.29's stricter `ToolCallback<I>` signature and `CallToolResult.structuredContent: Record<string, unknown>` typing) auto-fixed. Live JSON-RPC smoke: `node dist/mcp.mjs` round-trips initialize/tools-list/tools-call(whoop_doctor) — three valid JSON-RPC frames out, zero stderr bytes, exactly one tool advertised. Commits: `7b16220` (sanitize), `dea5e61` (register), `4cd6e3d` (mcp entry + tool + services + cli stubs).
+Executed Plan 01-04 (sanitizer unit tests + CI grep gates). Shipped two files: `src/mcp/sanitize.test.ts` (168 lines, 20 Vitest cases across three describe blocks — `sanitize patterns` covers every D-07 pattern with positive + negative cases plus a `PATTERNS.length === 4` drift pin; `serializeError cause chain` covers linear + cycle + depth>8 + boundary-exactly-8 + non-Error + mixed-cause shapes; `D-10 fixtures` exercises fetch TypeError, undici UND_ERR_*, JSON access_token, bare Bearer) and `scripts/ci-grep-gates.sh` (110 lines, mode 100755, `#!/usr/bin/env bash` + `set -euo pipefail`, three gates per the active prompt's `<critical_constraints>` — Gate A: banned tone words from CLAUDE.md plus emoji via LC_ALL=C byte-level UTF-8 prefix range; Gate B: console.log/error/warn outside `src/cli/**` and `*.test.ts`; Gate C: `process.stdout.write` outside `src/cli/commands/doctor.ts`). Each gate's `::error::`-prefixed message fires on a planted violation (recorded in SUMMARY.md). Adopted the user's prompt-level gate set over the plan's verbatim three (which named biome-ignore-noConsole / process.stdout / server.registerTool); the user's set is stricter and aligns with CLAUDE.md §Critical Rules. No defects discovered in Plan 03's sanitize.ts — all 20 characterization tests pass on first run. `npm run test && npm run lint && npx tsc --noEmit && bash scripts/ci-grep-gates.sh` all exit 0. Commits: `63e3867` (sanitize.test.ts), `325b72d` (ci-grep-gates.sh).
 
 ### Next Session
 
-Execute Plan 01-04 (`01-04-sanitizer-lint-PLAN.md`) — sanitizer unit tests (D-10 fixtures against PATTERNS + cause-chain walker) and CI lint enforcement (Biome `noConsole` deliberate-fail test, `process.stdout` grep gate, `server.registerTool` chokepoint grep gate). The Plan 01-03 sanitize.ts + register.ts surface is now in place to be consumed by these tests.
+Execute Plan 01-05 (`01-05-cli-doctor-PLAN.md`) — overwrite the `src/cli/index.ts` stub with the real Commander wiring, land `src/cli/commands/doctor.ts` as the one Gate-C-exempt CLI output point, and replace the stub `createServices()` in `src/services/index.ts` with the real three-check composition (better-sqlite3 native-module probe, @napi-rs/keyring native-module probe, mcp_stdout_purity subprocess self-test). Services contract is locked; MCP tool shim does not need to change.
 
 ---
 *State initialized: 2026-05-11*
 *Phase 1 context gathered: 2026-05-12*
 *Plan 01-01 complete: 2026-05-12 (3m 32s, 9 files)*
 *Plan 01-02 complete: 2026-05-12 (4m 56s, 3 files — 2 src + 1 modified config)*
+*Plan 01-03 complete: 2026-05-12 (4m 42s, 6 files)*
+*Plan 01-04 complete: 2026-05-12 (3m 17s, 2 files)*
