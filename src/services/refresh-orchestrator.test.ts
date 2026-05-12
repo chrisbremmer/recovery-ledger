@@ -18,7 +18,6 @@
 // factory.
 
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
-import { AuthError } from '../infrastructure/whoop/errors.js';
 import type { TokenStore, Tokens } from '../infrastructure/whoop/token-store.js';
 
 // -----------------------------------------------------------------------------
@@ -222,6 +221,13 @@ describe('401 reactive retry', () => {
 
 describe('refresh failure', () => {
   test('F-01: 401 → re-read still stale → getValidAccessToken throws refresh_failed → callWithAuth throws auth_expired wrapping cause; op called exactly once', async () => {
+    // Dynamic-import AuthError AFTER vi.resetModules() (in beforeEach) so the
+    // class identity here matches the class the orchestrator module catches +
+    // rethrows. Without this, `expect().toBeInstanceOf(AuthError)` would fail
+    // because the test's top-level AuthError import resolves a different
+    // module-graph instance than the orchestrator's import after reset.
+    const { AuthError: AuthErrorLocal } = await import('../infrastructure/whoop/errors.js');
+
     const m = makeMockTokenStore();
     m.getValidAccessTokenSpy.mockResolvedValueOnce('at-stale');
     const pastExpiry = Date.now() - 1000;
@@ -229,7 +235,7 @@ describe('refresh failure', () => {
       freshTokens({ accessToken: 'at-stale', expiresAt: pastExpiry }),
     );
     // Force refresh attempt throws refresh_failed from token-store.
-    const refreshErr = new AuthError({
+    const refreshErr = new AuthErrorLocal({
       kind: 'refresh_failed',
       detail: 'token endpoint 400',
     });
@@ -246,15 +252,15 @@ describe('refresh failure', () => {
     } catch (err) {
       caught = err;
     }
-    expect(caught).toBeInstanceOf(AuthError);
-    expect((caught as AuthError).kind).toBe('auth_expired');
-    expect((caught as AuthError).cause).toBe(refreshErr);
+    expect(caught).toBeInstanceOf(AuthErrorLocal);
+    expect((caught as InstanceType<typeof AuthErrorLocal>).kind).toBe('auth_expired');
+    expect((caught as InstanceType<typeof AuthErrorLocal>).cause).toBe(refreshErr);
     // Op called exactly once — never retry after a refresh failure.
     expect(op).toHaveBeenCalledTimes(1);
   });
 
   test('F-02: formatAuthError({kind: auth_expired}) mentions the `recovery-ledger auth` remediation', async () => {
-    const { formatAuthError } = await import('../infrastructure/whoop/errors.js');
+    const { AuthError, formatAuthError } = await import('../infrastructure/whoop/errors.js');
     const expired = new AuthError({ kind: 'auth_expired' });
     const msg = formatAuthError(expired);
     expect(msg).toContain('recovery-ledger auth');
