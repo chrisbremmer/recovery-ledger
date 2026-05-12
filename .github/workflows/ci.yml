@@ -22,10 +22,18 @@ concurrency:
 
 jobs:
   ci:
-    # macOS-latest per D-12 — matches the documented setup target. Linux
-    # fallback (libsecret-less keychain → file with chmod 600) lands in
-    # Phase 2 alongside the keyring code. Windows is permanently out of scope.
-    runs-on: macos-latest
+    # Phase 2 Plan 08 / D-25: matrix expanded from a single macOS row to
+    # macos-latest + ubuntu-latest. The Linux row exercises the file-fallback
+    # path (no libsecret keychain available) by setting
+    # RECOVERY_LEDGER_FORCE_FILE_STORE=1 on the Test step — the same env
+    # override the token-store reads at module load. macOS continues to
+    # exercise the keyring backend by default. Windows remains permanently
+    # out of scope.
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-latest, ubuntu-latest]
     steps:
       # MR-28: pinned to a commit SHA, with the tag in a trailing comment for
       # human readability. Floating major tags (`@v4`) can be retagged to
@@ -55,6 +63,13 @@ jobs:
         run: npm run build
 
       - name: Test
+        # D-25: on ubuntu-latest, force the file-fallback path so the
+        # keyring (absent on most Linux runners without libsecret) is
+        # skipped. macOS leaves the env unset so the keyring code path is
+        # exercised end-to-end. The token-store reads
+        # RECOVERY_LEDGER_FORCE_FILE_STORE at module load.
+        env:
+          RECOVERY_LEDGER_FORCE_FILE_STORE: ${{ matrix.os == 'ubuntu-latest' && '1' || '' }}
         run: npm run test
 
       # Single entrypoint for all three D-04 / D-09 grep gates (tone words +
