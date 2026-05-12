@@ -68,6 +68,19 @@ interface JsonRpcMessage {
   jsonrpc: string;
 }
 
+// MR-19: typed view over the parsed-and-narrowed frame. `isJsonRpcMessage`
+// narrows to `{ jsonrpc: string }`; the additional fields below are optional
+// JSON-RPC envelope slots that the frame-validation arms inspect. Treating
+// the parsed value as `JsonRpcFrame` is a single justified cast (the prior
+// implementation chained `as unknown as Record<string, unknown>`, a
+// double-cast that the type system flagged but did not stop).
+interface JsonRpcFrame {
+  jsonrpc: string;
+  id?: unknown;
+  result?: unknown;
+  error?: unknown;
+}
+
 function isJsonRpcMessage(value: unknown): value is JsonRpcMessage {
   return (
     typeof value === 'object' &&
@@ -199,7 +212,7 @@ export async function probeMcpStdoutPurity(opts: ProbeOptions = {}): Promise<Doc
           return;
         }
 
-        const parsedFrames: Array<Record<string, unknown>> = [];
+        const parsedFrames: JsonRpcFrame[] = [];
         for (const line of lines) {
           let parsed: unknown;
           try {
@@ -220,7 +233,11 @@ export async function probeMcpStdoutPurity(opts: ProbeOptions = {}): Promise<Doc
             });
             return;
           }
-          parsedFrames.push(parsed as unknown as Record<string, unknown>);
+          // MR-19: `parsed` is narrowed to `JsonRpcMessage` ({ jsonrpc: '2.0' });
+          // the additional envelope slots (id/result/error) are optional fields
+          // declared on `JsonRpcFrame`. A single justified cast — the old
+          // `as unknown as Record<string, unknown>` double-cast is gone.
+          parsedFrames.push(parsed as JsonRpcFrame);
         }
 
         // CR-05: explicit assertion that the tools/call response (id=3)
