@@ -51,7 +51,7 @@
 - [x] 02-05-cli-shims-PLAN.md — `recovery-ledger init` (config bootstrap) + `recovery-ledger auth` (runOAuth+tokenStore.write); Commander wiring; Gate C broadened to src/cli/commands/**/*.ts
 - [x] 02-06-doctor-extensions-PLAN.md — probeAuth + probeTokenFreshness (offline-safe); CHECK_NAMES extended to 5; Gate E added (only token-store.ts may reference oauth/oauth2/token)
 - [x] 02-07-sanitizer-fixtures-PLAN.md — sanitize.test.ts F6 positional matrix + F7 D-20 OAuth-cause-chain fixture; ZERO production-code changes (Phase 1 SECRET_KEY_NAMES already covers code+client_secret)
-- [ ] 02-08-cross-process-integration-PLAN.md — tests/integration/auth-concurrency.test.ts (10 forked children + real HTTP mock; AUTH-05 load-bearing); CI matrix expanded to macos+ubuntu (ubuntu sets FORCE_FILE_STORE=1)
+- [x] 02-08-cross-process-integration-PLAN.md — tests/integration/auth-concurrency.test.ts (10 forked children + real HTTP mock; AUTH-05 load-bearing); CI matrix expanded to macos+ubuntu (ubuntu sets FORCE_FILE_STORE=1)
 **UI hint**: no
 
 ### Phase 3: Data Model, DB Layer & Sync Loop
