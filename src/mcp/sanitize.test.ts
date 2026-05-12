@@ -360,6 +360,37 @@ describe('serializeError cause chain', () => {
     });
     expect(serializeError(err)).toBe('outer — caused by: middle — caused by: 42');
   });
+
+  // MR-15 — an Error subclass whose toString() exposes context beyond
+  // `.message` (undici's connection errors carry a `.body` that some
+  // formatters surface) must have that string-form output sanitized.
+  // We construct a minimal subclass that mimics the shape: a custom
+  // toString that appends body context. The sanitize() chain runs after
+  // serializeError so the eventual `body=Bearer fake_...` substring lands
+  // on the wire as `<redacted>`.
+  test('MR-15 — toString-overridden Error surfaces non-.message context to the sanitizer', () => {
+    class UndiciLike extends Error {
+      body: string;
+      constructor(message: string, body: string) {
+        super(message);
+        this.name = 'UndiciLike';
+        this.body = body;
+      }
+      override toString(): string {
+        return `${this.name}: ${this.message} body=${this.body}`;
+      }
+    }
+    const err = new UndiciLike(
+      'UND_ERR_CONNECT_TIMEOUT',
+      'access_token=secret_value_should_redact',
+    );
+    const out = sanitize(serializeError(err));
+    // The .message piece is preserved verbatim.
+    expect(out).toContain('UND_ERR_CONNECT_TIMEOUT');
+    // The body context (extracted via String(err)) is sanitized.
+    expect(out).not.toContain('secret_value_should_redact');
+    expect(out).toContain('access_token=<redacted>');
+  });
 });
 
 describe('D-10 fixtures (errors that historically leak)', () => {

@@ -143,9 +143,26 @@ export function sanitize(input: string): string {
 // `err.cause === err` cycles (Pitfall 9). Both guards are required: WeakSet
 // covers cycles, depth covers deep-but-distinct chains. Non-Error causes are
 // stringified once and the walk terminates (they have no `.cause` to follow).
+//
+// MR-15: include `String(err)` for the top-level error so a custom toJSON
+// or toString that surfaces non-`.message` fields (undici's `.body`,
+// `.headers`, or a class that overrides Symbol.toPrimitive) still gets
+// sanitized. Without this, an error whose load-bearing context lives on
+// `.body` (e.g., `{ body: 'access_token=...' }`) would leak when the SDK
+// or a downstream log formatter calls `.toString()` later. Phase 2 HTTP
+// client code must still keep tokens off non-`.message` Error fields as
+// a primary defense; this is the secondary net.
 export function serializeError(err: unknown): string {
   if (!(err instanceof Error)) return String(err);
+  // String(err) includes the message AND honors a custom toString / toJSON
+  // that some Error subclasses ship (notably undici's connection errors).
+  // We concatenate the explicit message first so a class without overrides
+  // still produces the original D-08 cause-chain shape verbatim.
+  const stringified = String(err);
   const parts: string[] = [err.message];
+  if (stringified !== `Error: ${err.message}` && !stringified.endsWith(err.message)) {
+    parts.push(`(string form: ${stringified})`);
+  }
   let cause: unknown = err.cause;
   let depth = 0;
   const seen = new WeakSet<object>();
