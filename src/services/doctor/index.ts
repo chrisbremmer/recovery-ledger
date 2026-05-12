@@ -41,11 +41,41 @@ export interface RunDoctorOptions {
   skipSubprocessChecks?: boolean;
 }
 
+// MR-27: exhaustive status switch with defense-in-depth fail arm. The
+// TypeScript type union (`'pass' | 'warn' | 'fail'`) already prevents any
+// other status at compile time; the runtime arm exists so a future schema
+// drift, a JSON.parse cast, or a probe that synthesizes a check from
+// unchecked input still surfaces as `fail` instead of silently bucketing
+// into pass. A unit test exercises this via a `@ts-expect-error` literal.
 export function deriveOverall(checks: ReadonlyArray<DoctorCheck>): DoctorResult['overall'] {
-  if (checks.some((c) => c.status === 'fail')) return 'fail';
-  if (checks.some((c) => c.status === 'warn')) return 'warn';
-  return 'pass';
+  let sawWarn = false;
+  for (const c of checks) {
+    switch (c.status) {
+      case 'fail':
+        return 'fail';
+      case 'warn':
+        sawWarn = true;
+        break;
+      case 'pass':
+        break;
+      default:
+        // Unknown status at runtime (impossible per the static type union).
+        // Defense-in-depth: never treat unknown as pass. A drift here is a
+        // load-bearing protocol failure; we surface it as fail so the doctor
+        // surfaces the bug instead of silently green-checking the user.
+        return 'fail';
+    }
+  }
+  return sawWarn ? 'warn' : 'pass';
 }
+
+// MR-07: switch from Promise.all to Promise.allSettled so a single probe
+// throwing does not collapse the whole doctor result into a rejected promise
+// (which would surface as a sanitized MCP error or an unhandled CLI exception
+// rather than a structured `fail` check). Each rejection is synthesized into
+// a DoctorCheck with status: 'fail' so the failing probe still appears in
+// the user-facing output with a useful detail string.
+const PROBE_NAMES = ['better_sqlite3_load', 'napi_keyring_load', 'mcp_stdout_purity'] as const;
 
 export async function runDoctor(opts: RunDoctorOptions = {}): Promise<DoctorResult> {
   // `RL_INSIDE_MCP=1` is set on the spawned MCP subprocess in
@@ -53,10 +83,23 @@ export async function runDoctor(opts: RunDoctorOptions = {}): Promise<DoctorResu
   // recursive subprocess check. Belt-and-suspenders: callers that forget to
   // pass the option still get safe behavior when the env var is present.
   const skipSubprocess = opts.skipSubprocessChecks === true || process.env.RL_INSIDE_MCP === '1';
-  const checks = await Promise.all([
+  const settled = await Promise.allSettled([
     probeBetterSqlite3(),
     probeKeyring(),
     probeMcpStdoutPurity({ skipSubprocess }),
   ]);
+  const checks: DoctorCheck[] = settled.map((r, i) => {
+    if (r.status === 'fulfilled') return r.value;
+    // Synthesize a fail check for a probe that threw rather than returning
+    // a structured DoctorCheck. `probeName` falls back to a positional name
+    // if PROBE_NAMES drifts out of sync — defense in depth, not contract.
+    const probeName = PROBE_NAMES[i] ?? `probe_${i}`;
+    const reason = r.reason instanceof Error ? r.reason.message : String(r.reason);
+    return {
+      name: probeName,
+      status: 'fail',
+      detail: `probe threw: ${reason}`,
+    };
+  });
   return { checks, overall: deriveOverall(checks) };
 }

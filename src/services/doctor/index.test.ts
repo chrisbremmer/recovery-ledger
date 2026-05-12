@@ -4,7 +4,7 @@
 // no subprocess driver fires. `runDoctor()` itself is exercised end-to-end
 // by Plan 06's integration test.
 
-import { describe, expect, test } from 'vitest';
+import { describe, expect, test, vi } from 'vitest';
 import { type DoctorCheck, deriveOverall, runDoctor } from './index.js';
 
 const stub = (name: string, status: DoctorCheck['status']): DoctorCheck => ({
@@ -26,6 +26,21 @@ describe('deriveOverall', () => {
 
   test('returns fail when any check is fail, regardless of warns', () => {
     const checks = [stub('a', 'fail'), stub('b', 'warn'), stub('c', 'pass')];
+    expect(deriveOverall(checks)).toBe('fail');
+  });
+
+  // MR-27 — defense-in-depth: an unknown status at runtime (impossible per the
+  // static type but possible after a JSON round-trip or a schema drift) must
+  // bucket into `fail`, not silently pass through. The pre-MR-27 implementation
+  // used `some(c => c.status === 'fail')`/`some(c => c.status === 'warn')` and
+  // fell through to `'pass'` for any unrecognized status — silent green-check.
+  test('MR-27 — returns fail when a check has an unknown status (defense-in-depth)', () => {
+    const checks: DoctorCheck[] = [
+      stub('a', 'pass'),
+      // @ts-expect-error — testing the runtime arm; the type union forbids this at compile time.
+      { name: 'b', status: 'unknown', detail: 'malformed' },
+      stub('c', 'pass'),
+    ];
     expect(deriveOverall(checks)).toBe('fail');
   });
 });
@@ -91,6 +106,42 @@ describe('runDoctor — CR-01 skipSubprocessChecks contract', () => {
     // drain). The skip arm must complete in a few milliseconds. 500ms is a
     // generous ceiling that still proves no spawn ran.
     expect(elapsed).toBeLessThan(500);
+  });
+
+  // MR-07 — a probe that throws must surface as a synthesized `fail` check,
+  // not as a rejected runDoctor() promise that escapes to the caller. The MCP
+  // and CLI surfaces both consume DoctorResult verbatim and assume every probe
+  // returns a structured check; a throw was previously a load-bearing bug.
+  test('MR-07 — runDoctor synthesizes a fail check when a probe throws', async () => {
+    // Mock probeBetterSqlite3 to throw. The other two probes return normally,
+    // so we expect three checks total with one synthesized-from-throw entry.
+    vi.resetModules();
+    vi.doMock('./checks/native-modules.js', () => ({
+      probeBetterSqlite3: async () => {
+        throw new Error('synthetic probe explosion');
+      },
+      probeKeyring: async () => ({
+        name: 'napi_keyring_load',
+        status: 'pass' as const,
+        detail: 'native binding loaded',
+      }),
+    }));
+    try {
+      // Dynamic import after the mock so the runDoctor under test resolves
+      // the mocked probeBetterSqlite3 binding.
+      const { runDoctor: runDoctorMocked } = await import('./index.js');
+      const result = await runDoctorMocked({ skipSubprocessChecks: true });
+
+      expect(result.overall).toBe('fail');
+      const failed = result.checks.find((c) => c.name === 'better_sqlite3_load');
+      expect(failed).toBeDefined();
+      expect(failed?.status).toBe('fail');
+      expect(failed?.detail).toContain('probe threw');
+      expect(failed?.detail).toContain('synthetic probe explosion');
+    } finally {
+      vi.doUnmock('./checks/native-modules.js');
+      vi.resetModules();
+    }
   });
 
   test('runDoctor() honours RL_INSIDE_MCP=1 env even without explicit option', async () => {
