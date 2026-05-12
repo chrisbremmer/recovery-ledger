@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-current_plan: 2
+current_plan: 3
 status: executing
-last_updated: "2026-05-12T22:23:46.313Z"
+last_updated: "2026-05-12T22:31:46.773Z"
 progress:
   total_phases: 5
   completed_phases: 1
   total_plans: 14
-  completed_plans: 7
-  percent: 50
+  completed_plans: 8
+  percent: 57
 ---
 
 # State: Recovery Ledger
@@ -26,16 +26,16 @@ progress:
 
 ## Current Position
 
-**Current Plan:** 2
+**Current Plan:** 3
 **Total Plans in Phase:** 8
 Phase: 02 (oauth-token-store-single-flight-refresh) — EXECUTING
-Plan: 2 of 8
+Plan: 3 of 8
 
 - **Milestone:** v1
 - **Phase:** 2
 - **Plan:** 02-01-wave0-infra-PLAN.md (complete) — Wave-0 infrastructure for Phase 2: paths.ts (5-path resolver + singleton), schema.ts (canonical ConfigSchema + D13_SCOPES), errors.ts (6-kind AuthError union, FROZEN), MSW helper (per-call hit counter), three OAuth fixtures, four npm deps.
-- **Status:** Ready to execute Plan 02-02 (token-store)
-- **Progress:** [█████░░░░░] 50%
+- **Status:** Ready to execute
+- **Progress:** [██████░░░░] 57%
 
 ```
 [████░░░░░░░░░░░░░░░░] 1 / 5 phases complete (6 / 6 plans complete in Phase 1)
@@ -51,6 +51,7 @@ Plan: 2 of 8
 | v1 requirements complete | 12 / 49 |
 | Plans drafted | 6 (Phase 1) + 8 (Phase 2) |
 | Plans complete | 7 |
+| Phase 02 P07 | 2m 1s | 1 tasks | 1 files |
 
 ### Plan Execution History
 
@@ -105,6 +106,11 @@ Plan: 2 of 8
 - **[Phase 02] Plan 02-01 deviation:** Biome formatter auto-fixed paths.ts configDir line-split and errors.ts super(...) collapse (Rule 3 — blocking format).
 - **[Phase 02] Plan 02-01 deviation:** rewrote paths.ts doc-comment mentions of process.env to 'env-global' so plan acceptance grep returns exactly the single export line (Rule 1 — comment regression).
 - **[Phase 02] Plan 02-01 deviation:** ran npm run build to rebuild stale dist/mcp.mjs (gitignored) before full-suite verify — pre-existing precondition, not Plan 02-01 regression; planner-template note worth recording.
+- **[Phase 02] Plan 02-07 decision:** D-19 collapsed to test-fixture-only work — RESEARCH lines 768-787 confirmed Phase 1 SECRET_KEY_NAMES already contains code + client_secret; plan ships fixtures only, no sanitize.ts regex changes.
+- **[Phase 02] Plan 02-07 decision:** D-18 attestation verified — src/mcp/register.ts NOT modified; new Phase 2 AuthError kinds (auth_port_in_use, auth_expired) flow through unchanged sanitize(serializeError(err)) pipeline; full-suite pass (127 tests / 12 files) exercises the wrapper end-to-end.
+- **[Phase 02] Plan 02-07 decision:** avoided F-number collision with Phase 1 D-10 fixtures — added Phase 2 fixtures as sibling describe blocks named 'F6 — Bearer/JWT/...' and 'F7 — D-20 ...' rather than renaming existing test('F6 ...') inside the D-10 describe block.
+- **[Phase 02] Plan 02-07 decision:** N-01 (code=12) uses permissive assertion — Pattern 2b has no length floor today; permissive shape documents intent without locking in a debatable choice.
+- **[Phase 02] Plan 02-07 deviation:** F6.02 fixture rewritten mid-execution — original D-20 verbatim eyJabc.eyJdef.signature123 too short for Pattern 3 floors (4/8/8); F6.02 now uses longer fixture; F7.01 retains D-20 verbatim because code= form-body catches it before Pattern 3 fires (Rule 1).
 
 ### Open Todos
 
@@ -127,11 +133,11 @@ None.
 
 ### Last Session Summary
 
-Executed Plan 02-01 (Wave-0 infrastructure for Phase 2). Shipped 10 created files + 2 modified across three task commits (Task 1 + Task 2 RED + Task 2 GREEN — TDD cycle). Installed four npm deps at pinned versions: `proper-lockfile@^4.1.2`, `open@^11.0.0` (runtime); `msw@^2.14.6`, `@types/proper-lockfile@^4.1.4` (dev). Three new TS modules with co-located unit tests (16 tests total, all green): (1) `src/infrastructure/config/paths.ts` — factory `resolvePaths(env)` + module-load `paths` singleton; five derived paths from D-03/D-06/D-07 (configFile, tokensFile, tokensLockFile, storageModeFile); throws when neither HOME nor RECOVERY_LEDGER_HOME is set. (2) `src/infrastructure/config/schema.ts` — canonical `ConfigSchema` (Zod) + `D13_SCOPES` frozen tuple + `InitConfig` type; eliminates the duplicate-schema DRY violation flagged by the planner checker (WARNING PLAN-05-DRY-VIOLATION). (3) `src/infrastructure/whoop/errors.ts` — `AuthError` discriminated union over SIX `AuthErrorKind` variants including `auth_port_in_use` (moved into Wave 0 per checker BLOCKER 1; errors.ts now FROZEN at 6 kinds across Plans 02-02 through 02-08); `formatAuthError` exhaustive switch is the MR-21 forcing function. Shared MSW helper at `tests/helpers/msw-whoop-oauth.ts` exports `createWhoopOauthHelper` with per-call hit counter + `setNextResponse` one-shot override; `WHOOP_TOKEN_URL` is the single source for the phase (T-02.01-04 mitigation). Three OAuth fixtures under `test/fixtures/oauth/`: token-200.json, token-400-invalid-grant.json, authorize-callback-state-mismatch.html. Three deviations all auto-fixed before commit: (1) Biome formatter reflows on paths.ts configDir + errors.ts super() (Rule 3 — blocking format); (2) paths.ts doc-comment mentions of `process.env` rewritten to "env-global" so plan's grep acceptance returns exactly one line (Rule 1 — comment regression); (3) ran `npm run build` to rebuild stale `dist/mcp.mjs` (gitignored) before full-suite verify — pre-existing local-machine precondition from Phase 1, NOT a Plan 02-01 regression. Planner-template note: chain `npm run build &&` ahead of full-suite verify commands. Commits: `ded9836` (chore — deps + MSW + fixtures), `dbee5a1` (test — RED), `0705a09` (feat — GREEN). Full src/infrastructure subset suite green (25 tests / 4 files); CI grep gates pass; `npm run lint` clean.
+Executed Plan 02-07 (sanitizer fixtures). Single-task plan: appended 12 new tests to `src/mcp/sanitize.test.ts` covering Phase 2 OAuth-specific leak shapes — 8 F6 positional matrix cases (Bearer header / bare JWT / refresh_token URL / refresh_token JSON / refresh_token form / access_token JSON / access_token URL / access_token Bearer literal), 1 F7 D-20 verbatim cause-chain fixture (`new Error('OAuth callback failed', { cause: Error('redirect ?code=eyJabc.eyJdef.signature123 with client_secret=hunter2') })` → both values redacted via Phase 1's D-08 cause walker + SECRET_KEY_NAMES), and 3 N-prefix negative cases (length-guard and English-word substring pinning). NO production-code changes: `src/mcp/sanitize.ts` and `src/mcp/register.ts` both untouched — D-18 attestation verified by `git diff --name-only` and D-19 confirmed (RESEARCH lines 768-787 predicted; Phase 1's SECRET_KEY_NAMES already contained `code` and `client_secret`). One deviation: F6.02's fixture was rewritten mid-execution because the original D-20 verbatim string `eyJabc.eyJdef.signature123` was too short for Pattern 3's `{4,}/{8,}/{8,}` length floors — updated to `eyJabcdef.eyJxyzabcdef.signatureMoreChars`. F7.01 retains the exact D-20 string because the surrounding `code=` form-body pattern (2b) catches it before Pattern 3 needs to fire. Tests: 54 → 66 in sanitize.test.ts; full suite 127/127 across 12 files; lint clean; CI grep gates pass. Commit: `61c1ae7` (test). Planner-template note: plan's `<acceptance_criteria>` referenced "20 Phase 1 cases" but real baseline was 54 — recommend planners run the count fresh at execution time.
 
 ### Next Session
 
-Execute Plan 02-02 (token-store). Wave 1+ of Phase 2 is now unblocked — paths.ts, schema.ts, errors.ts, MSW helper, and OAuth fixtures are all available for import. AuthError union is FROZEN at 6 kinds; no Wave-2 plan should mutate errors.ts. The verifier agent has not been re-run for Phase 1 yet (still pending from end of Phase 1) — orchestrator may choose to run it before continuing.
+Execute Plan 02-02 (token-store). Wave 1+ of Phase 2 is now unblocked — paths.ts, schema.ts, errors.ts, MSW helper, and OAuth fixtures are all available for import. AuthError union is FROZEN at 6 kinds; no Wave-2 plan should mutate errors.ts. The sanitizer CI regression-lock from Plan 02-07 now guards every Phase 2 leak shape, so Plan 02-08's `grep -v Bearer` end-to-end assertion has the underlying proof it needs. The verifier agent has not been re-run for Phase 1 yet (still pending from end of Phase 1) — orchestrator may choose to run it before continuing.
 
 ---
 *State initialized: 2026-05-11*
@@ -143,3 +149,4 @@ Execute Plan 02-02 (token-store). Wave 1+ of Phase 2 is now unblocked — paths.
 *Plan 01-05 complete: 2026-05-12 (5m 18s, 15 files — 13 created + 2 modified)*
 *Plan 01-06 complete: 2026-05-12 (4m 22s, 2 files) — Phase 1 closed.*
 *Plan 02-01 complete: 2026-05-12 (5m 17s, 12 files — 10 created + 2 modified) — Phase 2 Wave 0 done.*
+*Plan 02-07 complete: 2026-05-12 (2m 1s, 1 file — sanitizer fixtures + D-18 attestation; 12 new tests; no production-code changes).*

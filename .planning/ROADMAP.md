@@ -50,7 +50,7 @@
 - [ ] 02-04-refresh-orchestrator-PLAN.md — callWithAuth() 401-reactive retry orchestrator (budget=1); services barrel exports refreshOrchestrator
 - [ ] 02-05-cli-shims-PLAN.md — `recovery-ledger init` (config bootstrap) + `recovery-ledger auth` (runOAuth+tokenStore.write); Commander wiring; Gate C broadened to src/cli/commands/**/*.ts
 - [ ] 02-06-doctor-extensions-PLAN.md — probeAuth + probeTokenFreshness (offline-safe); CHECK_NAMES extended to 5; Gate E added (only token-store.ts may reference oauth/oauth2/token)
-- [ ] 02-07-sanitizer-fixtures-PLAN.md — sanitize.test.ts F6 positional matrix + F7 D-20 OAuth-cause-chain fixture; ZERO production-code changes (Phase 1 SECRET_KEY_NAMES already covers code+client_secret)
+- [x] 02-07-sanitizer-fixtures-PLAN.md — sanitize.test.ts F6 positional matrix + F7 D-20 OAuth-cause-chain fixture; ZERO production-code changes (Phase 1 SECRET_KEY_NAMES already covers code+client_secret)
 - [ ] 02-08-cross-process-integration-PLAN.md — tests/integration/auth-concurrency.test.ts (10 forked children + real HTTP mock; AUTH-05 load-bearing); CI matrix expanded to macos+ubuntu (ubuntu sets FORCE_FILE_STORE=1)
 **UI hint**: no
 
@@ -97,7 +97,7 @@
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Foundation & Stdout-Pure MCP Bootstrap | 6/6 | Complete | 2026-05-12 |
-| 2. OAuth, Token Store & Single-Flight Refresh | 1/8 | In Progress|  |
+| 2. OAuth, Token Store & Single-Flight Refresh | 2/8 | In Progress|  |
 | 3. Data Model, DB Layer & Sync Loop | 0/? | Not started | - |
 | 4. Domain Math, Reviews, Decision Ledger & MCP Surface | 0/? | Not started | - |
 | 5. Doctor Polish, Install Guide & <20-Minute Setup Validation | 0/? | Not started | - |

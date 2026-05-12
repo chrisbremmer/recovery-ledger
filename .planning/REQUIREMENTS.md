@@ -24,7 +24,7 @@ Requirements for the initial release. Each maps to roadmap phases.
 - [x] **AUTH-03**: OAuth tokens stored at rest via `@napi-rs/keyring` with `chmod 600` file fallback when keychain is unavailable, surfaced clearly by `doctor`
 - [x] **AUTH-04**: Token-refresh wrapper transparently refreshes expired access tokens and retries the originating request on 401
 - [x] **AUTH-05**: Single-flight refresh: in-process module-level `Promise<Tokens> | null` plus cross-process file advisory lock plus atomic temp-file-and-rename token write — concurrent CLI + MCP refresh never burns the refresh-token family
-- [ ] **AUTH-06**: Token-leak prevention: error messages and MCP tool error returns never expose token material (covered by FND-06)
+- [x] **AUTH-06**: Token-leak prevention: error messages and MCP tool error returns never expose token material (covered by FND-06)
 
 ### Data Model & DB
 
@@ -137,7 +137,7 @@ Explicitly excluded. Gated behind the hard scope guardrail in PROJECT.md (≥ 12
 | AUTH-03 | Phase 2 | Complete |
 | AUTH-04 | Phase 2 | Complete |
 | AUTH-05 | Phase 2 | Complete |
-| AUTH-06 | Phase 2 | Pending |
+| AUTH-06 | Phase 2 | Complete |
 | DATA-01 | Phase 3 | Pending |
 | DATA-02 | Phase 3 | Pending |
 | DATA-03 | Phase 3 | Pending |
