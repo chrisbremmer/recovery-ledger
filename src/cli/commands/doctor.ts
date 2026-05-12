@@ -20,8 +20,34 @@ export const DOCTOR_EXIT_CODES: Readonly<Record<DoctorResult['overall'], number>
 });
 
 export async function runDoctorCommand(opts: { text?: boolean }): Promise<void> {
-  const result = await runDoctor();
-  const body = opts.text ? renderDoctor(result) : JSON.stringify(result, null, 2);
-  process.stdout.write(`${body}\n`);
-  process.exit(DOCTOR_EXIT_CODES[result.overall]);
+  try {
+    const result = await runDoctor();
+    const body = opts.text ? renderDoctor(result) : JSON.stringify(result, null, 2);
+    // MR-05: pass exit as the write callback so slow pipe consumers (e.g.,
+    // `recovery-ledger doctor | (sleep 0.5; cat)`) get the full buffered
+    // output before the process exits. `process.exit()` is synchronous and
+    // does not flush stdio; writing to a pipe whose buffer is not fully
+    // drained truncates the tail. The callback fires once the kernel has
+    // accepted the bytes (or the write fails).
+    process.stdout.write(`${body}\n`, () => {
+      process.exit(DOCTOR_EXIT_CODES[result.overall]);
+    });
+  } catch (err) {
+    // MR-08: runDoctor() should not reject after MR-07 (Promise.allSettled
+    // synthesizes fail checks from probe rejections), but an outer guard is
+    // cheap and prevents an unhandled rejection from escaping with no output
+    // at all. JSON.stringify can also throw for cyclic or BigInt fields a
+    // future probe might emit — we'd rather surface a one-line error than a
+    // silent crash. CLI errors are NOT routed through the MCP sanitizer
+    // (those rules apply to JSON-RPC framing); we use String(err) to avoid
+    // leaking object internals while keeping the message intelligible.
+    const message = String(err);
+    const fallback = { checks: [], overall: 'fail' as const, error: message };
+    const body = opts.text
+      ? `[fail] cli — ${message}\noverall: fail`
+      : JSON.stringify(fallback, null, 2);
+    process.stdout.write(`${body}\n`, () => {
+      process.exit(DOCTOR_EXIT_CODES.fail);
+    });
+  }
 }
