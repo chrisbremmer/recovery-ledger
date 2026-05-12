@@ -67,6 +67,22 @@ describe('sanitize patterns', () => {
     const input = 'the word Bearer in prose';
     expect(sanitize(input)).toBe(input);
   });
+
+  // P4 case-insensitivity — lowercase `bearer` and uppercase `BEARER` must
+  // redact identically to mixed-case `Bearer`. Pattern 1 only pre-empts when
+  // the `Authorization:` prefix is present; bare lowercase Bearer tokens in
+  // undici body excerpts or third-party log lines hit pattern 4 alone.
+  test('P4+ redacts lowercase bare bearer prefix (case-insensitive)', () => {
+    expect(sanitize('bearer abcdef1234567890')).toBe('Bearer <redacted>');
+  });
+
+  test('P4+ redacts uppercase bare BEARER prefix (case-insensitive)', () => {
+    expect(sanitize('BEARER abcdef1234567890')).toBe('Bearer <redacted>');
+  });
+
+  test('P4+ redacts mixed-case bare Bearer prefix', () => {
+    expect(sanitize('BeArEr abcdef1234567890')).toBe('Bearer <redacted>');
+  });
 });
 
 describe('serializeError cause chain', () => {

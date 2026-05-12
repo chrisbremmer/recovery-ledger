@@ -34,9 +34,13 @@ export const PATTERNS: ReadonlyArray<{ pattern: RegExp; replacement: string }> =
   },
   // 4. Bare `Bearer <token>` in error messages without an `Authorization:` prefix.
   //    The `{10,}` minimum length prevents stripping the literal word "Bearer"
-  //    if it appears in prose (e.g., "the Bearer token expired").
+  //    if it appears in prose (e.g., "the Bearer token expired"). The `i` flag
+  //    catches `bearer abc…` / `BEARER abc…` — some servers and log-formatters
+  //    lowercase header values, and undici's `UND_ERR_*` body excerpts do not
+  //    normalize case. Pattern 1 still pre-empts this rule for the
+  //    `Authorization:` form via earlier-rule precedence.
   {
-    pattern: /Bearer\s+[A-Za-z0-9._-]{10,}/g,
+    pattern: /Bearer\s+[A-Za-z0-9._-]{10,}/gi,
     replacement: 'Bearer <redacted>',
   },
 ];
