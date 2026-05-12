@@ -24,11 +24,27 @@
 
 import { spawn } from 'node:child_process';
 import { access, readFile } from 'node:fs/promises';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { describe, expect, test } from 'vitest';
+// MR-31: import the canonical frame-settle constant from the probe so the
+// integration test and the production probe stay in lockstep. The two share
+// a wire-level coupling (same JSON-RPC fixtures, same SDK async cadence);
+// a divergence here would silently change one without the other.
+import { FRAME_SETTLE_MS } from '../../src/services/doctor/checks/mcp-stdout-purity.js';
 
 const FIXTURES = ['initialize', 'initialized', 'tools-list', 'whoop-doctor-call'] as const;
-const DIST_MCP = 'dist/mcp.mjs';
-const FRAME_SETTLE_MS = 200;
+// MR-33: resolve dist/mcp.mjs and the fixtures relative to this test file's
+// URL instead of process.cwd(). The doctor probe (CR-02) already uses
+// import.meta.url + fileURLToPath for the same reason: a test or probe that
+// reads from cwd silently misbehaves when run from outside the repo root
+// (e.g., `cd test && vitest run integration/...` or a future packaged smoke
+// test). Anchored at this file's location, two levels up resolves to the
+// repo root.
+const HERE = path.dirname(fileURLToPath(import.meta.url));
+const REPO_ROOT = path.resolve(HERE, '..', '..');
+const DIST_MCP = path.resolve(REPO_ROOT, 'dist', 'mcp.mjs');
+const FIXTURES_DIR = path.resolve(REPO_ROOT, 'test', 'fixtures', 'mcp');
 // After CR-01 the inner tools/call no longer recursively respawns another
 // dist/mcp.mjs (it short-circuits via skipSubprocessChecks), so the budget
 // can be tight. We use a response-driven wait keyed on the id=3 frame's
@@ -47,7 +63,7 @@ describe('MCP stdout purity (dist smoke)', () => {
       expect.fail(`${DIST_MCP} missing — run \`npm run build\` first`);
     }
 
-    const child = spawn(process.execPath, ['dist/mcp.mjs'], {
+    const child = spawn(process.execPath, [DIST_MCP], {
       stdio: ['pipe', 'pipe', 'pipe'],
       env: { ...process.env, NODE_ENV: 'production' },
     });
@@ -92,7 +108,7 @@ describe('MCP stdout purity (dist smoke)', () => {
     // round-tripped when the raw `json.trim()` was written). Same collapse
     // pattern as src/services/doctor/checks/mcp-stdout-purity.ts.
     for (const name of FIXTURES) {
-      const body = await readFile(`test/fixtures/mcp/${name}.json`, 'utf8');
+      const body = await readFile(path.resolve(FIXTURES_DIR, `${name}.json`), 'utf8');
       const frame = `${JSON.stringify(JSON.parse(body))}\n`;
       child.stdin.write(frame);
       await new Promise<void>((r) => setTimeout(r, FRAME_SETTLE_MS));

@@ -53,7 +53,13 @@ export function setMcpEntryForTesting(override: string | null): void {
 // here (initialize, tools/list, tools/call with a no-arg doctor stub) without
 // dragging out the doctor command. Plan 06's integration test can extend this
 // if real workloads ever need more headroom.
-const FRAME_SETTLE_MS = 200;
+//
+// MR-31: exported so the integration test can re-use the same constant
+// instead of declaring its own. The probe and the integration test share a
+// wire-level coupling (they drive the same JSON-RPC handshake against the
+// same fixtures); a single source of truth prevents drift if the SDK's
+// async cadence ever changes.
+export const FRAME_SETTLE_MS = 200;
 const FINAL_DRAIN_MS = 300;
 
 // Required response id from the tools/call frame (whoop-doctor-call fixture).
