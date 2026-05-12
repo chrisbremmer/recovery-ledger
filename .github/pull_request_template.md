@@ -49,15 +49,15 @@ out what you ran and what you saw.
 > Read this before running `/ce-code-review` on the PR. The reviewer
 > team uses this section as its context budget.
 
-**Critical rules touched** *(tick any the diff brushes against)*
+**Critical rules touched** *(tick any the diff brushes against — full text in [AGENTS.md § Critical Rules](../AGENTS.md#critical-rules))*
 
-- [ ] ADR-0001 — MCP stdout purity (no `console.*` in MCP-reachable code)
-- [ ] ADR-0002 — Single-flight OAuth refresh
-- [ ] ADR-0003 — `score_state` discipline (discriminated union)
-- [ ] ADR-0004 — "No reliable pattern detected" is a positive output
-- [ ] ADR-0005 — Banned tone words / no emoji in review output
-- [ ] ADR-0006 — Tests never call WHOOP for real (MSW only)
-- [ ] ADR-0007 — Read-only with respect to WHOOP (GET-only HTTP)
+- [ ] [ADR-0001](../agent_docs/decisions/0001-mcp-stdout-purity.md)
+- [ ] [ADR-0002](../agent_docs/decisions/0002-single-flight-oauth-refresh.md)
+- [ ] [ADR-0003](../agent_docs/decisions/0003-score-state-discipline.md)
+- [ ] [ADR-0004](../agent_docs/decisions/0004-no-reliable-pattern-positive-output.md)
+- [ ] [ADR-0005](../agent_docs/decisions/0005-banned-tone-words.md)
+- [ ] [ADR-0006](../agent_docs/decisions/0006-fixture-only-tests.md)
+- [ ] [ADR-0007](../agent_docs/decisions/0007-whoop-read-only.md)
 - [ ] None — purely tooling, planning, or unrelated docs
 
 **What was attempted**

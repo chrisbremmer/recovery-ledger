@@ -22,7 +22,7 @@ Numbers are sequential and never reused, even if an ADR is superseded.
 ```markdown
 # NNNN. Title
 
-- **Status:** Proposed | Accepted | Superseded by [NNNN](./NNNN-name.md)
+- **Status:** Proposed | Accepted | Superseded by ADR-NNNN (when superseding, link to the actual file path)
 - **Date:** YYYY-MM-DD
 - **Decider(s):** initials
 

@@ -26,10 +26,13 @@ second presents a now-invalid token; WHOOP revokes the family.
 1. **In-process single-flight.** A module-level `Promise<Tokens> | null`
    serialises concurrent refresh attempts in the same process. The
    second caller awaits the first's result.
-2. **Cross-process advisory lock.** A `flock`-style file lock on the
-   token store (path: `<config-dir>/tokens.lock`) serialises refreshes
-   across CLI + MCP processes. The lock is held only across the refresh
-   request, not for the whole token lifetime.
+2. **Cross-process advisory lock** via `proper-lockfile` (the only
+   primitive that works portably across macOS + Linux without depending
+   on `flock(1)`, which macOS does not ship). The lock target is the
+   token-store file (`<config-dir>/tokens.json.lock`) with
+   `{ retries: { retries: 10, factor: 1.2, minTimeout: 50 }, stale: 5000 }`.
+   Held only across the refresh request, not for the whole token
+   lifetime.
 3. **Atomic temp-and-rename write.** Refreshed tokens are written to
    `tokens.json.tmp`, fsynced, then renamed over `tokens.json`. Readers
    see either the old or the new file, never a partial write.
@@ -55,6 +58,9 @@ all callers go through it.
 - **Database-stored token with `SELECT … FOR UPDATE`.** Rejected: adds
   a SQLite transaction round-trip to every API call; file lock is
   cheaper.
+- **`flock(1)` shell-level lock.** Rejected: macOS does not ship `flock(1)`
+  (only `flock(2)` syscall); cross-platform support requires a Node
+  primitive. `proper-lockfile` is the chosen library.
 - **Pessimistic "always refresh once per process start".** Rejected:
   burns refresh tokens unnecessarily and still races between
   concurrent processes.
