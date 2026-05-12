@@ -2,20 +2,20 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-current_plan: 5
+current_plan: 6
 status: executing
-last_updated: "2026-05-12T22:54:52.440Z"
+last_updated: "2026-05-12T23:04:37.210Z"
 progress:
   total_phases: 5
   completed_phases: 1
   total_plans: 14
-  completed_plans: 10
-  percent: 71
+  completed_plans: 11
+  percent: 79
 ---
 
 # State: Recovery Ledger
 
-**Last updated:** 2026-05-12 — completed Plan 02-03 (oauth-round-trip: buildAuthorizeUrl + listenForCallback 127.0.0.1-only + exchangeCode + runOAuth; OAuth error-code response policy BLOCKER 4 / OPEN-Q-01; 30 unit tests green; full suite 174/174 across 14 files; errors.ts unchanged at 6 frozen kinds).
+**Last updated:** 2026-05-12 — completed Plan 02-04 (refresh-orchestrator: 401-reactive retry policy chokepoint with budget = 1 per D-15; sibling-refresh-aware re-read; refresh failure wraps as AuthError({kind: 'auth_expired', cause: refreshErr}); services barrel extended with refreshOrchestrator alongside runDoctor; SOLE consumer of tokenStore.getValidAccessToken() outside token-store internals — grep-verified; Plan 02-06 Gate E will lock at CI time; 9 unit tests green; full suite 183/183 across 15 files; errors.ts unchanged at 6 frozen kinds).
 **Mode:** yolo
 **Granularity:** standard
 
@@ -26,16 +26,16 @@ progress:
 
 ## Current Position
 
-**Current Plan:** 5
+**Current Plan:** 6
 **Total Plans in Phase:** 8
 Phase: 02 (oauth-token-store-single-flight-refresh) — EXECUTING
-Plan: 5 of 8
+Plan: 6 of 8
 
 - **Milestone:** v1
 - **Phase:** 2
 - **Plan:** 02-03-oauth-round-trip-PLAN.md (complete) — OAuth Authorization-Code surface for `recovery-ledger auth`: buildAuthorizeUrl (D-13 scope + 256-bit base64url state + URL-safe clientId regex) + listenForCallback (127.0.0.1-only loopback + D-09 verbatim HTML pages + D-10 timeout + EADDRINUSE → auth_port_in_use) + exchangeCode (POST to WHOOP_TOKEN_URL + Zod passthrough) + runOAuth (full orchestration with --no-browser stderr fallback). OAuth error-code response policy (BLOCKER 4 / OPEN-Q-01): RENDER invalid_scope/invalid_request/unsupported_response_type verbatim; STRIP opaque codes. PKCE OFF by default per A1. 30 unit tests green; errors.ts FROZEN at 6 kinds.
 - **Status:** Ready to execute
-- **Progress:** [███████░░░] 71%
+- **Progress:** [████████░░] 79%
 
 ```
 [████░░░░░░░░░░░░░░░░] 1 / 5 phases complete (6 / 6 plans complete in Phase 1)
@@ -54,6 +54,7 @@ Plan: 5 of 8
 | Phase 02 P07 | 2m 1s | 1 tasks | 1 files |
 | Phase 02 P02 | 5m 32s | 1 tasks | 2 files |
 | Phase 02 P03 | 4m 28s | 1 tasks | 2 files |
+| Phase 02 P04 | 3m 3s | 1 tasks | 3 files |
 
 ### Plan Execution History
 
@@ -131,6 +132,11 @@ Plan: 5 of 8
 - [Phase ?]: [Phase 02] Plan 02-03 deviation: MSW onUnhandledRequest:'bypass' (not 'error') — runOAuth tests drive real fetch against loopback 127.0.0.1 server; helper still intercepts WHOOP_TOKEN_URL only (Rule 1 test correctness).
 - [Phase ?]: [Phase 02] Plan 02-03 deviation: settled-promise wrapper pattern for L-02 + OE-01..09 tests — Vitest treats single-tick rejection gap as unhandled; .then(ok,err) wrapper attaches handler before fetch round-trip (Rule 1 test correctness).
 - [Phase ?]: [Phase 02] Plan 02-03 deviation: plan acceptance grep 'oauth/oauth2/auth ... grep -v oauth.ts' returns matches in oauth.test.ts (oauth.ts is NOT a substring of oauth.test.ts); same precedent as Plan 02-02 Gate-E. Plan 02-06 input note: must --exclude='*.test.ts' (Rule 1 plan-text drift).
+- [Phase ?]: [Phase 02] Plan 02-04 decision: refresh orchestrator is the SOLE consumer of tokenStore.getValidAccessToken() outside token-store internals; grep-verified; Plan 02-06 Gate E will lock at CI time. 401-reactive retry policy chokepoint with budget = 1 per D-15.
+- [Phase ?]: [Phase 02] Plan 02-04 decision: FetchLikeResponse intentionally minimal — just {status: number}. Orchestrator only needs .status to decide retry; full Response shape is operation callback's concern. Decouples from globalThis.Response and lets Phase 3 WHOOP HTTP client pass any wrapper.
+- [Phase ?]: [Phase 02] Plan 02-04 decision: callWithAuth bound on singleton via .bind(refreshOrchestrator) — naked property reference would lose this binding for free-function import sites. Functionally equivalent to plan's <interfaces> wording; semantically more robust.
+- [Phase ?]: [Phase 02] Plan 02-04 deviation: dynamic-imported AuthError inside F-01/F-02 instead of top-level static import — vi.resetModules() creates fresh module-graph instances per test, so toBeInstanceOf against a top-level static class binding fails (same class name, different runtime identity). Planner-template note: any test using vi.resetModules + dynamic import + toBeInstanceOf must dynamic-import the class symbol too (Rule 1).
+- [Phase ?]: [Phase 02] Plan 02-04 deviation: orchestrator module-leading comment uses 'console calls' and 'direct stdout writes' phrasing rather than literal 'console.*' and 'process.stdout.write' to avoid plan-acceptance-grep collision — same precedent as Plan 02-01 paths.ts and Plan 02-02 token-store.ts (Rule 1).
 
 ### Open Todos
 
@@ -153,11 +159,11 @@ None.
 
 ### Last Session Summary
 
-Executed Plan 02-03 (oauth-round-trip). Single TDD task across RED → GREEN → REFACTOR. Landed `src/infrastructure/whoop/oauth.ts` (~452 LOC, 9 named exports: WHOOP_AUTHORIZE_URL + buildAuthorizeUrl + listenForCallback + exchangeCode + runOAuth + 4 type interfaces) + `oauth.test.ts` (~654 LOC, 30 tests). Implements OAuth Authorization-Code surface: buildAuthorizeUrl (URLSearchParams D-13 scope + 256-bit base64url state + URL-safe clientId regex validation, rejects hostile shapes); listenForCallback (127.0.0.1-only loopback bound via `server.listen(port, '127.0.0.1')`; finalise() one-shot guard mirroring `src/services/doctor/checks/mcp-stdout-purity.ts` lines 126-168 — server.close() + clearTimeout() + (resolve|reject) called exactly once; D-09 verbatim HTML pages inline as module-level constants; D-10 5-min timeout via setTimeout; EADDRINUSE → AuthError({kind: 'auth_port_in_use'}) — kind consumed from Wave 0 errors.ts unchanged); exchangeCode (POST to WHOOP_TOKEN_URL re-imported from token-store.ts; obtainedAt captured BEFORE fetch; Zod passthrough schema; non-2xx → AuthError 'refresh_failed' status-only); runOAuth (composes all three; --no-browser or no-openBrowser-callback or openBrowser-throw arms all fall back to `printAuthorizeUrlToStderr` — process.stderr.write is allowed per ADR-0001 §Decision). OAuth error-code response policy (BLOCKER 4 / OPEN-Q-01): RENDERABLE_OAUTH_ERROR_CODES = {invalid_scope, invalid_request, unsupported_response_type} render error_description verbatim after sanitize+escapeHtml; opaque codes (server_error/access_denied/unauthorized_client/temporarily_unavailable/default) strip the description; OE-09 verbatim acceptance fixture (`error=invalid_scope&error_description=foo` → body contains `foo`) pinned. PKCE OFF by default per A1/D-12; usePkce flag threads S256 challenge+verifier. Sanitize() ALWAYS runs on the render path (Test OE-08 — JWT-shaped substring inside error_description is redacted). Five deviations all auto-fixed: 2 Rule-3 blocking-lint (Biome reflow `finaliseReject(new AuthError(...))` + unused `beforeEach` import), 2 Rule-1 test-correctness (MSW `onUnhandledRequest:'bypass'` for loopback fetches; settled-promise wrapper for L-02 + OE-01..09 to satisfy Vitest's strict unhandled-rejection accounting), 1 Rule-1 plan-text drift (acceptance grep `grep -v 'oauth.ts'` does NOT filter `oauth.test.ts` — same precedent as Plan 02-02 Gate-E; Plan 02-06 input note). errors.ts unchanged (FROZEN at 6 kinds — verified by `git diff --name-only HEAD~3..HEAD -- src/infrastructure/whoop/errors.ts` returning empty); sanitize.ts / register.ts unchanged (D-18 attestation preserved). REFACTOR replaced GREEN-phase busy-wait with Promise-based listening wait + `printAuthorizeUrlToStderr` helper. Tests: 144 → 174 across 13 → 14 files; lint clean; CI grep gates clean. Commits: `dc544df` (RED — 27 tests), `da420a6` (GREEN — 30 tests pass), `3d6ea15` (REFACTOR).
+Executed Plan 02-04 (refresh-orchestrator). Single TDD task across RED → GREEN (REFACTOR skipped — implementation matched planned shape; same precedent as Plan 02-01 Task 2 + Plan 02-07 Task 1). Landed `src/services/refresh-orchestrator.ts` (133 LOC, 7 named exports: callWithAuth + createRefreshOrchestrator + refreshOrchestrator + 4 type interfaces FetchLikeResponse/AuthedOperation/CallWithAuthOptions/RefreshOrchestrator) + `refresh-orchestrator.test.ts` (296 LOC, 9 tests across 4 describe blocks). Extended `src/services/index.ts` (19 → 34 LOC) — Services interface now includes refreshOrchestrator alongside runDoctor; createServices() returns both; type re-exports for orchestrator surface. 401-reactive retry policy chokepoint per D-14/D-15/D-16 + ADR-0002 §Consequences: attempt 1 → tokenStore.getValidAccessToken() + op(at) → if 401, re-read tokens (sibling may have refreshed) → if fresh, retry with current.accessToken (no force-refresh — getValidAccessToken called only once in this path); else force getValidAccessToken() through three-layer gate, retry once with fresh token, return result regardless of status (retry budget = 1). Refresh failure (token-store throws AuthError({kind: 'refresh_failed'})) wraps as AuthError({kind: 'auth_expired', cause: refreshErr}) and does NOT retry the operation (STACK.md §Token refresh point 4 — retry budget 0 on refresh). The orchestrator is the SOLE consumer of tokenStore.getValidAccessToken() outside of token-store internals (grep-verified — `grep -rEn "tokenStore\.getValidAccessToken" src/` outside refresh-orchestrator.ts + token-store.ts + their tests returns 0; Plan 02-06's Gate E will lock at CI time). Consumer scope corrected per checker WARNING PLAN-04-CIRCULAR-NOTE: Phase 3's WHOOP sync service is the FIRST runtime consumer; Plan 02-05's auth.ts does NOT consume (auth-code grant has no 401-reactive boundary — auth.ts imports infrastructure directly). FetchLikeResponse intentionally minimal — just `{status: number}` — orchestrator only inspects `.status` to decide retry; full Response shape is operation callback's concern (decouples from globalThis.Response, lets Phase 3 WHOOP HTTP client pass any wrapper). callWithAuth bound on singleton via `.bind(refreshOrchestrator)` so free-function `import { callWithAuth }` preserves `this`. 9 tests green: H-01/H-02 (happy path; access-token plumbing), R-01/R-02/R-03 (sibling re-read, force refresh path, retry budget exhausted), F-01/F-02 (auth_expired wrap with cause; formatAuthError remediation), S-01/S-02 (services-barrel wiring + end-to-end). Two deviations all auto-fixed: 1 Rule-1 cross-module class identity (top-level static `import { AuthError }` resolves a pre-vi.resetModules() module-graph instance — toBeInstanceOf fails against the orchestrator's caught class; fix: dynamic-import AuthError inside F-01/F-02 matching the orchestrator's lifecycle — planner-template note: any test using vi.resetModules + dynamic import + toBeInstanceOf must dynamic-import the class too); 1 Rule-1 doc-comment phrasing precedent (used `console calls` / `direct stdout writes` rather than literal `console.*` / `process.stdout.write` to dodge plan-acceptance-grep collision — same precedent as Plan 02-01 paths.ts + Plan 02-02 token-store.ts). errors.ts unchanged (FROZEN at 6 kinds — Wave 0 contract preserved); token-store.ts unchanged; sanitize.ts/register.ts unchanged (D-18 attestation preserved across Plans 02-07 + 02-02 + 02-03 + 02-04). REFACTOR skipped — module-leading comment, retry policy, AuthError wrap, services-barrel wiring all matched `<interfaces>` and `<action>` verbatim. Tests: 174 → 183 across 14 → 15 files; lint clean; CI grep gates clean. Commits: `ea6735a` (RED — 9 tests; 8 fail with module-not-found, F-02 passes against existing errors.ts contract as expected), `63c5f10` (GREEN — 9/9 tests pass after class-identity fix).
 
 ### Next Session
 
-Execute Plan 02-04 (refresh-orchestrator) or Plan 02-05 (cli-shims). Wave 3's oauth-round-trip is now in place: Plan 02-05's `auth` CLI command can `import { runOAuth } from '../infrastructure/whoop/oauth.js'` and compose `await runOAuth({...opts, openBrowser: open})` then `await tokenStore.write(tokens)`. Plan 02-04's refresh orchestrator does NOT consume oauth.ts (refresh delegates to tokenStore.getValidAccessToken; oauth.ts is only for the initial auth-code grant). Plan 02-06 input note recorded twice now (Plan 02-02 + this plan): when wiring Gate E in `scripts/ci-grep-gates.sh`, must `--exclude='*.test.ts'` to avoid false-positive on both `src/mcp/sanitize.test.ts` (Plan 02-07 fixture) and `src/infrastructure/whoop/oauth.test.ts` (this plan's test cases). AuthError union remains FROZEN at 6 kinds; sanitize.ts / register.ts unchanged (D-18 attestation preserved across Plan 02-07 + 02-02 + this plan). The verifier agent has not been re-run for Phase 1 yet (still pending from end of Phase 1) — orchestrator may choose to run it before continuing.
+Execute Plan 02-05 (cli-shims) or Plan 02-06 (doctor-extensions). Wave-3 chokepoints (oauth round-trip + refresh orchestrator) are now both in place. Plan 02-05's auth CLI command consumes `runOAuth` from `src/infrastructure/whoop/oauth.js` and `tokenStore.write` from `src/infrastructure/whoop/token-store.js` directly — NOT through the services barrel (corrected per checker WARNING PLAN-04-CIRCULAR-NOTE: auth-code grant has no 401-reactive boundary). Plan 02-06's Gate E in `scripts/ci-grep-gates.sh` should now check that the SOLE consumer of `tokenStore.getValidAccessToken()` outside token-store internals is `src/services/refresh-orchestrator.ts` (allow-list grep returns 0 currently; Plan 02-06 should lock it). Gate E should also `--exclude='*.test.ts'` for the `oauth/oauth2/token` URL check to avoid Plan 02-07's sanitize.test.ts fixture and Plan 02-03's oauth.test.ts false positives (input notes recorded three times now — Plans 02-02 + 02-03 + 02-04). AuthError union remains FROZEN at 6 kinds; sanitize.ts/register.ts unchanged (D-18 attestation preserved). Phase 3's WHOOP sync service will be the FIRST runtime consumer of `callWithAuth` — composition shape: `import { callWithAuth } from '../services/refresh-orchestrator.js'; await callWithAuth((at) => whoopGet('/recovery', at))`. The verifier agent has not been re-run for Phase 1 yet (still pending from end of Phase 1) — orchestrator may choose to run it before continuing.
 
 ---
 *State initialized: 2026-05-11*
@@ -172,3 +178,4 @@ Execute Plan 02-04 (refresh-orchestrator) or Plan 02-05 (cli-shims). Wave 3's oa
 *Plan 02-07 complete: 2026-05-12 (2m 1s, 1 file — sanitizer fixtures + D-18 attestation; 12 new tests; no production-code changes).*
 *Plan 02-02 complete: 2026-05-12 (5m 32s, 2 files — token-store.ts + token-store.test.ts; 17 unit tests; ADR-0002 three-layer gate landed) — Phase 2 Wave 2 chokepoint in place.*
 *Plan 02-03 complete: 2026-05-12 (4m 28s, 2 files — oauth.ts + oauth.test.ts; 30 unit tests; OAuth Authorization-Code surface + BLOCKER 4 / OPEN-Q-01 error-code policy; errors.ts FROZEN) — Phase 2 Wave 3 round-trip in place.*
+*Plan 02-04 complete: 2026-05-12 (3m 3s, 3 files — refresh-orchestrator.ts + refresh-orchestrator.test.ts + services/index.ts; 9 unit tests; 401-reactive retry chokepoint with budget = 1; SOLE consumer of tokenStore.getValidAccessToken() outside token-store internals; services barrel extended with refreshOrchestrator) — Phase 2 Wave 3 chokepoint complete.*
