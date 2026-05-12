@@ -7,7 +7,7 @@
 
 ## Phases
 
-- [ ] **Phase 1: Foundation & Stdout-Pure MCP Bootstrap** - Bootstrapped TypeScript repo, empty CLI + MCP stdio shells, stderr-only logging, MCP error-sanitizer contract, native-module load verification
+- [x] **Phase 1: Foundation & Stdout-Pure MCP Bootstrap** - Bootstrapped TypeScript repo, empty CLI + MCP stdio shells, stderr-only logging, MCP error-sanitizer contract, native-module load verification
 - [ ] **Phase 2: OAuth, Token Store & Single-Flight Refresh** - WHOOP OAuth flow, keychain-backed token store with chmod 600 fallback, in-process + cross-process single-flight refresh, MCP error sanitizer wired through
 - [ ] **Phase 3: Data Model, DB Layer & Sync Loop** - Three-layer types with discriminated-union Score, Drizzle schema + atomic migrator with pre-migration backup, WHOOP HTTP client with rate limiting + pagination, idempotent sync with DST/tz flagging and partial-failure reporting
 - [ ] **Phase 4: Domain Math, Reviews, Decision Ledger & MCP Surface** - Median+MAD baselines, confidence-tier gating, FDR-corrected weekly patterns, daily + weekly reviews, decision ledger, 8 MCP tools + 6 resources + 4 prompts, banned-word tone lint
@@ -31,7 +31,7 @@
 - [x] 01-03-mcp-skeleton-PLAN.md — MCP stdio server + register() wrapper + sanitize.ts + whoop_doctor shim (FND-03, FND-06)
 - [x] 01-04-sanitizer-lint-PLAN.md — Sanitizer unit tests + scripts/ci-grep-gates.sh (FND-05, FND-06)
 - [x] 01-05-cli-doctor-PLAN.md — Commander CLI + real runDoctor() + three checks + formatter (FND-02, FND-03, FND-07)
-- [ ] 01-06-ci-integration-PLAN.md — Subprocess round-trip test + macOS-latest GitHub Actions workflow (FND-01..07 cross-cut)
+- [x] 01-06-ci-integration-PLAN.md — Subprocess round-trip test + macOS-latest GitHub Actions workflow (FND-01..07 cross-cut)
 **UI hint**: no
 
 ### Phase 2: OAuth, Token Store & Single-Flight Refresh
@@ -88,7 +88,7 @@
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Foundation & Stdout-Pure MCP Bootstrap | 5/6 | In progress | - |
+| 1. Foundation & Stdout-Pure MCP Bootstrap | 6/6 | Complete | 2026-05-12 |
 | 2. OAuth, Token Store & Single-Flight Refresh | 0/? | Not started | - |
 | 3. Data Model, DB Layer & Sync Loop | 0/? | Not started | - |
 | 4. Domain Math, Reviews, Decision Ledger & MCP Surface | 0/? | Not started | - |
@@ -117,4 +117,4 @@ Concerns originate in the phase where the first vulnerable code is introduced; t
 
 ---
 *Roadmap created: 2026-05-11*
-*Last updated: 2026-05-12 — Plan 01-05 complete (CLI Commander wiring + real doctor service, FND-02 / FND-07 closed)*
+*Last updated: 2026-05-12 — Plan 01-06 complete (CI workflow + integration test) — Phase 1 closed; all seven FND-* requirements CI-enforced.*

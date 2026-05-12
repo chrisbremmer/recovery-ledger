@@ -2,20 +2,20 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-current_plan: 5
-status: executing
-last_updated: "2026-05-12T18:14:46.565Z"
+current_plan: 6
+status: planning
+last_updated: "2026-05-12T18:25:00.581Z"
 progress:
   total_phases: 5
-  completed_phases: 0
+  completed_phases: 1
   total_plans: 6
-  completed_plans: 5
-  percent: 83
+  completed_plans: 6
+  percent: 100
 ---
 
 # State: Recovery Ledger
 
-**Last updated:** 2026-05-12 — completed Plan 01-05 (CLI Commander wiring + real doctor service)
+**Last updated:** 2026-05-12 — completed Plan 01-06 (CI integration test + GitHub Actions workflow) — Phase 1 closed.
 **Mode:** yolo
 **Granularity:** standard
 
@@ -26,19 +26,19 @@ progress:
 
 ## Current Position
 
-**Current Plan:** 5
+**Current Plan:** 6
 **Total Plans in Phase:** 6
-Phase: 01 (foundation-stdout-pure-mcp-bootstrap) — EXECUTING
-Plan: 5 of 6
+Phase: 01 (foundation-stdout-pure-mcp-bootstrap) — COMPLETE
+Plan: 6 of 6
 
 - **Milestone:** v1
-- **Phase:** 1 — Foundation & Stdout-Pure MCP Bootstrap
-- **Plan:** 01-06-ci-integration-PLAN.md (next) — GitHub Actions workflow + dist/mcp.mjs subprocess round-trip integration test
-- **Status:** Ready to execute
-- **Progress:** [████████░░] 83%
+- **Phase:** 1 — Foundation & Stdout-Pure MCP Bootstrap (COMPLETE — awaiting verifier sign-off)
+- **Plan:** 01-06-ci-integration-PLAN.md (complete) — GitHub Actions workflow + dist/mcp.mjs subprocess round-trip integration test landed.
+- **Status:** Phase 1 complete; ready for verification then Phase 2 planning
+- **Progress:** [██████████] 100%
 
 ```
-[█░░░░░░░░░░░░░░░░░░░] 0 / 5 phases complete (5 / 6 plans complete in Phase 1)
+[████░░░░░░░░░░░░░░░░] 1 / 5 phases complete (6 / 6 plans complete in Phase 1)
 ```
 
 ## Performance Metrics
@@ -46,11 +46,11 @@ Plan: 5 of 6
 | Metric | Value |
 |--------|-------|
 | Phases planned | 5 |
-| Phases complete | 0 |
+| Phases complete | 1 |
 | v1 requirements mapped | 49 / 49 |
 | v1 requirements complete | 7 / 49 |
 | Plans drafted | 6 (Phase 1) |
-| Plans complete | 5 |
+| Plans complete | 6 |
 
 ### Plan Execution History
 
@@ -61,6 +61,7 @@ Plan: 5 of 6
 | 01-03-mcp-skeleton | 4m 42s | 3 | 6 | Complete (2026-05-12) |
 | 01-04-sanitizer-lint | 3m 17s | 2 | 2 | Complete (2026-05-12) |
 | 01-05-cli-doctor   | 5m 18s | 3 | 15 | Complete (2026-05-12) |
+| 01-06-ci-integration | 4m 22s | 2 | 2 | Complete (2026-05-12) |
 
 ## Accumulated Context
 
@@ -93,10 +94,15 @@ Plan: 5 of 6
 - **[Phase 01] Plan 01-05 decision:** subprocess settle timing pinned at 200ms per-frame + 300ms final drain (vs Pattern 5b's ~100ms) — empirically required on the Node 25.2.1 dev box without dragging the doctor command above sub-second.
 - **[Phase 01] Plan 01-05 deviation:** Biome import-order + line-collapsing required minor reshape of the doctor service core after first write (Rule 3 — blocking; auto-fixed inline).
 - **[Phase 01] Plan 01-05 deviation:** plan's verify command uses Vitest 4-removed `--reporter=basic`; substituted the default reporter (Rule 1 — plan-text bug; no code change). Worth surfacing as a planner-template fix for the Vitest-4-pinned stack.
+- **[Phase 01] Plan 01-06 decision:** final drain pinned at 1500ms (tools/call:whoop_doctor triggers an inner mcp_stdout_purity subprocess costing ~1.1s) — integration test total runtime ~2.3s, under the 5s acceptance criterion.
+- **[Phase 01] Plan 01-06 decision:** integration test does NOT import probeMcpStdoutPurity — it asserts against raw stdout bytes directly so a bug in the probe's framing logic is caught by a second independent eye.
+- **[Phase 01] Plan 01-06 deviation:** RESEARCH Pattern 5(b) writes `json.trim()` to stdin, but pretty-printed multi-line fixtures are silently dropped by the MCP line-delimited parser; adopted single-line collapse via `JSON.stringify(JSON.parse(body))` — same pattern as src/services/doctor/checks/mcp-stdout-purity.ts.
+- **[Phase 01] Plan 01-06 deviation (repeat from 01-05):** Vitest 4 `--reporter=basic` was removed; planner-template fix needed for the Vitest 4 pinned stack.
 
 ### Open Todos
 
-- Execute Plan 01-06 (`01-06-ci-integration-PLAN.md`) — GitHub Actions workflow (`npm ci → npm run lint → npm run build → npm run test → bash scripts/ci-grep-gates.sh` on `macos-latest`) plus the Vitest integration test under `test/integration/` that imports `probeMcpStdoutPurity` (already factored as a reusable export by Plan 01-05) and asserts the subprocess round-trip against the four committed `test/fixtures/mcp/*.json` fixtures.
+- Run the verifier on Phase 1 (all six Plan summaries + integration test green; FND-01..FND-07 CI-enforced). Reference table in `.planning/phases/01-foundation-stdout-pure-mcp-bootstrap/01-06-SUMMARY.md` § "Phase 1 Completion Status".
+- Verify the first post-merge GitHub Actions run on `main` is green (`gh run list --limit 1 --json conclusion --jq '.[0].conclusion'`). Not yet runnable — CI has not been invoked yet; will land on the first push of these commits.
 - Confirm whether to deepen research before Phase 2 planning (cross-process file-lock semantics + replay-on-401 contract are research-flagged).
 - Confirm whether to deepen research before Phase 4 planning (confidence-tier thresholds, MAD scaling for small samples, FDR q-value defaults; Zod→JSON-Schema fidelity at the pinned SDK × Zod combination).
 
@@ -114,11 +120,11 @@ None.
 
 ### Last Session Summary
 
-Executed Plan 01-05 (CLI Commander wiring + real doctor service). Shipped 13 created files + 2 modified across three task commits. Created: `src/services/doctor/index.ts` (real `runDoctor()` + exported `deriveOverall` precedence helper), `src/services/doctor/checks/native-modules.ts` (`probeBetterSqlite3` opens `:memory:` + closes; `probeKeyring` constructs `new Entry('recovery-ledger', 'doctor-probe')` only — touches zero disk, zero keychain), `src/services/doctor/checks/mcp-stdout-purity.ts` (spawns `dist/mcp.mjs`, writes the four newline-delimited fixtures, parses each captured stdout line as JSON-RPC 2.0 — the same reusable function Plan 06 will import into its integration test), `src/formatters/doctor.txt.ts` (compact `[status] name — detail` per check, trailing `overall: <status>`), `src/cli/index.ts` (overwrites the Plan 03 `export {};` stub with Commander 14: `name`, `version('0.1.0')`, `description`, `command('doctor').option('--text').action(runDoctorCommand)`, top-level `await parseAsync`), `src/cli/commands/doctor.ts` (the codebase's ONLY `process.stdout.write` call site; renders JSON by default or plaintext under `--text`; `process.exit(overall === 'fail' ? 1 : 0)`), three test files (5 → 7 tests added; suite now 29 tests across 5 files), and four `test/fixtures/mcp/*.json` JSON-RPC fixtures at `protocolVersion: "2025-06-18"`. Modified: `src/services/index.ts` (stub `createServices` replaced with one-line delegation), `src/mcp/tools/whoop-doctor.ts` (inline `renderDoctor` stub swapped for the real formatter import — D-06 parity between CLI `--text` and MCP `content[0].text`). End-to-end smoke verified: `node dist/cli.mjs --version` → `0.1.0`; `node dist/cli.mjs doctor` → 3-check `{checks, overall: "pass"}` JSON; `--text` → plaintext with `overall:` trailer; `node dist/mcp.mjs` driven with all four fixtures returns three JSON-RPC frames containing real probe data with zero stderr leakage. `npm run test && npm run lint && npx tsc --noEmit && npm run build && bash scripts/ci-grep-gates.sh` all exit 0. Three deviations all auto-fixed (Rule 3 Biome shape, Rule 1 self-tripping comment grep, Rule 1 Vitest 4 reporter removal). A2 + A3 both resolved positively against the installed SDK + keyring packages. Commits: `ed7e343` (service core + fixtures), `3032d0e` (formatter + tests), `67a2592` (CLI Commander wiring).
+Executed Plan 01-06 (CI integration — closes Phase 1). Shipped 2 created files across two task commits. Created: `test/integration/mcp-stdout-purity.test.ts` (124 lines — spawns `dist/mcp.mjs`, drives the four-fixture JSON-RPC sequence, asserts every stdout line parses as JSON-RPC 2.0, asserts no `Bearer/Authorization/eyJ` substrings, asserts the id=3 tools/call response carries `result` not `error`, exit code ≤ 0). Created: `.github/workflows/ci.yml` (51 lines — single `macos-latest` job, Node 22, `actions/checkout@v4` + `actions/setup-node@v4` with npm cache, steps `npm ci → lint → build → test → bash scripts/ci-grep-gates.sh` in that exact order, concurrency block cancels in-flight runs on the same ref). Full local pipeline green: `npm ci → npm run lint → npm run build → npm run test → bash scripts/ci-grep-gates.sh` — 30 tests / 6 files, 2.49s; integration test alone 2.32s. Three Rule 1 deviations all auto-fixed before commit: (1) pretty-printed multi-line fixtures silently dropped by MCP line-delimited parser → adopted `JSON.stringify(JSON.parse(body))` collapse pattern; (2) final drain too short for the inner mcp_stdout_purity subprocess (~1.1s round-trip) → bumped to 1500ms; (3) plan's verify command uses Vitest-4-removed `--reporter=basic` → substituted default reporter (second occurrence — worth a planner-template fix). Commits: `fa9bc52` (test — integration test), `354ed7c` (chore — CI workflow). Phase 1 closed: all seven FND-* requirements now CI-enforced (see `01-06-SUMMARY.md` § "Phase 1 Completion Status" for the mapping table). Ready for verifier sign-off; first post-merge GitHub Actions run on `main` is the final acceptance gate.
 
 ### Next Session
 
-Execute Plan 01-06 (`01-06-ci-integration-PLAN.md`) — write `.github/workflows/ci.yml` (macos-latest, Node 22 from `.nvmrc`) sequencing `npm ci → npm run lint → npm run build → npm run test → bash scripts/ci-grep-gates.sh`, and land the Vitest integration test under `test/integration/` that imports the already-factored `probeMcpStdoutPurity` from Plan 01-05 and asserts the subprocess round-trip against the four committed `test/fixtures/mcp/*.json`. No new source modules required — Plan 01-05 shipped every reusable piece. The integration test doubles as Phase 1's "build runs against compiled `dist/`" assertion (success criterion 5 in ROADMAP §Phase 1).
+Run the verifier agent on Phase 1 (six Plan summaries + integration test + CI workflow). Awaiting verifier sign-off before planning Phase 2 (auth). STATE.md flags two research-deepen-before-planning questions for Phase 2 — cross-process file-lock semantics for single-flight refresh + replay-on-401 contract — the orchestrator should choose deepen-research-or-skip before `/gsd-plan-phase 2`. First post-merge GitHub Actions run is the external acceptance gate (`gh run list --limit 1 --json conclusion --jq '.[0].conclusion'`); not yet runnable because CI has not been invoked.
 
 ---
 *State initialized: 2026-05-11*
@@ -128,3 +134,4 @@ Execute Plan 01-06 (`01-06-ci-integration-PLAN.md`) — write `.github/workflows
 *Plan 01-03 complete: 2026-05-12 (4m 42s, 6 files)*
 *Plan 01-04 complete: 2026-05-12 (3m 17s, 2 files)*
 *Plan 01-05 complete: 2026-05-12 (5m 18s, 15 files — 13 created + 2 modified)*
+*Plan 01-06 complete: 2026-05-12 (4m 22s, 2 files) — Phase 1 closed.*
