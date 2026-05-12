@@ -29,13 +29,13 @@ import { describe, expect, test } from 'vitest';
 const FIXTURES = ['initialize', 'initialized', 'tools-list', 'whoop-doctor-call'] as const;
 const DIST_MCP = 'dist/mcp.mjs';
 const FRAME_SETTLE_MS = 200;
-// tools/call(whoop_doctor) triggers the mcp_stdout_purity check, which itself
-// spawns another `dist/mcp.mjs` subprocess and drives the same four fixtures
-// against it. That inner round-trip costs ~1.1s (200ms × 4 + 300ms drain per
-// src/services/doctor/checks/mcp-stdout-purity.ts). 1500ms gives the inner
-// subprocess plus the outer response framing enough headroom on CI cold
-// starts without dragging the test above the 60s suite budget.
-const FINAL_DRAIN_MS = 1500;
+// After CR-01 the inner tools/call no longer recursively respawns another
+// dist/mcp.mjs (it short-circuits via skipSubprocessChecks), so the budget
+// can be tight. We use a response-driven wait keyed on the id=3 frame's
+// arrival rather than a fixed timer — this is faster on hot CI and robust to
+// slow macOS-latest cold starts (WR-03). The hard ceiling below is a
+// circuit-breaker; the typical path completes in well under 500ms.
+const TOOLS_CALL_TIMEOUT_MS = 5000;
 
 describe('MCP stdout purity (dist smoke)', () => {
   test('dist/mcp.mjs stdout contains only valid JSON-RPC, with sanitized tool responses', async () => {
@@ -54,7 +54,34 @@ describe('MCP stdout purity (dist smoke)', () => {
 
     const stdoutChunks: Buffer[] = [];
     const stderrChunks: Buffer[] = [];
-    child.stdout.on('data', (b: Buffer) => stdoutChunks.push(b));
+    // Response-driven wait: track ids as they arrive so the test can resolve
+    // as soon as the id=3 (tools/call) response is observed rather than
+    // sleeping for a fixed budget (WR-03).
+    const idsSeen = new Set<unknown>();
+    let toolsCallResolve: (() => void) | null = null;
+    const toolsCallSeen = new Promise<void>((resolve) => {
+      toolsCallResolve = resolve;
+    });
+    child.stdout.on('data', (b: Buffer) => {
+      stdoutChunks.push(b);
+      // Parse only the newly-accumulated buffer; stray non-JSON bytes still
+      // reach the assertions below where they are reported with their full
+      // content. A parse error here is swallowed deliberately — the canonical
+      // assertion happens after the read loop completes.
+      const text = Buffer.concat(stdoutChunks).toString('utf8');
+      for (const line of text.split('\n').filter(Boolean)) {
+        try {
+          const parsed = JSON.parse(line) as { id?: unknown };
+          if ('id' in parsed) idsSeen.add(parsed.id);
+        } catch {
+          // Defer reporting to the post-loop assertion path.
+        }
+      }
+      if (idsSeen.has(3) && toolsCallResolve) {
+        toolsCallResolve();
+        toolsCallResolve = null;
+      }
+    });
     child.stderr.on('data', (b: Buffer) => stderrChunks.push(b));
 
     // Drive the four fixtures over stdin as newline-delimited JSON. The
@@ -70,7 +97,24 @@ describe('MCP stdout purity (dist smoke)', () => {
       child.stdin.write(frame);
       await new Promise<void>((r) => setTimeout(r, FRAME_SETTLE_MS));
     }
-    await new Promise<void>((r) => setTimeout(r, FINAL_DRAIN_MS));
+
+    // Wait for the id=3 response or hit the circuit-breaker ceiling. A real
+    // failure (response never arrives) surfaces as a clear timeout message
+    // rather than a silent missing-id-3 assertion below.
+    await Promise.race([
+      toolsCallSeen,
+      new Promise<void>((_, reject) =>
+        setTimeout(
+          () =>
+            reject(
+              new Error(
+                `tools/call (id=3) response timed out after ${TOOLS_CALL_TIMEOUT_MS}ms — observed ids: [${[...idsSeen].join(', ')}]`,
+              ),
+            ),
+          TOOLS_CALL_TIMEOUT_MS,
+        ),
+      ),
+    ]);
 
     child.stdin.end();
     const exitCode = await new Promise<number>((r) => {
