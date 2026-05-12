@@ -53,16 +53,11 @@ const TOOL_DESCRIPTION = [
 ].join(' ');
 
 export function registerWhoopDoctor(server: McpServer, services: Services): void {
-  register(
-    server,
-    'whoop_doctor',
-    { description: TOOL_DESCRIPTION, inputSchema: {} },
-    async () => {
-      const result = await services.runDoctor({ skipSubprocessChecks: true });
-      return {
-        content: [{ type: 'text', text: renderDoctor(result) }],
-        structuredContent: toStructuredContent(result),
-      };
-    },
-  );
+  register(server, 'whoop_doctor', { description: TOOL_DESCRIPTION, inputSchema: {} }, async () => {
+    const result = await services.runDoctor({ skipSubprocessChecks: true });
+    return {
+      content: [{ type: 'text', text: renderDoctor(result) }],
+      structuredContent: toStructuredContent(result),
+    };
+  });
 }
