@@ -854,10 +854,7 @@ describe('real lockfile contention (WR-05)', () => {
     // mechanics MUST not deadlock or error out. This test pins that the
     // real lock acquires + releases cleanly and the MSW server is hit
     // exactly once.
-    const [r1, r2] = await Promise.all([
-      store.getValidAccessToken(),
-      store.getValidAccessToken(),
-    ]);
+    const [r1, r2] = await Promise.all([store.getValidAccessToken(), store.getValidAccessToken()]);
 
     expect(r1).toBe('at-1');
     expect(r2).toBe('at-1');
