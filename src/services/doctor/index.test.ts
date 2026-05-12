@@ -30,6 +30,33 @@ describe('deriveOverall', () => {
   });
 });
 
+// WR-05 regression guard — DoctorResult must round-trip through JSON without
+// loss. The MCP whoop_doctor tool serializes the result via
+// `JSON.parse(JSON.stringify(result))` (see src/mcp/tools/whoop-doctor.ts),
+// which guards against future fields that JSON cannot represent (Date,
+// function, Map, Buffer, undefined). Adding such a field flips this test
+// red before the cast-free conversion silently mangles MCP output.
+describe('DoctorResult — WR-05 JSON serializability contract', () => {
+  test('DoctorResult round-trips through JSON byte-for-byte', () => {
+    const sample: import('./index.js').DoctorResult = {
+      checks: [
+        { name: 'better_sqlite3_load', status: 'pass', detail: 'native binding loaded' },
+        { name: 'napi_keyring_load', status: 'warn', detail: 'optional fallback used' },
+        { name: 'mcp_stdout_purity', status: 'fail', detail: 'stream invalid' },
+      ],
+      overall: 'fail',
+    };
+    const roundTripped = JSON.parse(JSON.stringify(sample)) as typeof sample;
+    expect(roundTripped).toEqual(sample);
+    // Deep-equal check above implies every field survived. Explicit checks
+    // on the discriminator values too — a regression that changed `status`
+    // to a non-string union would survive structural equality but not the
+    // explicit type assertion below.
+    expect(roundTripped.overall).toBe('fail');
+    expect(roundTripped.checks[0]?.status).toBe('pass');
+  });
+});
+
 // CR-01 regression guard — `runDoctor({ skipSubprocessChecks: true })` must
 // NOT cause the mcp_stdout_purity probe to spawn `dist/mcp.mjs`. The MCP
 // `whoop_doctor` tool passes this flag; without it, the tool would recursively
