@@ -18,6 +18,21 @@
 #         one chokepoint where the try/catch/sanitize wrapper applies). Any
 #         direct call from a tool module would bypass the sanitizer and risk
 #         leaking secrets through MCP error responses (PITFALLS.md Pitfall 17).
+# Gate E: only src/infrastructure/whoop/token-store.ts may reference the WHOOP
+#         refresh endpoint (oauth/oauth2/token). ADR-0002 §Enforcement: the
+#         token-store module is the sole consumer of the refresh endpoint.
+#         Biome's noRestrictedImports operates on import paths, not URL
+#         strings, so this grep gate is the load-bearing enforcement for
+#         literal URL references. Test files (*.test.ts) are excluded — the
+#         Plan 02-07 fixture in src/mcp/sanitize.test.ts deliberately
+#         includes the URL as a redaction-coverage test input, and
+#         src/infrastructure/whoop/oauth.test.ts has test cases that
+#         exercise the URL constant in error paths. Production-module
+#         enforcement intent is intact.
+#         Note: literal-string gate — URL-construction-via-concatenation
+#         bypass is documented as out-of-scope for Plan 02-06 (single-user
+#         personal tool; a developer concatenating the URL would be
+#         deliberately bypassing their own constraint).
 #
 # Exit-code semantics (Pitfall 10): grep returns 0 on match (= violation found).
 # Each gate inverts that: if grep -rEn matches, the gate prints ::error:: and
@@ -161,6 +176,41 @@ if "$GREP" -rEn "$REGISTER_TOOL_RE" --include='*.ts' src/mcp/ 2>/dev/null \
   fi
 fi
 rm -f /tmp/gate-d.$$
+
+# ----------------------------------------------------------------------------
+# Gate E — only src/infrastructure/whoop/token-store.ts may reference the
+# WHOOP refresh endpoint. ADR-0002 §Enforcement (line 70): "Token-store
+# module is the only consumer of the refresh endpoint." Biome's
+# noRestrictedImports operates on import paths, not URL strings, so this
+# grep gate is the load-bearing enforcement for literal URL references.
+#
+# Test files (*.test.ts) are excluded for two reasons:
+#  - src/mcp/sanitize.test.ts has a Plan 02-07 fixture that includes the
+#    literal URL as a redaction-coverage test input.
+#  - src/infrastructure/whoop/oauth.test.ts has test cases that reference
+#    the URL constant in error paths (Plan 02-03).
+# Production-module enforcement intent is preserved (Plan 02-02 and 02-03
+# both flagged the test-file exclusion as a required Plan 06 input).
+#
+# URL-construction-via-concatenation bypass is intentionally out-of-scope:
+# Recovery Ledger is a single-user personal tool, and a developer
+# concatenating the endpoint URL to bypass this gate would be deliberately
+# bypassing their own constraint.
+# ----------------------------------------------------------------------------
+TOKEN_ENDPOINT_RE='oauth/oauth2/token'
+
+if "$GREP" -rEn "$TOKEN_ENDPOINT_RE" --include='*.ts' src/ 2>/dev/null \
+   | "$GREP" -Ev '^src/infrastructure/whoop/token-store\.ts:' \
+   | "$GREP" -Ev '\.test\.ts:' \
+   > /tmp/gate-e.$$; then
+  if [ -s /tmp/gate-e.$$ ]; then
+    echo "::error::Gate E — oauth/oauth2/token referenced outside src/infrastructure/whoop/token-store.ts:"
+    cat /tmp/gate-e.$$
+    rm -f /tmp/gate-e.$$
+    exit 1
+  fi
+fi
+rm -f /tmp/gate-e.$$
 
 echo "All grep gates passed."
 exit 0
