@@ -1,0 +1,18 @@
+# Dependabot configuration — MR-28.
+#
+# Tracks the github-actions ecosystem so SHA-pinned versions in
+# .github/workflows/*.yml get lifted to newer commits as the upstream
+# action ships fixes. Without this, a pinned SHA stays stale forever and
+# the security tradeoff of pinning (auditable, attacker-resistant) is
+# paid without the offsetting maintenance benefit.
+#
+# Weekly cadence balances signal vs noise — actions cut releases
+# infrequently enough that daily would generate mostly empty PRs.
+
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5

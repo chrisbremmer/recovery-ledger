@@ -53,9 +53,6 @@ turns out to be wrong, write a new one that supersedes it.
 
 ## Active learnings
 
-> No learnings yet. Categories below are pre-seeded so the structure is
-> stable; entries get added in date order as recurrences happen.
-
 ### Category: Git / branching / worktrees
 
 _(empty)_
@@ -66,7 +63,61 @@ _(empty)_
 
 ### Category: MCP protocol (stdout purity, tool schema, prompts)
 
-_(empty)_
+### L0001 — MCP doctor self-recursion via subprocess spawn (2026-05-12)
+
+- **Symptom:** the `whoop_doctor` MCP tool spawned `dist/mcp.mjs` as a
+  subprocess to drive the stdout-purity probe. Inside that subprocess,
+  `whoop_doctor` ran again, which spawned another subprocess, which
+  ran the tool again, and so on. The chain bottomed out only when the
+  parent's read timer fired and the orphaned descendants were SIGTERMed
+  by SIGKILL. CR-01 caught this in code review.
+- **Root cause:** the probe assumed it ran from the CLI; when invoked
+  from the MCP tool handler, the spawn loop had no terminator. Both
+  call sites (`recovery-ledger doctor`, `whoop_doctor` tool) share the
+  same `runDoctor()` orchestrator, so a flag was needed to signal
+  intent.
+- **Rule:** any service that spawns a subprocess to self-test must
+  gate the spawn on an explicit option set by the MCP entry point.
+  The env-var fallback that previously honored `RL_INSIDE_MCP=1`
+  alone was removed in MR-14 — a stale env var in the user's shell
+  would have silently skipped the CLI's subprocess check.
+- **Where the rule lives:**
+  [`src/services/doctor/checks/mcp-stdout-purity.ts`](../src/services/doctor/checks/mcp-stdout-purity.ts)
+  (`opts.skipSubprocess`),
+  [`src/services/doctor/index.ts`](../src/services/doctor/index.ts)
+  (`RunDoctorOptions.skipSubprocessChecks`),
+  [`src/mcp/tools/whoop-doctor.ts`](../src/mcp/tools/whoop-doctor.ts)
+  (explicit `skipSubprocessChecks: true`).
+- **Triggered by:** PR #2 review — CR-01 + MR-14.
+- **Recurrences before pinning:** 1 (caught in first cross-review of
+  Phase 1's doctor implementation).
+- **Status:** active.
+
+### L0004 — Case-sensitive Bearer regex misses mixed-case (2026-05-12)
+
+- **Symptom:** `sanitize('bearer abc123…')` returned the input
+  unchanged. The Authorization-header pattern carried `/gi`; the bare
+  `Bearer` fallback (pattern 4) and the JSON token-key pattern
+  (pattern 2) did not. Real-world upstreams (undici body excerpts,
+  some load-balancer log formatters) lowercase or capitalize header
+  names — a token in those shapes leaked while a casual reader
+  assumed all token shapes were redacted.
+- **Root cause:** the pattern set evolved by incremental addition. The
+  earliest pattern (Authorization header) carried `/gi` from day one;
+  later additions inherited only `/g` because they were copy-pasted
+  from contexts where case had been the default.
+- **Rule:** every sanitizer pattern matching a case-insensitive HTTP
+  construct (Bearer, Authorization, content-type, etc.) MUST carry
+  the `/i` flag. New patterns must include a positive test for the
+  uppercase variant.
+- **Where the rule lives:**
+  [`src/mcp/sanitize.ts`](../src/mcp/sanitize.ts) (patterns 1, 2, 2a,
+  2b, 2c, 4 all carry `/gi`),
+  [`src/mcp/sanitize.test.ts`](../src/mcp/sanitize.test.ts) (P4 +
+  P2a mixed-case positive tests, MR-25/MR-40).
+- **Triggered by:** PR #2 review — MR-25.
+- **Recurrences before pinning:** 1.
+- **Status:** active.
 
 ### Category: Domain logic (baselines, anomalies, FDR, score_state)
 
@@ -74,11 +125,60 @@ _(empty)_
 
 ### Category: Tests / fixtures / MSW
 
-_(empty)_
+### L0003 — OAuth form-body and URL-query tokens require dedicated sanitizer patterns (2026-05-12)
+
+- **Symptom:** the sanitizer's JSON-token pattern (`"access_token":"…"`)
+  redacted JSON payloads but left URL-query (`?access_token=…`) and
+  form-body (`access_token=…`) shapes alone. WHOOP's OAuth refresh
+  flow uses both shapes verbatim, and a connection-error message
+  from native fetch / undici surfaces the request body inline.
+- **Root cause:** the original Phase 1 pattern catalog covered
+  `Authorization: Bearer`, JSON-keys, JWTs, and bare-Bearer — the
+  four shapes documented in PITFALLS.md Pitfall 17. The OAuth wire
+  shapes were absent because Phase 1 has no HTTP client yet; the
+  catalog was scoped to error messages, not request bodies.
+- **Rule:** extending the sanitizer pattern set MUST add a
+  corresponding test fixture in
+  [`sanitize.test.ts`](../src/mcp/sanitize.test.ts) that FAILS without
+  the new pattern. The MR-03 / MR-11 / MR-24 expansion proved this
+  by adding 14 positive tests against the unified `SECRET_KEY_NAMES`
+  list; the alternation count (`PATTERNS.length >= 7`) is the
+  floor pin.
+- **Where the rule lives:**
+  [`src/mcp/sanitize.ts`](../src/mcp/sanitize.ts) (`SECRET_KEY_NAMES`
+  constant, patterns 2/2a/2b/2c),
+  [`src/mcp/sanitize.test.ts`](../src/mcp/sanitize.test.ts) (D-10
+  fixture block F5+F6 + the SECRET_KEY_NAMES membership test).
+- **Triggered by:** PR #2 review — CR-03 + MR-03 + MR-11 + MR-24.
+- **Recurrences before pinning:** 1.
+- **Status:** active.
 
 ### Category: Tooling / CI / hooks
 
-_(empty)_
+### L0002 — cwd-relative subprocess paths break `npx recovery-ledger` (2026-05-12)
+
+- **Symptom:** the doctor's stdout-purity probe spawned
+  `path.resolve('dist/mcp.mjs')` — fine from the repo root, but
+  invoking `npx recovery-ledger doctor` from any other directory
+  produced a misleading "ENOENT: no such file or directory" on
+  whichever path `process.cwd()` happened to be.
+- **Root cause:** subprocess + asset paths defaulted to
+  cwd-relative because the prototype was built from the repo root.
+  The packaged binary runs from arbitrary user directories.
+- **Rule:** subprocess paths AND test fixture paths in installed
+  CLI code MUST resolve via `import.meta.url` +
+  `path.dirname(fileURLToPath(import.meta.url))`, never
+  `process.cwd()`. The same rule applies to integration tests that
+  spawn the built binary — `cd test && vitest run integration/...`
+  must work.
+- **Where the rule lives:**
+  [`src/services/doctor/checks/mcp-stdout-purity.ts`](../src/services/doctor/checks/mcp-stdout-purity.ts)
+  (`HERE` constant via `import.meta.url`),
+  [`test/integration/mcp-stdout-purity.test.ts`](../test/integration/mcp-stdout-purity.test.ts)
+  (`HERE` + `REPO_ROOT` constants, MR-33).
+- **Triggered by:** PR #2 review — CR-02 + MR-33.
+- **Recurrences before pinning:** 1.
+- **Status:** active.
 
 ### Category: Documentation / process
 
