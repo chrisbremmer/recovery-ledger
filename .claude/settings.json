@@ -18,11 +18,15 @@
         ]
       },
       {
-        "matcher": "Edit|Write|NotebookEdit",
+        "matcher": "Edit|Write|MultiEdit|NotebookEdit",
         "hooks": [
           {
             "type": "command",
             "command": "bash \"$CLAUDE_PROJECT_DIR/.claude/hooks/guard-mcp-stdout.sh\""
+          },
+          {
+            "type": "command",
+            "command": "bash \"$CLAUDE_PROJECT_DIR/.claude/hooks/guard-settings-edit.sh\""
           }
         ]
       }

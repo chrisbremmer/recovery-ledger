@@ -9,9 +9,10 @@ Claude). Hooks are wired up in [`../settings.json`](../settings.json).
 
 | Script | Triggers on | Refuses |
 |--------|-------------|---------|
-| [`guard-git-push-main.sh`](./guard-git-push-main.sh) | Bash | `git push` refspecs that resolve to `main` / `master` |
-| [`guard-hook-bypass.sh`](./guard-hook-bypass.sh) | Bash | `--no-verify`, `--no-gpg-sign`, `-c commit.gpgsign=false` |
-| [`guard-mcp-stdout.sh`](./guard-mcp-stdout.sh) | Edit / Write / NotebookEdit | `console.*` writes into `src/{mcp,services,domain,infrastructure,formatters}/` |
+| [`guard-git-push-main.sh`](./guard-git-push-main.sh) | Bash | `git push` refspecs that resolve to `main`/`master` (including full-ref `refs/heads/main`, quoted forms, `--all`, `--mirror`, force `+main`). Best-effort: shell indirection (`sh -c`, `eval`) is out of scope — branch protection on `main` is the actual fence. |
+| [`guard-hook-bypass.sh`](./guard-hook-bypass.sh) | Bash | `--no-verify`, `--no-gpg-sign`, `--gpg-sign=false`, `-c commit.gpgsign=...`, `-c core.hooksPath=/dev/null`. Scoped to git commands; ignores commit-message bodies containing the flags. |
+| [`guard-mcp-stdout.sh`](./guard-mcp-stdout.sh) | Edit / Write / MultiEdit / NotebookEdit | `console.*` and `process.stdout.write` writes into `src/{mcp,services,domain,infrastructure,formatters}/`. `*.test.ts` / `*.spec.ts` exempt. |
+| [`guard-settings-edit.sh`](./guard-settings-edit.sh) | Edit / Write / MultiEdit / NotebookEdit | Direct edits to `.claude/settings.json` or `.claude/hooks/*.sh`. README updates in this directory are allowed. |
 
 ## How to add a new hook
 
