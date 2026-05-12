@@ -101,24 +101,55 @@ describe('MCP stdout purity (dist smoke)', () => {
     // Wait for the id=3 response or hit the circuit-breaker ceiling. A real
     // failure (response never arrives) surfaces as a clear timeout message
     // rather than a silent missing-id-3 assertion below.
-    await Promise.race([
-      toolsCallSeen,
-      new Promise<void>((_, reject) =>
-        setTimeout(
-          () =>
-            reject(
-              new Error(
-                `tools/call (id=3) response timed out after ${TOOLS_CALL_TIMEOUT_MS}ms — observed ids: [${[...idsSeen].join(', ')}]`,
+    //
+    // MR-17: the subprocess must be torn down in BOTH the success and the
+    // timeout-rejection paths. Without the finally block, a tools/call that
+    // never arrives leaves a spawned `dist/mcp.mjs` running until Vitest's
+    // worker exits — leaking processes between test reruns and masking
+    // unrelated CI flakes. SIGKILL is scheduled 2s after SIGTERM as a
+    // fallback for a child that ignores graceful shutdown.
+    let killTimer: NodeJS.Timeout | null = null;
+    try {
+      await Promise.race([
+        toolsCallSeen,
+        new Promise<void>((_, reject) =>
+          setTimeout(
+            () =>
+              reject(
+                new Error(
+                  `tools/call (id=3) response timed out after ${TOOLS_CALL_TIMEOUT_MS}ms — observed ids: [${[...idsSeen].join(', ')}]`,
+                ),
               ),
-            ),
-          TOOLS_CALL_TIMEOUT_MS,
+            TOOLS_CALL_TIMEOUT_MS,
+          ),
         ),
-      ),
-    ]);
+      ]);
+    } finally {
+      // Tear down regardless of success or timeout. Order: close stdin to
+      // let a well-behaved child exit on EOF; if it does not, SIGTERM; if
+      // it still does not, SIGKILL after 2s.
+      try {
+        child.stdin.end();
+      } catch {
+        // stdin may already be closed.
+      }
+      if (!child.killed) {
+        child.kill('SIGTERM');
+        killTimer = setTimeout(() => {
+          if (!child.killed) child.kill('SIGKILL');
+        }, 2000);
+        killTimer.unref();
+      }
+    }
 
-    child.stdin.end();
     const exitCode = await new Promise<number>((r) => {
-      child.on('close', (c) => r(c ?? -1));
+      child.on('close', (c) => {
+        if (killTimer) {
+          clearTimeout(killTimer);
+          killTimer = null;
+        }
+        r(c ?? -1);
+      });
     });
 
     const stdout = Buffer.concat(stdoutChunks).toString('utf8');
