@@ -41,4 +41,33 @@ describe('resolvePaths', () => {
     // write silently lands in the wrong directory.
     expect(() => resolvePaths({})).toThrowError(/HOME|RECOVERY_LEDGER_HOME/);
   });
+
+  test('WR-04 regression: module-load succeeds under empty env; throw deferred to first access', async () => {
+    // Pre-fix: `export const paths = resolvePaths(process.env)` threw at
+    // module load if neither HOME nor RECOVERY_LEDGER_HOME was set. That
+    // crashed the entire module graph before any test runner could catch and
+    // report it. Post-fix: paths is a Proxy; the throw is deferred to first
+    // property access, so the import itself always succeeds.
+    const { resetModules } = await import('vitest').then((m) => ({
+      resetModules: m.vi.resetModules.bind(m.vi),
+    }));
+    resetModules();
+
+    // Scrub the env so the lazy bind sees no HOME or RECOVERY_LEDGER_HOME.
+    const originalHome = process.env.HOME;
+    const originalRlHome = process.env.RECOVERY_LEDGER_HOME;
+    delete process.env.HOME;
+    delete process.env.RECOVERY_LEDGER_HOME;
+    try {
+      // Import must NOT throw, even with an empty env.
+      const mod = await import('./paths.js');
+      expect(mod.paths).toBeDefined();
+      // First property access surfaces the throw with the same message.
+      expect(() => mod.paths.configDir).toThrowError(/HOME|RECOVERY_LEDGER_HOME/);
+    } finally {
+      if (originalHome !== undefined) process.env.HOME = originalHome;
+      if (originalRlHome !== undefined) process.env.RECOVERY_LEDGER_HOME = originalRlHome;
+      resetModules();
+    }
+  });
 });

@@ -57,8 +57,36 @@ export function resolvePaths(env: PathsEnv): ResolvedPaths {
   };
 }
 
-// Production singleton — bound at module load to the current global env.
-// Token-store / init / auth import this directly; tests construct their
-// own ResolvedPaths via `resolvePaths({ HOME: tmpdir() })` to avoid the
-// process-level env and the home directory.
-export const paths = resolvePaths(process.env);
+// Production singleton — bound LAZILY on first property access (WR-04). The
+// initial implementation resolved paths at module load (`export const paths =
+// resolvePaths(process.env)`), which throws if neither HOME nor
+// RECOVERY_LEDGER_HOME is set. That throw crashed the entire module graph
+// before any test runner / CLI guard could catch and report it — a sandboxed
+// CI container with no HOME env would fail at import time, before `beforeEach`
+// could repair the env.
+//
+// Lazy binding via a Proxy: module load always succeeds; the missing-env
+// throw surfaces on first `paths.X` access (which is the same load-bearing
+// invariant — the error message and the failure mode are identical for
+// production callers). Tests still call `resolvePaths({...})` directly for
+// the unit suite seam; this singleton is the production-import path.
+//
+// Pinning behavior: `_resolved` memoizes the first successful resolution. A
+// second access reads the cached value — re-running `process.env` lookups on
+// every access would let a test that mutates env mid-test see inconsistent
+// paths (subtle bug; not exercised today). Tests that need a different
+// resolution path use `resolvePaths(env)` directly with their own ResolvedPaths.
+let _resolved: ResolvedPaths | null = null;
+function getResolved(): ResolvedPaths {
+  if (_resolved === null) {
+    _resolved = resolvePaths(process.env);
+  }
+  return _resolved;
+}
+
+export const paths: ResolvedPaths = new Proxy({} as ResolvedPaths, {
+  get(_target, prop) {
+    const resolved = getResolved();
+    return resolved[prop as keyof ResolvedPaths];
+  },
+});
