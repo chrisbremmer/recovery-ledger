@@ -23,7 +23,7 @@
 //      (≤ 0 covers both clean exit and SIGTERM-on-stdin-close).
 
 import { spawn } from 'node:child_process';
-import { access, readFile } from 'node:fs/promises';
+import { access, readFile, stat } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, test } from 'vitest';
@@ -61,6 +61,29 @@ describe('MCP stdout purity (dist smoke)', () => {
       await access(DIST_MCP);
     } catch {
       expect.fail(`${DIST_MCP} missing — run \`npm run build\` first`);
+    }
+
+    // MR-30: dist/mcp.mjs must be at least as new as the relevant src files.
+    // A stale dist (developer edited src/ but forgot to rebuild) would
+    // silently exercise the prior build, masking the change under test
+    // and producing a false-pass. We compare mtimes against the canonical
+    // MCP entry sources and the sanitizer/register chokepoint. If the
+    // dist is older than any of these, fail loudly.
+    const distMtime = (await stat(DIST_MCP)).mtimeMs;
+    const watchedSources = [
+      path.resolve(REPO_ROOT, 'src', 'mcp', 'index.ts'),
+      path.resolve(REPO_ROOT, 'src', 'mcp', 'register.ts'),
+      path.resolve(REPO_ROOT, 'src', 'mcp', 'sanitize.ts'),
+      path.resolve(REPO_ROOT, 'src', 'mcp', 'tools', 'whoop-doctor.ts'),
+      path.resolve(REPO_ROOT, 'src', 'services', 'doctor', 'index.ts'),
+    ];
+    for (const src of watchedSources) {
+      const srcMtime = (await stat(src)).mtimeMs;
+      if (srcMtime > distMtime) {
+        expect.fail(
+          `dist/mcp.mjs is stale (older than ${path.relative(REPO_ROOT, src)}) — run \`npm run build\` before this test`,
+        );
+      }
     }
 
     const child = spawn(process.execPath, [DIST_MCP], {
