@@ -30,6 +30,7 @@ import { logger } from '../infrastructure/config/logger.js';
 import { AuthError } from '../infrastructure/whoop/errors.js';
 import {
   tokenStore as defaultTokenStore,
+  REFRESH_BUFFER_MS,
   type TokenStore,
 } from '../infrastructure/whoop/token-store.js';
 
@@ -91,8 +92,14 @@ async function callWithAuthImpl<T extends FetchLikeResponse>(
   // fresh, use it without burning another refresh.
   logger.warn({ event: '401_received', retry: true });
 
+  // Apply the same REFRESH_BUFFER_MS that token-store.getValidAccessToken uses
+  // (5 minutes). Without the buffer, a sibling's "fresh"-but-near-expiry token
+  // (delta < 5min) is handed back here; the operation takes longer than the
+  // remaining lifetime; a second 401 fires; per D-15 the retry budget is
+  // already burned. The buffer keeps the orchestrator's 401-recovery path
+  // symmetric with the preemptive-refresh path.
   const current = await store.read();
-  if (current !== null && current.expiresAt > Date.now()) {
+  if (current !== null && current.expiresAt > Date.now() + REFRESH_BUFFER_MS) {
     // Sibling refreshed our way out — retry with current.accessToken.
     return operation(current.accessToken);
   }

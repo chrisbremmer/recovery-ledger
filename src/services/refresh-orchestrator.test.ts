@@ -212,6 +212,49 @@ describe('401 reactive retry', () => {
     expect(res).toBe(second401);
     expect(op).toHaveBeenCalledTimes(2);
   });
+
+  test('R-04 (CR-03 regression): re-read returns a token within REFRESH_BUFFER_MS → force-refresh instead of reusing', async () => {
+    // CR-03: post-401 re-read must apply the same 5-min REFRESH_BUFFER_MS the
+    // token-store's preemptive-refresh path uses. Without the buffer, a
+    // sibling's near-expiry token (delta = 30s) would be handed back here;
+    // the operation takes longer than the remaining lifetime; a second 401
+    // fires; D-15 retry budget is exhausted; the caller sees a 401 the
+    // orchestrator could have prevented by force-refreshing once.
+    const m = makeMockTokenStore();
+    m.getValidAccessTokenSpy
+      .mockResolvedValueOnce('at-initial-stale')
+      .mockResolvedValueOnce('at-force-refreshed');
+    // Re-read returns a NOT-YET-EXPIRED token (delta = 30s) — Date.now() <
+    // expiresAt < Date.now() + REFRESH_BUFFER_MS. Pre-fix: `expiresAt >
+    // Date.now()` evaluates true and the orchestrator retries with the
+    // near-expiry token. Post-fix: `expiresAt > Date.now() + 5min` is false
+    // and execution falls through to the force-refresh path.
+    const nearExpiry = Date.now() + 30 * 1000;
+    m.readSpy.mockResolvedValueOnce(
+      freshTokens({ accessToken: 'at-sibling-near-expiry', expiresAt: nearExpiry }),
+    );
+
+    const mod = await loadOrchestrator();
+    const orch = mod.createRefreshOrchestrator(m.store);
+
+    const op = vi
+      .fn<(at: string) => Promise<{ status: number }>>()
+      .mockResolvedValueOnce({ status: 401 })
+      .mockResolvedValueOnce({ status: 200 });
+
+    const res = await orch.callWithAuth(op);
+
+    expect(res.status).toBe(200);
+    // Attempt 1 used the initial stale token; attempt 2 used the FORCE-
+    // REFRESHED token, NOT the sibling's near-expiry one. If the buffer were
+    // missing, attempt 2 would have received 'at-sibling-near-expiry'.
+    expect(op).toHaveBeenCalledTimes(2);
+    expect(op).toHaveBeenNthCalledWith(1, 'at-initial-stale');
+    expect(op).toHaveBeenNthCalledWith(2, 'at-force-refreshed');
+    // getValidAccessToken called twice: attempt 1 + force-refresh path. If
+    // the buffer regressed, this would be exactly 1.
+    expect(m.getValidAccessTokenSpy).toHaveBeenCalledTimes(2);
+  });
 });
 
 // =============================================================================
