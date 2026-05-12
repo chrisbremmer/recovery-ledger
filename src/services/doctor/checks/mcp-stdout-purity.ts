@@ -10,21 +10,28 @@
 // parent process. The subprocess speaks JSON-RPC on its stdout; we read it
 // silently and never echo. Failures are surfaced through the returned
 // DoctorCheck `detail` field, never via stdout/stderr writes from this file.
+//
+// CR-02: fixtures are vendored as TS constants in `./fixtures.js` (not read
+// from disk) and `dist/mcp.mjs` is resolved relative to this module's URL,
+// not `process.cwd()`. The check therefore works from any cwd — including
+// `npx recovery-ledger` from outside the source tree.
 
 import { spawn } from 'node:child_process';
-import { readFile } from 'node:fs/promises';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import type { DoctorCheck } from '../index.js';
+import { JSONRPC_FIXTURES } from './fixtures.js';
 
-const FIXTURE_DIR = 'test/fixtures/mcp';
-const FIXTURE_FILES = [
-  'initialize.json',
-  'initialized.json',
-  'tools-list.json',
-  'whoop-doctor-call.json',
-] as const;
-
-const MCP_ENTRY = 'dist/mcp.mjs';
+// Resolve `mcp.mjs` as a sibling of this compiled module. `tsup` bundles
+// every entry into a single flat file under `dist/`, so this module's source
+// is inlined into both `dist/cli.mjs` and `dist/mcp.mjs`. When invoked from
+// the CLI, `import.meta.url` points at `dist/cli.mjs` and `./mcp.mjs` resolves
+// to its sibling. Under `tsx`/Vitest the resolved path points into the
+// non-built `src/` tree; that file does not exist and the probe surfaces a
+// clear absolute-path failure (IN-02) rather than the misleading cwd-relative
+// message it had before.
+const HERE = path.dirname(fileURLToPath(import.meta.url));
+const MCP_ENTRY = path.resolve(HERE, 'mcp.mjs');
 
 // How long to wait after each frame is written before considering the response
 // drained. 200ms covers the SDK's async response cycle for the fixtures used
@@ -48,25 +55,10 @@ function isJsonRpcMessage(value: unknown): value is JsonRpcMessage {
 }
 
 export async function probeMcpStdoutPurity(): Promise<DoctorCheck> {
-  let frames: string[];
-  try {
-    frames = await Promise.all(
-      FIXTURE_FILES.map(async (name) => {
-        const body = await readFile(path.join(FIXTURE_DIR, name), 'utf8');
-        // Each fixture is pretty-printed JSON on disk; collapse to single-line
-        // framing so newline-delimited transport stays unambiguous.
-        return `${JSON.stringify(JSON.parse(body))}\n`;
-      }),
-    );
-  } catch (err) {
-    return {
-      name: 'mcp_stdout_purity',
-      status: 'fail',
-      detail: `failed to load JSON-RPC fixtures from ${FIXTURE_DIR}: ${
-        err instanceof Error ? err.message : String(err)
-      }`,
-    };
-  }
+  // Canonicalize each fixture frame to single-line JSON-RPC framing. The MCP
+  // stdio transport is strictly line-delimited; multi-line frames are silently
+  // dropped by the parser. Mirrors the on-disk fixtures' wire shape.
+  const frames = JSONRPC_FIXTURES.map((f) => `${JSON.stringify(f.frame)}\n`);
 
   return new Promise<DoctorCheck>((resolve) => {
     const child = spawn(process.execPath, [MCP_ENTRY], {
