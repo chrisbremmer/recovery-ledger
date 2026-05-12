@@ -27,7 +27,7 @@
   5. A stub `recovery-ledger doctor` command reports `better-sqlite3` and `@napi-rs/keyring` native-module load status; build is run against compiled `dist/` (not `tsx`) at least once in CI.
 **Plans**: 6 plans
 - [x] 01-01-bootstrap-PLAN.md — Bootstrap npm + TS strict + tsup + Vitest + Biome config files (FND-01) — completed 2026-05-12 (3m 32s, 9 files)
-- [ ] 01-02-logger-PLAN.md — Pino stderr-only logger + programmatic destination assertion (FND-04 unit half)
+- [x] 01-02-logger-PLAN.md — Pino stderr-only logger + programmatic destination assertion (FND-04 unit half) — completed 2026-05-12 (4m 56s, 2 src files + 1 modified config)
 - [ ] 01-03-mcp-skeleton-PLAN.md — MCP stdio server + register() wrapper + sanitize.ts + whoop_doctor shim (FND-03, FND-06)
 - [ ] 01-04-sanitizer-lint-PLAN.md — Sanitizer unit tests + scripts/ci-grep-gates.sh (FND-05, FND-06)
 - [ ] 01-05-cli-doctor-PLAN.md — Commander CLI + real runDoctor() + three checks + formatter (FND-02, FND-03, FND-07)
@@ -88,7 +88,7 @@
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Foundation & Stdout-Pure MCP Bootstrap | 1/6 | In progress | - |
+| 1. Foundation & Stdout-Pure MCP Bootstrap | 2/6 | In progress | - |
 | 2. OAuth, Token Store & Single-Flight Refresh | 0/? | Not started | - |
 | 3. Data Model, DB Layer & Sync Loop | 0/? | Not started | - |
 | 4. Domain Math, Reviews, Decision Ledger & MCP Surface | 0/? | Not started | - |
@@ -117,4 +117,4 @@ Concerns originate in the phase where the first vulnerable code is introduced; t
 
 ---
 *Roadmap created: 2026-05-11*
-*Last updated: 2026-05-12 — Plan 01-01 complete*
+*Last updated: 2026-05-12 — Plan 01-02 complete (Pino stderr-only logger, FND-04 unit half)*

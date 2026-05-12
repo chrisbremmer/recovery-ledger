@@ -2,19 +2,20 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
+current_plan: 2
 status: executing
-last_updated: "2026-05-12T17:33:00.105Z"
+last_updated: "2026-05-12T17:42:48.889Z"
 progress:
   total_phases: 5
   completed_phases: 0
   total_plans: 6
-  completed_plans: 1
-  percent: 17
+  completed_plans: 2
+  percent: 33
 ---
 
 # State: Recovery Ledger
 
-**Last updated:** 2026-05-12 — completed Plan 01-01 (bootstrap config)
+**Last updated:** 2026-05-12 — completed Plan 01-02 (Pino stderr-only logger + D-02a unit assertion)
 **Mode:** yolo
 **Granularity:** standard
 
@@ -25,19 +26,19 @@ progress:
 
 ## Current Position
 
-**Current Plan:** 01-02
+**Current Plan:** 01-03
 **Total Plans in Phase:** 6
 Phase: 01 (foundation-stdout-pure-mcp-bootstrap) — EXECUTING
-Plan: 2 of 6 (01-01 complete; 01-02 next)
+Plan: 3 of 6 (01-01 and 01-02 complete; 01-03 next)
 
 - **Milestone:** v1
 - **Phase:** 1 — Foundation & Stdout-Pure MCP Bootstrap
-- **Plan:** 01-02-logger-PLAN.md (next) — Pino stderr-only logger + programmatic destination assertion (FND-04 unit half)
-- **Status:** Executing Phase 01 (1/6 plans complete)
-- **Progress:** Plan 01-01 shipped 9 config files; `npm ci && npm run lint && npm run test` all green on the empty source tree; FND-01 complete.
+- **Plan:** 01-03-mcp-skeleton-PLAN.md (next) — MCP stdio server + register() wrapper + sanitize.ts + whoop_doctor shim (FND-03, FND-06)
+- **Status:** Executing Phase 01 (2/6 plans complete)
+- **Progress:** Plan 01-02 shipped 2 source files (logger.ts + logger.test.ts) plus a one-line biome.json scope fix; `npm run test`, `npm run lint`, `npx tsc --noEmit` all green; FND-04 unit half complete.
 
 ```
-[█░░░░░░░░░░░░░░░░░░░] 0 / 5 phases complete (1 / 6 plans complete in Phase 1)
+[█░░░░░░░░░░░░░░░░░░░] 0 / 5 phases complete (2 / 6 plans complete in Phase 1)
 ```
 
 ## Performance Metrics
@@ -47,15 +48,16 @@ Plan: 2 of 6 (01-01 complete; 01-02 next)
 | Phases planned | 5 |
 | Phases complete | 0 |
 | v1 requirements mapped | 49 / 49 |
-| v1 requirements complete | 1 / 49 |
+| v1 requirements complete | 2 / 49 |
 | Plans drafted | 6 (Phase 1) |
-| Plans complete | 1 |
+| Plans complete | 2 |
 
 ### Plan Execution History
 
 | Plan | Duration | Tasks | Files | Status |
 |------|----------|-------|-------|--------|
 | 01-01-bootstrap | 3m 32s | 2 | 9 | Complete (2026-05-12) |
+| 01-02-logger    | 4m 56s | 2 | 3 | Complete (2026-05-12) |
 
 ## Accumulated Context
 
@@ -71,11 +73,16 @@ Plan: 2 of 6 (01-01 complete; 01-02 next)
 - **Plan 01-01 deviation: Biome formatter quote style (single)** — Set `javascript.formatter.quoteStyle: 'single'` so RESEARCH.md verbatim templates and the Plan's must_haves grep patterns (e.g., `pool: 'forks'`) round-trip through `biome check` unmodified.
 - **Plan 01-01 deviation: Vitest `passWithNoTests` in config (not CLI)** — Vitest 4 changed default behavior to exit 1 with no test files; moved the flag to `vitest.config.ts` so package.json `scripts.test` stays the verbatim `"vitest run"` required by must_haves.
 - **Plan 01-01 deviation: TypeScript pinned to ^5.7 (resolved 5.9.3)** — Honored A4 in 01-RESEARCH.md Assumptions Log; explicitly NOT bumped to 6.x.
+- **[Phase 01] Plan 01-02 decision:** chose Pino async destination (sync: false) for prod — RESEARCH Open Question 1 resolved by performance > shutdown-flush determinism.
+- **[Phase 01] Plan 01-02 deviation:** switched RESEARCH Pattern 1's named import `{pino}` to default import — pino@10.3.1 ships CJS `export = pino`, so `.destination` / `.symbols` only attach to the default callable.
+- **[Phase 01] Plan 01-02 decision:** A1 (pino.symbols.streamSym brittleness) RESOLVED — symbol is stable on Pino 10.3.1; symbol-based introspection ships green alongside the load-bearing fallback assertion.
+- **[Phase 01] Plan 01-02 deviation:** `process.env.NODE_ENV` dot-notation (not bracket) — both forms equivalent under `noUncheckedIndexedAccess` for `@types/node` named optionals; Biome `useLiteralKeys` mandates dot.
+- **[Phase 01] Plan 01-02 deviation (environmental):** Added `!.worktrees` to biome.json `files.includes` — stale harness worktree shadow-config was breaking lint.
 
 ### Open Todos
 
-- Execute Plan 01-02 (Pino stderr-only logger + programmatic destination assertion).
-- Plans 01-03 through 01-06 remain (MCP skeleton, sanitizer + lint, CLI doctor, CI + integration).
+- Execute Plan 01-03 (MCP skeleton + register() wrapper + sanitize.ts + whoop_doctor shim — FND-03, FND-06).
+- Plans 01-04 through 01-06 remain (sanitizer + lint, CLI doctor, CI + integration).
 - Confirm whether to deepen research before Phase 2 planning (cross-process file-lock semantics + replay-on-401 contract are research-flagged).
 - Confirm whether to deepen research before Phase 4 planning (confidence-tier thresholds, MAD scaling for small samples, FDR q-value defaults; Zod→JSON-Schema fidelity at the pinned SDK × Zod combination).
 
@@ -93,13 +100,14 @@ None.
 
 ### Last Session Summary
 
-Executed Plan 01-01 (bootstrap config). Shipped 9 config files in 3m 32s: package.json + package-lock.json, tsconfig.json (strict + NodeNext + noUncheckedIndexedAccess + exactOptionalPropertyTypes), tsup.config.ts (two ESM entries, shebang banner, native externals), vitest.config.ts (pool 'forks' + passWithNoTests), biome.json (noConsole 'error' global + src/cli + *.test.ts overrides), .nvmrc, .gitignore, .gitattributes. All 14 deps resolved within STACK.md caret ranges; `npm ci` reproduces in 2s. Three Rule 1 auto-fixes applied where RESEARCH.md templates predated current library versions (Biome 2.4.15 folder-ignore glob, Vitest 4 poolOptions removal, Vitest 4 passWithNoTests default flip). Plan-level verification green: `npm ci && npm run lint && npm run test && npx tsc --noEmit` all exit 0; no `src/`, `test/`, `dist/`, `.github/` directories created (configuration-only plan). Commits: `e52c860` (Task 1), `31ad0c7` (Task 2).
+Executed Plan 01-02 (Pino stderr-only logger). Shipped `src/infrastructure/config/logger.ts` (named export `logger`; prod uses `pino.destination({ dest: 2, sync: false })`; dev uses pino-pretty transport with `options.destination: 2`) and `src/infrastructure/config/logger.test.ts` (two tests under `describe('logger destination', ...)` — fallback `pino.destination({dest:2}).fd === 2` + symbol-based `logger[pino.symbols.streamSym].fd === 2`). Manual stdout-purity smoke: prod logger import emits 0 bytes to stdout, 109 bytes to stderr. Six deviations auto-fixed (1 Rule 3 environment unblock + 5 Rule 1 template/version drift): stale .worktrees biome.json shadow-root, RESEARCH Pattern 1's broken named import, Biome useLiteralKeys vs noUncheckedIndexedAccess, formatter line-collapse, Vitest 4 reporter rename, SonicBoom .d.ts omits .fd. Open Question 1 (sync vs async destination) resolved as async; A1 (pino.symbols.streamSym stability) resolved as stable on Pino 10.3.1. Plan verification: `npm run test`, `npm run lint`, `npx tsc --noEmit` all exit 0. Commits: `cea4221` (env), `5efbbf8` (Task 1), `d7b110a` (Task 2).
 
 ### Next Session
 
-Execute Plan 01-02 (`01-02-logger-PLAN.md`) — Pino stderr-only logger at `src/infrastructure/config/logger.ts` plus a Vitest unit asserting the destination resolves to fd 2 (FND-04 unit half). The integration half (subprocess round-trip against `dist/mcp.mjs`) lands in Plan 01-06.
+Execute Plan 01-03 (`01-03-mcp-skeleton-PLAN.md`) — MCP stdio server skeleton + `register()` wrapper around `server.registerTool` + `sanitize.ts` regex pipeline + `whoop_doctor` 5-line tool shim. Establishes FND-03 (empty MCP server entry) and FND-06 (error sanitizer contract).
 
 ---
 *State initialized: 2026-05-11*
 *Phase 1 context gathered: 2026-05-12*
 *Plan 01-01 complete: 2026-05-12 (3m 32s, 9 files)*
+*Plan 01-02 complete: 2026-05-12 (4m 56s, 3 files — 2 src + 1 modified config)*
