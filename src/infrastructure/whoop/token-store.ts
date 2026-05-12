@@ -290,12 +290,18 @@ export function createTokenStore(opts: TokenStoreOptions = {}): TokenStore {
       throw new AuthError({ kind: 'auth_missing', detail: 'no refresh token on disk' });
     }
     const creds = readClientCreds();
+    // RFC 6749 §6: omit `scope` so the authorization server retains the
+    // originally-granted scope set. Sending `scope: 'offline'` here would
+    // silently NARROW the token to just the offline scope on every refresh,
+    // dropping the seven read scopes the user granted at `init` time and
+    // breaking every Phase 3 `read:*` API call with a 403. Mirrors
+    // `exchangeCode` (oauth.ts) which also omits scope from its token-endpoint
+    // POST body — scope belongs in the authorize URL, not the refresh body.
     const body = new URLSearchParams({
       grant_type: 'refresh_token',
       refresh_token: stale.refreshToken,
       client_id: creds.clientId,
       client_secret: creds.clientSecret,
-      scope: 'offline',
     });
 
     // Capture obtainedAt BEFORE the fetch so a slow network does not push

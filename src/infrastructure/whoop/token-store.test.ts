@@ -696,4 +696,57 @@ describe('cross-process lock', () => {
     expect(body?.get('refresh_token')).toBe('rt-sibling-also-stale');
     expect(body?.get('refresh_token')).not.toBe('rt-original-stale');
   });
+
+  test('L-04 (CR-02 regression): refresh body omits `scope` so the AS retains originally-granted scope', async () => {
+    // CR-02 / RFC 6749 §6: sending `scope: 'offline'` on refresh asks the AS
+    // to narrow the token to just the offline scope, dropping the seven read
+    // scopes the user granted at init and breaking every Phase 3 `read:*`
+    // API call with a 403. The fix omits the `scope` parameter entirely so
+    // the AS retains the original grant.
+    const kr = installKeyringMock();
+    installLockfileMock();
+    const now = Date.UTC(2026, 4, 12, 0, 0, 0);
+    seedExpiredKeyringToken(kr, now);
+
+    const mod = await loadTokenStore();
+    const store = mod.createTokenStore({ paths, now: () => now });
+    await writeFile(paths.storageModeFile, 'keychain\n', { mode: 0o600 });
+
+    await store.getValidAccessToken();
+
+    const body = helper.getLastRequestBody();
+    expect(body).not.toBeNull();
+    expect(body?.get('grant_type')).toBe('refresh_token');
+    // The `scope` parameter must NOT be present on the wire — its absence is
+    // what tells WHOOP to retain the originally-granted scope set per RFC
+    // 6749 §6.
+    expect(body?.has('scope')).toBe(false);
+  });
+
+  test('L-05 (CR-02 regression): post-refresh tokens.scope preserves all seven init-time read scopes', async () => {
+    const kr = installKeyringMock();
+    installLockfileMock();
+    const now = Date.UTC(2026, 4, 12, 0, 0, 0);
+    seedExpiredKeyringToken(kr, now);
+
+    const mod = await loadTokenStore();
+    const store = mod.createTokenStore({ paths, now: () => now });
+    await writeFile(paths.storageModeFile, 'keychain\n', { mode: 0o600 });
+
+    await store.getValidAccessToken();
+
+    // token-200 fixture carries the seven init-time scopes. With the fix in
+    // place, the absent `scope` param means WHOOP echoes the original grant;
+    // a regression that reintroduces `scope: 'offline'` would cause the
+    // fixture/response shape to need to change to surface — keeping the
+    // fixture rich pins the round-trip contract here.
+    const stored = await store.read();
+    expect(stored).not.toBeNull();
+    expect(stored?.scope).toContain('read:recovery');
+    expect(stored?.scope).toContain('read:sleep');
+    expect(stored?.scope).toContain('read:workout');
+    expect(stored?.scope).toContain('read:cycles');
+    expect(stored?.scope).toContain('read:profile');
+    expect(stored?.scope).toContain('read:body_measurement');
+  });
 });
