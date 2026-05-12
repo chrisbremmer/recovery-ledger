@@ -25,7 +25,13 @@
   3. A lint rule fails the build on any bare `console.*` call outside `src/cli/`, and a CI gate fails on any non-JSON-RPC byte written to stdout from the MCP server path.
   4. The MCP error-sanitizer contract strips `Authorization` headers and JWT-shaped strings from any error surfaced to a tool result, verified by a fixture of "errors that historically leak" (Node `fetch` failure shapes, undici TypeError variants).
   5. A stub `recovery-ledger doctor` command reports `better-sqlite3` and `@napi-rs/keyring` native-module load status; build is run against compiled `dist/` (not `tsx`) at least once in CI.
-**Plans**: TBD
+**Plans**: 6 plans
+- [ ] 01-01-bootstrap-PLAN.md — Bootstrap npm + TS strict + tsup + Vitest + Biome config files (FND-01)
+- [ ] 01-02-logger-PLAN.md — Pino stderr-only logger + programmatic destination assertion (FND-04 unit half)
+- [ ] 01-03-mcp-skeleton-PLAN.md — MCP stdio server + register() wrapper + sanitize.ts + whoop_doctor shim (FND-03, FND-06)
+- [ ] 01-04-sanitizer-lint-PLAN.md — Sanitizer unit tests + scripts/ci-grep-gates.sh (FND-05, FND-06)
+- [ ] 01-05-cli-doctor-PLAN.md — Commander CLI + real runDoctor() + three checks + formatter (FND-02, FND-03, FND-07)
+- [ ] 01-06-ci-integration-PLAN.md — Subprocess round-trip test + macOS-latest GitHub Actions workflow (FND-01..07 cross-cut)
 **UI hint**: no
 
 ### Phase 2: OAuth, Token Store & Single-Flight Refresh
@@ -82,7 +88,7 @@
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Foundation & Stdout-Pure MCP Bootstrap | 0/? | Not started | - |
+| 1. Foundation & Stdout-Pure MCP Bootstrap | 0/6 | Not started | - |
 | 2. OAuth, Token Store & Single-Flight Refresh | 0/? | Not started | - |
 | 3. Data Model, DB Layer & Sync Loop | 0/? | Not started | - |
 | 4. Domain Math, Reviews, Decision Ledger & MCP Surface | 0/? | Not started | - |

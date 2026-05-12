@@ -1054,27 +1054,27 @@ coverage/
 | A5 | tsup `external: ['better-sqlite3', '@napi-rs/keyring']` is sufficient to keep both out of the bundle and have Node load them at runtime | tsup.config.ts | If wrong, `dist/mcp.mjs` runtime fails to load native modules. STACK.md prescribes this; tsup docs confirm `external` is the right knob, but the planner should test by running `node dist/mcp.mjs` once after build and confirming the MCP server starts |
 | A6 | Native macOS Keychain prompt does NOT fire on `new Entry(...)` (constructor only — no read/write) | Pattern 6 | If wrong, CI on macOS-latest might prompt for credentials (it won't on the headless runner, but local dev would). Phase 2 will replace with a fuller probe; Phase 1 is OK accepting a load-only check |
 
-## Open Questions
+## Open Questions (RESOLVED)
 
 1. **Should the prod logger use `sync: true` or `sync: false` for fd 2?**
    - What we know: Pino's `pino.destination({ dest: 2, sync: false })` is async (faster, buffers); `sync: true` flushes synchronously.
    - What's unclear: Whether an async logger can drop log lines on a fast shutdown (subprocess test ends the child quickly).
-   - Recommendation: `sync: false` for prod (perf), `sync: true` only if Phase 1 test flakiness shows missed lines on graceful shutdown. Document the choice in `logger.ts`.
+   - RESOLVED: `sync: false` for prod (perf), `sync: true` only if Phase 1 test flakiness shows missed lines on graceful shutdown. Document the choice in `logger.ts`.
 
 2. **Should the version banner go in `package.json` and be read at runtime, or hardcoded in `0.1.0` initially?**
    - What we know: Phase 1 ships `0.1.0`. The CLI advertises `--version`; the MCP advertises a `version` field in `initialize`.
    - What's unclear: Whether to wire `package.json` version read at runtime now or in Phase 5.
-   - Recommendation: Hardcode `0.1.0` in two places (CLI `program.version('0.1.0')` and MCP `new McpServer({ name: 'recovery-ledger', version: '0.1.0' })`). Phase 5 can read from `package.json` once stable. Don't optimize this in Phase 1.
+   - RESOLVED: Hardcode `0.1.0` in two places (CLI `program.version('0.1.0')` and MCP `new McpServer({ name: 'recovery-ledger', version: '0.1.0' })`). Phase 5 can read from `package.json` once stable. Don't optimize this in Phase 1.
 
 3. **Does the `dist/` smoke-test integration need to run `npm run build` itself (vitest globalSetup) or rely on CI ordering?**
    - What we know: CI runs `build` before `test`. Local `vitest` might not.
    - What's unclear: Whether developers running `vitest` locally without first running `npm run build` should get a clear error or have build run automatically.
-   - Recommendation: Add a `vitest.config.ts` `globalSetup` that runs `tsup` once before the integration test, OR a clear precondition check in the test that says "run `npm run build` first." CI is unaffected either way. The simpler answer (precondition check) ships in Phase 1; auto-build can be a Phase 2 polish.
+   - RESOLVED: Add a `vitest.config.ts` `globalSetup` that runs `tsup` once before the integration test, OR a clear precondition check in the test that says "run `npm run build` first." CI is unaffected either way. The simpler answer (precondition check) ships in Phase 1; auto-build can be a Phase 2 polish.
 
 4. **`@modelcontextprotocol/sdk/server/mcp.js` vs `@modelcontextprotocol/sdk/server/index.js` for the `McpServer` import**
    - What we know: STACK.md uses `@modelcontextprotocol/sdk/server/mcp.js`. The SDK's exports map includes `./server` (resolving to `index.js`) and wildcard `./*` (resolving to `mcp.js` for `/server/mcp.js`).
    - What's unclear: Whether `McpServer` is reliably exported from both. STACK.md's import path is verbatim from the canonical example.
-   - Recommendation: Use the STACK.md import path (`./server/mcp.js`). If the planner sees a TS error at implementation time, fall back to `./server/index.js` — both should expose `McpServer` per the SDK's documented surface.
+   - RESOLVED: Use the STACK.md import path (`./server/mcp.js`). If the planner sees a TS error at implementation time, fall back to `./server/index.js` — both should expose `McpServer` per the SDK's documented surface.
 
 ## Environment Availability
 

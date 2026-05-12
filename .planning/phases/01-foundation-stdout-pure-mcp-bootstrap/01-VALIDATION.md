@@ -2,8 +2,8 @@
 phase: 1
 slug: foundation-stdout-pure-mcp-bootstrap
 status: draft
-nyquist_compliant: false
-wave_0_complete: false
+nyquist_compliant: true
+wave_0_complete: true
 created: 2026-05-12
 ---
 
@@ -64,7 +64,7 @@ created: 2026-05-12
 - [ ] `tsup.config.ts` — shebang banner, `external: ['better-sqlite3', '@napi-rs/keyring']`, two entries (`src/cli/index.ts`, `src/mcp/index.ts`), output to `dist/`
 - [ ] `vitest.config.ts` — `pool: 'forks'`, no watch by default, fixture path resolution
 - [ ] `biome.json` — `noConsole` enabled globally with `src/cli/**/*.ts` override and `**/*.test.ts` exempt; `biome-ignore` for `noConsole` banned (enforced by CI grep gate, not Biome)
-- [ ] `test/fixtures/mcp/initialize.json`, `tools-list.json`, `whoop-doctor-call.json`, `shutdown.json` — committed NDJSON-RPC payloads for subprocess round-trip
+- [ ] `test/fixtures/mcp/initialize.json`, `tools-list.json`, `whoop-doctor-call.json` — committed NDJSON-RPC payloads for subprocess round-trip. (No `shutdown.json` — the subprocess test uses `child.stdin.end()` for graceful close; no fixture needed.)
 - [ ] `scripts/ci-grep-gates.sh` — three grep gates with explicit exit codes (`if grep -qrn …; then exit 1; fi`)
 - [ ] `.github/workflows/ci.yml` — macOS-latest, Node 22, single job, `npm ci → lint → build → test → grep-gates`
 
@@ -81,11 +81,13 @@ created: 2026-05-12
 
 ## Validation Sign-Off
 
-- [ ] All tasks have `<automated>` verify or Wave 0 dependencies
-- [ ] Sampling continuity: no 3 consecutive tasks without automated verify
-- [ ] Wave 0 covers all MISSING references (the eight Wave 0 files above)
-- [ ] No watch-mode flags (vitest runs in `run` mode in CI)
-- [ ] Feedback latency < 60s
-- [ ] `nyquist_compliant: true` set in frontmatter
+- [x] All tasks have `<automated>` verify or Wave 0 dependencies
+- [x] Sampling continuity: no 3 consecutive tasks without automated verify
+- [x] Wave 0 covers all MISSING references (the seven Wave 0 files above — `shutdown.json` removed)
+- [x] No watch-mode flags (vitest runs in `run` mode in CI)
+- [x] Feedback latency < 60s
+- [x] `nyquist_compliant: true` set in frontmatter
 
-**Approval:** pending
+**Approval:** approved 2026-05-12
+</content>
+</invoke>
