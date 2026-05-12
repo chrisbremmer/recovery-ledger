@@ -34,4 +34,30 @@ describe('renderDoctor', () => {
     const lines = text.split('\n').filter((l) => l.length > 0);
     expect(lines[lines.length - 1]).toBe('overall: warn');
   });
+
+  // MR-41 — explicit fail-path coverage. The existing fixture exercises pass
+  // and warn; a regression that mangled the fail emit (e.g., a future
+  // formatter that special-cased the fail prefix) would slip through. Cover
+  // every status independently so the table is contract-tested end-to-end.
+  test('MR-41 — renders [fail] tag and overall: fail when a check fails', () => {
+    const failFixture: DoctorResult = {
+      checks: [
+        { name: 'better_sqlite3_load', status: 'pass', detail: 'native binding loaded' },
+        {
+          name: 'mcp_stdout_purity',
+          status: 'fail',
+          detail: 'tools/call response (id=3) missing — 2 frames observed',
+        },
+      ],
+      overall: 'fail',
+    };
+    const text = renderDoctor(failFixture);
+    expect(text).toContain('[fail]');
+    expect(text).toContain('mcp_stdout_purity');
+    expect(text).toContain('tools/call response (id=3) missing');
+    expect(text).toContain('overall: fail');
+    // overall is the last non-empty line.
+    const lines = text.split('\n').filter((l) => l.length > 0);
+    expect(lines[lines.length - 1]).toBe('overall: fail');
+  });
 });
