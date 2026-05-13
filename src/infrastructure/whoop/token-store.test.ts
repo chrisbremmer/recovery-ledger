@@ -486,6 +486,87 @@ describe('backend fallback', () => {
     const raw = await readFile(paths.tokensFile, 'utf8');
     expect(JSON.parse(raw)).toEqual(tokens);
   });
+
+  test('B-05 (WR-D regression): setThrows fallback best-effort-deletes the keychain entry', async () => {
+    // WR-D: when the keyring write throws and we fall back to file, any
+    // prior keychain blob would otherwise survive. The fallback arm must
+    // best-effort-delete the keychain entry so a later session that
+    // somehow reverts the storage-mode marker does NOT silently re-emerge
+    // with stale tokens. Symmetry with clear().
+    const kr = installKeyringMock({ setThrows: true });
+    installLockfileMock();
+
+    const mod = await loadTokenStore();
+    const now = Date.UTC(2026, 4, 12, 0, 0, 0);
+    const store = mod.createTokenStore({ paths, now: () => now });
+    const tokens: import('./token-store.js').Tokens = {
+      accessToken: 'at-wd',
+      refreshToken: 'rt-wd',
+      tokenType: 'bearer',
+      scope: 'offline',
+      obtainedAt: now,
+      expiresAt: now + 3600_000,
+    };
+
+    await store.write(tokens);
+
+    // Storage mode flipped to file.
+    expect((await readFile(paths.storageModeFile, 'utf8')).trim()).toBe('file');
+    // The keychain entry was best-effort-deleted on the fallback path.
+    expect(kr.deletePasswordSpy).toHaveBeenCalledWith('recovery-ledger', 'whoop');
+  });
+
+  test('B-06 (WR-D regression): Pitfall F fallback best-effort-deletes the keychain entry', async () => {
+    // Pitfall F: setPassword succeeds but the round-trip read mismatches.
+    // The mismatched blob is still IN the keychain — we must delete it
+    // before the file fallback writes so the stale keychain blob cannot
+    // re-emerge if the storage-mode marker is later reverted.
+    const kr = installKeyringMock({ getMismatch: true });
+    installLockfileMock();
+
+    const mod = await loadTokenStore();
+    const now = Date.UTC(2026, 4, 12, 0, 0, 0);
+    const store = mod.createTokenStore({ paths, now: () => now });
+    const tokens: import('./token-store.js').Tokens = {
+      accessToken: 'at-wd2',
+      refreshToken: 'rt-wd2',
+      tokenType: 'bearer',
+      scope: 'offline',
+      obtainedAt: now,
+      expiresAt: now + 3600_000,
+    };
+
+    await store.write(tokens);
+
+    expect((await readFile(paths.storageModeFile, 'utf8')).trim()).toBe('file');
+    expect(kr.deletePasswordSpy).toHaveBeenCalledWith('recovery-ledger', 'whoop');
+  });
+
+  test('B-07 (WR-D regression): forceFile=true does NOT touch the keychain (no delete probe)', async () => {
+    // D-25 forceFile path: the user explicitly disabled the keyring. We
+    // must not even probe deletePassword in that case — the keychain is
+    // off-limits for this session.
+    const kr = installKeyringMock();
+    installLockfileMock();
+    process.env.RECOVERY_LEDGER_FORCE_FILE_STORE = '1';
+
+    const mod = await loadTokenStore();
+    const now = Date.UTC(2026, 4, 12, 0, 0, 0);
+    const store = mod.createTokenStore({ paths, now: () => now });
+    const tokens: import('./token-store.js').Tokens = {
+      accessToken: 'at-wd3',
+      refreshToken: 'rt-wd3',
+      tokenType: 'bearer',
+      scope: 'offline',
+      obtainedAt: now,
+      expiresAt: now + 3600_000,
+    };
+
+    await store.write(tokens);
+
+    expect(kr.setPasswordSpy).not.toHaveBeenCalled();
+    expect(kr.deletePasswordSpy).not.toHaveBeenCalled();
+  });
 });
 
 // =============================================================================

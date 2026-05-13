@@ -241,6 +241,20 @@ export function createTokenStore(opts: TokenStoreOptions = {}): TokenStore {
     }
 
     if (mode === 'file') {
+      // WR-D: best-effort delete any prior keychain entry so a future
+      // session that somehow reverts the storage-mode marker (manual edit
+      // or a future bug) does not silently re-emerge with stale tokens.
+      // Symmetry with clear(), which also best-effort-deletes the keychain
+      // entry whenever the mode was 'keychain'. Skip when forceFile is
+      // true (D-25 / RECOVERY_LEDGER_FORCE_FILE_STORE=1): the user
+      // explicitly disabled the keyring, so we do not touch it at all.
+      if (!forceFile) {
+        try {
+          new Entry(KEYRING_SERVICE, KEYRING_ACCOUNT).deletePassword();
+        } catch {
+          // best-effort — keychain may not be available, or no entry exists
+        }
+      }
       await writeFileAtomic(resolvedPaths.tokensFile, blob);
     }
 
