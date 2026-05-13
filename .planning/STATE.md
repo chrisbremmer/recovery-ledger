@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 current_plan: 8
-status: verifying
+status: ready_to_plan
 last_updated: "2026-05-12T23:37:28.269Z"
 progress:
   total_phases: 5
-  completed_phases: 2
+  completed_phases: 3
   total_plans: 14
   completed_plans: 14
-  percent: 100
+  percent: 60
 ---
 
 # State: Recovery Ledger
@@ -26,15 +26,15 @@ progress:
 
 ## Current Position
 
-**Current Plan:** 8
+**Current Plan:** Not started
 **Total Plans in Phase:** 8
 Phase: 02 (oauth-token-store-single-flight-refresh) — COMPLETE (ready for verification)
 Plan: 8 of 8 — complete
 
 - **Milestone:** v1
-- **Phase:** 2 — closed
+- **Phase:** 3
 - **Plan:** 02-08-cross-process-integration-PLAN.md (complete) — load-bearing AUTH-05 cross-process integration test + AUTH-06 grep gate across 3 surfaces + D-17 runtime attestation + D-25 CI matrix + tsup.config.ts entry per checker WARNING PLAN-08-BUILD-DEP. 7 tests green; full suite 238/238 across 20 files; lint clean; CI grep gates clean. Phase 2 closed: all 8 plans complete; all 4 Phase 2 success criteria CI-enforced.
-- **Status:** Phase 2 complete — ready for verification (`/gsd-verify-phase 2`)
+- **Status:** Ready to plan
 - **Progress:** [██████████] 100%
 
 ```
