@@ -26,15 +26,19 @@ async function main() {
   try {
     const accessToken = await tokenStore.getValidAccessToken();
     const storageMode = await tokenStore.readStorageMode();
-    process.stdout.write(`${JSON.stringify({ ok: true, accessToken, storageMode })}\n`);
-    process.exit(0);
+    // WR-09: await stdout drain via the write callback before exiting. On
+    // macOS Node 22 with `silent: true` IPC pipes, `process.exit()` can fire
+    // before the kernel drains the stdout pipe — the parent's `child.stdout
+    // .on('data')` listener then receives an empty buffer and the test
+    // flakes. The CLI shims (auth.ts, init.ts) follow the same pattern.
+    process.stdout.write(
+      `${JSON.stringify({ ok: true, accessToken, storageMode })}\n`,
+      () => process.exit(0),
+    );
   } catch (err) {
     const kind =
-      err !== null && typeof err === 'object' && 'kind' in err
-        ? String(err.kind)
-        : 'unknown';
-    process.stderr.write(`${JSON.stringify({ ok: false, kind })}\n`);
-    process.exit(1);
+      err !== null && typeof err === 'object' && 'kind' in err ? String(err.kind) : 'unknown';
+    process.stderr.write(`${JSON.stringify({ ok: false, kind })}\n`, () => process.exit(1));
   }
 }
 
