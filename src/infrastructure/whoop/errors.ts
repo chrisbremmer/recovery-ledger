@@ -18,13 +18,26 @@
 // and the union is FROZEN at six kinds. No Wave 2 plan mutates this
 // file.
 
-export type AuthErrorKind =
-  | 'auth_missing'
-  | 'auth_expired'
-  | 'auth_state_mismatch'
-  | 'auth_timeout'
-  | 'auth_port_in_use'
-  | 'refresh_failed';
+// AUTH_ERROR_KINDS is the single source of truth for the AuthErrorKind
+// union. The union is derived from the tuple via `typeof
+// AUTH_ERROR_KINDS[number]`, and `isAuthError` (below) uses the same
+// tuple as its duck-type set. Adding a seventh kind requires only one
+// edit here -- the type, the duck-type set, AND (via the formatAuthError
+// exhaustive switch) the compile error all grow together. This restores
+// the MR-21 forcing function that the earlier WR-C duplicate-list in
+// auth.ts had degraded.
+export const AUTH_ERROR_KINDS = [
+  'auth_missing',
+  'auth_expired',
+  'auth_state_mismatch',
+  'auth_timeout',
+  'auth_port_in_use',
+  'refresh_failed',
+] as const;
+
+export type AuthErrorKind = (typeof AUTH_ERROR_KINDS)[number];
+
+const AUTH_ERROR_KINDS_SET: ReadonlySet<string> = new Set(AUTH_ERROR_KINDS);
 
 export interface AuthErrorInit {
   kind: AuthErrorKind;
@@ -59,6 +72,26 @@ export class AuthError extends Error {
     }
     this.name = 'AuthError';
   }
+}
+
+/**
+ * Type guard for AuthError. Duck-types on `name === 'AuthError'` and
+ * `kind` membership in the AUTH_ERROR_KINDS tuple. Required because
+ * `instanceof AuthError` is unreliable under Vitest's `vi.resetModules()`:
+ * two module-graph instances of errors.ts produce different class
+ * identities for the same logical type. The CLI catch arm in
+ * `src/cli/commands/auth.ts` uses this so test ergonomics match
+ * production behavior.
+ *
+ * The duck-type set is derived from AUTH_ERROR_KINDS (the same tuple the
+ * AuthErrorKind union is derived from). Adding a kind to the tuple
+ * automatically extends both the union AND this guard -- the MR-21
+ * forcing function (a new kind breaks a switch somewhere) is preserved.
+ */
+export function isAuthError(err: unknown): err is AuthError {
+  if (typeof err !== 'object' || err === null) return false;
+  const e = err as { name?: unknown; kind?: unknown };
+  return e.name === 'AuthError' && typeof e.kind === 'string' && AUTH_ERROR_KINDS_SET.has(e.kind);
 }
 
 /**

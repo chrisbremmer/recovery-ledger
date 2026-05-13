@@ -25,7 +25,7 @@ import open from 'open';
 import { z } from 'zod';
 import { paths } from '../../infrastructure/config/paths.js';
 import { ConfigSchema } from '../../infrastructure/config/schema.js';
-import { AuthError, formatAuthError } from '../../infrastructure/whoop/errors.js';
+import { AuthError, formatAuthError, isAuthError } from '../../infrastructure/whoop/errors.js';
 import { runOAuth } from '../../infrastructure/whoop/oauth.js';
 import { tokenStore } from '../../infrastructure/whoop/token-store.js';
 // Cross-layer import: src/mcp/sanitize.ts is the single source of truth for
@@ -114,17 +114,18 @@ export async function runAuthCommand(opts: {
       process.exit(AUTH_EXIT_CODES.success);
     });
   } catch (err) {
-    // Duck-type AuthError detection: `instanceof AuthError` is unreliable
-    // under Vitest's `vi.resetModules()` because two module-graph instances
-    // of errors.ts produce different class identities for the same logical
-    // type (see Plan 02-04 deviation 1 — planner-template note). Check the
-    // structural shape instead: `name === 'AuthError'` AND `kind` is one
-    // of the FROZEN six kinds. Production code only ever throws AuthError
-    // from within this module graph, so the duck-type is safe; tests get
-    // robust dispatch regardless of resetModules timing.
-    if (isAuthErrorShape(err)) {
-      const remediation = formatAuthError(err as AuthError);
-      const code = AUTH_EXIT_CODES[(err as AuthError).kind] ?? 1;
+    // Use the shared `isAuthError` type guard from errors.ts. `instanceof
+    // AuthError` is unreliable under Vitest's `vi.resetModules()`: two
+    // module-graph instances of errors.ts produce different class
+    // identities for the same logical type. The guard duck-types on
+    // `name === 'AuthError'` + `kind` membership in AUTH_ERROR_KINDS.
+    // AUTH_ERROR_KINDS is the same tuple AuthErrorKind is derived from,
+    // so adding a kind there automatically extends both the type union
+    // AND the guard -- the MR-21 forcing function (a new kind breaks
+    // formatAuthError's exhaustive switch) is preserved end-to-end.
+    if (isAuthError(err)) {
+      const remediation = formatAuthError(err);
+      const code = AUTH_EXIT_CODES[err.kind] ?? 1;
       process.stdout.write(`${remediation}\n`, () => {
         process.exit(code);
       });
@@ -150,19 +151,4 @@ function isNotFound(err: unknown): boolean {
     'code' in err &&
     (err as { code?: string }).code === 'ENOENT'
   );
-}
-
-const AUTH_ERROR_KINDS = new Set([
-  'auth_missing',
-  'auth_expired',
-  'auth_state_mismatch',
-  'auth_timeout',
-  'auth_port_in_use',
-  'refresh_failed',
-]);
-
-function isAuthErrorShape(err: unknown): boolean {
-  if (typeof err !== 'object' || err === null) return false;
-  const e = err as { name?: unknown; kind?: unknown };
-  return e.name === 'AuthError' && typeof e.kind === 'string' && AUTH_ERROR_KINDS.has(e.kind);
 }

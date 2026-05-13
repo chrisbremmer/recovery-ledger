@@ -7,7 +7,13 @@
 
 import { describe, expect, test } from 'vitest';
 import { sanitize, serializeError } from '../../mcp/sanitize.js';
-import { AuthError, type AuthErrorKind, formatAuthError } from './errors.js';
+import {
+  AUTH_ERROR_KINDS,
+  AuthError,
+  type AuthErrorKind,
+  formatAuthError,
+  isAuthError,
+} from './errors.js';
 
 describe('AuthError', () => {
   test('Test 6: kind is preserved and the instance is an Error subclass', () => {
@@ -108,5 +114,80 @@ describe('formatAuthError', () => {
     const err = new AuthError({ kind: 'auth_port_in_use', detail: 'port 4321' });
     const msg = formatAuthError(err);
     expect(msg).toMatch(/init|port/);
+  });
+});
+
+describe('isAuthError (WR-C)', () => {
+  test('IS-01: real AuthError instance is detected', () => {
+    const err = new AuthError({ kind: 'auth_missing' });
+    expect(isAuthError(err)).toBe(true);
+  });
+
+  test('IS-02: structurally-shaped AuthError (resetModules-cross-graph) is detected', () => {
+    // Simulate the cross-module-graph scenario: an object with the same
+    // shape an AuthError carries, but NOT actually `instanceof AuthError`
+    // from THIS module's class identity. Under vi.resetModules() this is
+    // the literal failure mode that motivated WR-C.
+    const shaped = { name: 'AuthError', kind: 'refresh_failed' };
+    expect(isAuthError(shaped)).toBe(true);
+    expect(shaped).not.toBeInstanceOf(AuthError);
+  });
+
+  test('IS-03: plain Error is rejected', () => {
+    expect(isAuthError(new Error('plain'))).toBe(false);
+  });
+
+  test('IS-04: null / undefined / non-object are rejected', () => {
+    expect(isAuthError(null)).toBe(false);
+    expect(isAuthError(undefined)).toBe(false);
+    expect(isAuthError('AuthError')).toBe(false);
+    expect(isAuthError(42)).toBe(false);
+  });
+
+  test('IS-05: object with name=AuthError but invalid kind is rejected', () => {
+    // Defense-in-depth: a synthesized object claiming to be AuthError but
+    // with a non-union kind value must not pass the guard. Without this,
+    // formatAuthError would hit its default arm with an "unknown auth
+    // error" string -- silent green-check failure mode.
+    const fake = { name: 'AuthError', kind: 'not_a_real_kind' };
+    expect(isAuthError(fake)).toBe(false);
+  });
+
+  test('IS-06: AUTH_ERROR_KINDS tuple is the single source of truth for the union', () => {
+    // The static type AuthErrorKind is derived from
+    // `(typeof AUTH_ERROR_KINDS)[number]`. This test pins the tuple
+    // contents so adding a kind to the union (which requires editing
+    // AUTH_ERROR_KINDS) intentionally trips here AND the formatAuthError
+    // exhaustive switch -- the MR-21 forcing function.
+    expect([...AUTH_ERROR_KINDS]).toEqual([
+      'auth_missing',
+      'auth_expired',
+      'auth_state_mismatch',
+      'auth_timeout',
+      'auth_port_in_use',
+      'refresh_failed',
+    ]);
+    // Every kind in the tuple is constructible AND surfaces a non-empty
+    // remediation string via formatAuthError. This mirrors Test 7 but
+    // pulls the kind list from the canonical source instead of a
+    // duplicated tuple literal.
+    for (const kind of AUTH_ERROR_KINDS) {
+      const err = new AuthError({ kind });
+      expect(isAuthError(err)).toBe(true);
+      expect(formatAuthError(err).length).toBeGreaterThan(0);
+    }
+  });
+
+  test('IS-07: AUTH_ERROR_KINDS is exported as a readonly tuple', () => {
+    // `as const` makes the array deeply readonly at the type level.
+    // Pin at runtime: it must be array-shaped (length 6) and every
+    // element must be a string. We do NOT freeze it at runtime --
+    // `as const` is a type-system contract; a freeze() would also be
+    // fine but is not required for the guard's correctness.
+    expect(Array.isArray(AUTH_ERROR_KINDS)).toBe(true);
+    expect(AUTH_ERROR_KINDS.length).toBe(6);
+    for (const k of AUTH_ERROR_KINDS) {
+      expect(typeof k).toBe('string');
+    }
   });
 });
