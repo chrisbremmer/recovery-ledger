@@ -906,19 +906,40 @@ describe('cross-process lock', () => {
 });
 
 // =============================================================================
-// describe('real lockfile contention') — WR-05: ALL OTHER tests in this file
-// mock proper-lockfile. This describe block uses the REAL `proper-lockfile`
-// against a tmpdir so a regression in the lock retry policy (e.g., dropping
-// `retries: 10` to `retries: 0`) surfaces here at unit scope instead of
-// silently relying on the cross-process integration suite (Plan 02-08), which
-// is gated behind `npm run build` and a 30s timeout.
+// describe('real lockfile smoke-test') — WR-A correction of WR-05's
+// over-promise. ALL OTHER tests in this file mock proper-lockfile. This block
+// uses the REAL `proper-lockfile` against a tmpdir to verify the module is
+// actually wired into the code path (not just satisfied by the per-test mock)
+// and that acquire/release works in-process.
+//
+// What this block does NOT do (WR-A): it does NOT exercise cross-process lock
+// CONTENTION. Both LR-01 calls share a single `createTokenStore()` instance,
+// and the in-process `inFlightRefresh` Promise-gate intercepts the second
+// call BEFORE `doRefresh` runs -- only ONE call ever reaches
+// `proper-lockfile.lock`, uncontended. A regression in the retry policy
+// (e.g., dropping `retries: 10` to `retries: 0`) would NOT cause LR-01 or
+// LR-02 to fail; that detection target is owned by the cross-process
+// integration test in `tests/integration/auth-concurrency.test.ts`, which
+// spawns two child processes against a local mock server.
+//
+// Value this block DOES provide:
+// - LR-01 proves the real `proper-lockfile` module is reachable from
+//   `createTokenStore` (a wiring regression that replaced the import with a
+//   no-op would fail here).
+// - LR-02 proves the lock release cleans up `<target>.lock` (a regression
+//   where `release()` is never called would leave the directory and fail).
 // =============================================================================
 
-describe('real lockfile contention (WR-05)', () => {
-  test('LR-01: two simultaneous doRefresh calls — second blocks until first releases', async () => {
+describe('real lockfile smoke-test (WR-A correction of WR-05)', () => {
+  test('LR-01: real proper-lockfile wires through createTokenStore + acquire/release succeeds in-process', async () => {
     // No vi.doMock('proper-lockfile') here — the dynamic import resolves the
     // real module from node_modules. We DO still mock the keyring so the test
     // is deterministic across macOS/Linux keychain availability.
+    //
+    // Note: two simultaneous getValidAccessToken() calls on the SAME store
+    // funnel through the in-process Promise-gate; only one ever reaches the
+    // real lock. This still exercises the real lock for that single
+    // acquisition; it does NOT exercise contention. See block header above.
     const kr = installKeyringMock();
     // installLockfileMock() intentionally NOT called — use the real module.
     const now = Date.UTC(2026, 4, 12, 0, 0, 0);
@@ -928,13 +949,6 @@ describe('real lockfile contention (WR-05)', () => {
     const store = mod.createTokenStore({ paths, now: () => now });
     await writeFile(paths.storageModeFile, 'keychain\n', { mode: 0o600 });
 
-    // Two simultaneous calls. With the real proper-lockfile in place, the
-    // in-process Promise-gate funnels both into a single doRefresh; the
-    // CROSS-process lock is what serializes when two different processes
-    // race. In-process, the in-flight Promise still wins — but the lock
-    // mechanics MUST not deadlock or error out. This test pins that the
-    // real lock acquires + releases cleanly and the MSW server is hit
-    // exactly once.
     const [r1, r2] = await Promise.all([store.getValidAccessToken(), store.getValidAccessToken()]);
 
     expect(r1).toBe('at-1');
@@ -943,10 +957,11 @@ describe('real lockfile contention (WR-05)', () => {
     expect(helper.getRefreshHitCount()).toBe(1);
   });
 
-  test('LR-02: real lockfile actually creates a .lock directory under the tmpdir', async () => {
-    // Defense-in-depth: prove the real proper-lockfile is wired (not just the
-    // mock). proper-lockfile creates a `<target>.lock` directory while held;
-    // we attach a hook that observes the directory existing mid-acquisition.
+  test('LR-02: real lockfile release cleans up the .lock directory', async () => {
+    // Wiring proof: proper-lockfile creates a `<target>.lock` directory
+    // while held. After release we assert the directory is gone -- a
+    // regression where `release()` is never called would leave the
+    // directory and fail this test.
     const kr = installKeyringMock();
     const now = Date.UTC(2026, 4, 12, 0, 0, 0);
     seedExpiredKeyringToken(kr, now);
@@ -957,15 +972,7 @@ describe('real lockfile contention (WR-05)', () => {
 
     await store.getValidAccessToken();
 
-    // After release, the .lock directory is cleaned up. Sanity check: the
-    // tokens file path is what we expect, and the test ran without
-    // proper-lockfile throwing (it would throw EEXIST if the lock dir
-    // existed but no holder was detected, etc.). The real assertion is that
-    // we got here.
     expect(helper.getRefreshHitCount()).toBe(1);
-    // Lock target path matches resolvePaths(). proper-lockfile creates the
-    // lock target dir adjacent (i.e., `${tokensLockFile}.lock`). We assert
-    // we DON'T see that dir lingering — the lock was released cleanly.
     await expect(stat(`${paths.tokensLockFile}.lock`)).rejects.toMatchObject({
       code: 'ENOENT',
     });
