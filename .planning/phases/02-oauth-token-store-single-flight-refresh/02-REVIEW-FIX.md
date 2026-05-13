@@ -1,261 +1,241 @@
 ---
 phase: 02-oauth-token-store-single-flight-refresh
-fixed_at: 2026-05-13T00:03:09Z
+fixed_at: 2026-05-13T00:57:00Z
 review_path: .planning/phases/02-oauth-token-store-single-flight-refresh/02-REVIEW.md
-iteration: 1
-findings_in_scope: 15
-fixed: 15
+iteration: 2
+findings_in_scope: 4
+fixed: 4
 skipped: 0
 status: all_fixed
 ---
 
-# Phase 02: Code Review Fix Report
+# Phase 02: Code Review Fix Report (Pass 2)
 
-**Fixed at:** 2026-05-13T00:03:09Z
-**Source review:** `.planning/phases/02-oauth-token-store-single-flight-refresh/02-REVIEW.md`
-**Iteration:** 1
+**Fixed at:** 2026-05-13T00:57:00Z
+**Source review:** `.planning/phases/02-oauth-token-store-single-flight-refresh/02-REVIEW.md` (pass 2 re-review)
+**Iteration:** 2
+**Prior pass:** Pass-1 fixes (15/15 in-scope findings) committed at `a8566b5..153768c`; pass-1 REVIEW-FIX.md preserved in git at commit `8b00b58`.
 
 **Summary:**
-- Findings in scope (critical + warning): 15
-- Fixed: 15
+- Findings in scope (warnings only, default fix_scope=critical_warning): 4
+- Fixed: 4
 - Skipped: 0
+- Info findings (out of scope): 5 — documented in REVIEW.md, deferred to a future cleanup pass
 
-All four critical findings — the load-bearing failures ADRs 0001/0002/0007 were
-written to prevent — are addressed with source fixes plus pinning regression
-tests. All eleven warnings are addressed with either source fixes or pinning
-tests. 255/255 tests pass; lint and all five CI grep gates remain green.
+All four pass-2 warnings are addressed with source fixes plus pinning
+regression tests. 258/258 in-scope tests pass (1 pre-existing build-gated
+integration failure unrelated to this work); lint and all five CI grep gates
+remain green.
 
-Verification per fix: re-read modified files (Tier 1), `npm run test` on the
-affected test files (Tier 2 — both syntax AND behavioral semantic check), and
-`npm run lint` + `bash scripts/ci-grep-gates.sh` after every commit. The full
-test suite was re-run after each fix to surface cross-file regressions; no
-finding produced one.
+Verification per fix: Tier 1 (re-read modified file section) + Tier 2 (run
+the affected `npx vitest` test file AND `npm run test` for cross-file
+regressions) + `npm run lint` + `bash scripts/ci-grep-gates.sh` after every
+commit. No fix introduced a TypeScript regression (pre-existing tsc errors
+in `tests/helpers/msw-whoop-oauth.ts` and `src/cli/commands/auth.ts:97`
+were present before this pass; confirmed via `git stash` + `npx tsc
+--noEmit`).
 
 ## Fixed Issues
 
-### CR-01: `doRefresh` sends the OLD stale refresh_token when a sibling has already refreshed
-
-**Files modified:** `src/infrastructure/whoop/token-store.ts`, `src/infrastructure/whoop/token-store.test.ts`, `tests/helpers/msw-whoop-oauth.ts`
-**Commit:** `a8566b5`
-**Applied fix:** Changed `callRefreshEndpoint(stale ?? fresh)` to
-`callRefreshEndpoint(fresh ?? stale)` so the freshest on-disk refresh_token
-wins (the sibling-replaced token, not the pre-lock snapshot that WHOOP would
-treat as token-family-revocation per ADR-0002 §Context). Extended the MSW
-helper with `getLastRequestBody()` so a regression test can pin the
-refresh_token value on the wire. Added test `L-03` exercising the
-sibling-rotated-but-still-stale window (sibling refreshes during lock
-acquisition AND the new token is also within REFRESH_BUFFER_MS).
-
-### CR-02: Refresh request hardcodes `scope: 'offline'`, silently narrowing the token's scope
-
-**Files modified:** `src/infrastructure/whoop/token-store.ts`, `src/infrastructure/whoop/token-store.test.ts`
-**Commit:** `7a1cd82`
-**Applied fix:** Removed `scope: 'offline'` from the refresh URLSearchParams
-body. Per RFC 6749 §6, omitting `scope` tells the authorization server to
-retain the originally-granted scope. Mirrors the behavior of `exchangeCode`
-in oauth.ts (scope belongs in the authorize URL, not the refresh body).
-Added tests `L-04` and `L-05` pinning that (a) no `scope` field appears on
-the wire post-refresh, and (b) the round-trip Tokens.scope contains all
-seven init-time read scopes.
-
-### CR-03: refresh-orchestrator's post-401 re-read uses no expiry buffer
-
-**Files modified:** `src/services/refresh-orchestrator.ts`, `src/services/refresh-orchestrator.test.ts`
-**Commit:** `cea871a`
-**Applied fix:** Imported `REFRESH_BUFFER_MS` from the token-store and
-changed `current.expiresAt > Date.now()` to `current.expiresAt > Date.now() +
-REFRESH_BUFFER_MS` in `callWithAuthImpl`. This makes the orchestrator's
-post-401 re-read symmetric with `getValidAccessToken`'s preemptive-refresh
-check; a sibling's near-expiry token (delta < 5 min) is no longer handed
-back as the retry token (which would have produced a second 401 and
-exhausted the D-15 retry budget). Added test `R-04` seeding a 30-second
-delta and asserting the orchestrator force-refreshes instead of retrying
-with the near-expiry token.
-
-### CR-04: `runAuthCommand` leaks `clientSecret` through `String(ZodError)` on config-parse failure
-
-**Files modified:** `src/cli/commands/auth.ts`, `src/cli/commands/auth.test.ts`
-**Commit:** `bf4b6f3`
-**Applied fix:** Wrapped `ConfigSchema.parse(JSON.parse(configText))` in a
-try/catch. On `ZodError`, emit a field-names-only remediation message
-(mirroring the existing pattern at `init.ts:94`) and exit with
-`AUTH_EXIT_CODES.auth_missing` — without introducing a new AuthError kind
-(the FROZEN 6-kind union is preserved). On non-Zod parse failures
-(SyntaxError from `JSON.parse`), emit a generic "not valid JSON" message
-without the raw error text. Additionally, routed the outer-catch
-`String(err)` arm through the shared MCP `sanitize()` function as
-defense-in-depth against any future non-AuthError shape carrying
-secret-bearing strings. Cross-layer import precedent (`oauth.ts` already
-imports from `src/mcp/sanitize.js`) is preserved; `PLAN-03-CROSS-LAYER`
-relocation remains deferred work. Added tests `A-11` and `A-12` with
-clearly-fingerprinted clientSecret and JSON-syntax-error inputs, asserting
-the fingerprint never appears on stdout.
-
-### WR-01: `listenForCallback` accepts any HTTP method on any path
-
-**Files modified:** `src/infrastructure/whoop/oauth.ts`, `src/infrastructure/whoop/oauth.test.ts`
-**Commit:** `de4d917`
-**Applied fix:** Added a pre-handler dispatch in `listenForCallback`'s
-`createServer` callback that returns 405 for non-GET methods and 404 for
-paths other than `/callback`. Critically, the dispatch returns WITHOUT
-calling `handleCallback`, so a non-conforming request cannot resolve the
-OAuth promise — the state-mismatch check is no longer the sole filter. The
-5-minute window stays open for a legitimate browser redirect. Added tests
-`L-07` (POST /callback with valid code+state → 405, promise rejects with
-auth_timeout) and `L-08` (GET /literally-anything?code=… → 404, promise
-rejects with auth_timeout).
-
-### WR-02: `read()` inside the cross-process lock can throw and abort the refresh
-
-**Files modified:** `src/infrastructure/whoop/token-store.ts`, `src/infrastructure/whoop/token-store.test.ts`
-**Commit:** `048011d`
-**Applied fix:** Wrapped the post-lock `read()` call in a try/catch that
-logs `tokens_reread_failed_inside_lock` and treats the result as null. The
-subsequent `callRefreshEndpoint(fresh ?? stale)` falls through to the
-pre-lock stale snapshot — a malformed on-disk blob (an editor save, a
-backup-restore) no longer surfaces as `refresh_failed` ("WHOOP rejected the
-refresh") when the actual failure mode is unrecoverable on-disk state. If
-`stale` is also null, `callRefreshEndpoint` still throws `auth_missing`
-("re-run init") which is the correct remediation. Added test `L-03b`
-seeding a malformed blob via the `onLockAcquired` hook and asserting the
-refresh succeeds via the stale snapshot.
-
-### WR-03: storage-mode write races outside the refresh lock
-
-**Files modified:** `src/infrastructure/whoop/token-store.ts`, `src/infrastructure/whoop/token-store.test.ts`
-**Commit:** `c4cb1f4`
-**Applied fix:** Split `write` into two functions: the public `write`
-acquires the same cross-process lock the refresh path uses, then delegates
-to `writeUnderLock` (internal). `doRefresh` calls `writeUnderLock` directly
-(the lock is already held by its enclosing scope; re-entering would
-deadlock). The CLI `auth` completion path now goes through `write`, so an
-MCP-server mid-refresh and a `recovery-ledger auth` run cannot interleave
-their storage-mode writes. Added test `L-03a` asserting
-`tokenStore.write(tokens)` calls `lockfile.lock` with the same documented
-options (retries 10, factor 1.2, minTimeout 50, stale 5000) the refresh
-path uses.
-
-### WR-04: `paths.ts` module-load throws if neither HOME nor RECOVERY_LEDGER_HOME is set
-
-**Files modified:** `src/infrastructure/config/paths.ts`, `src/infrastructure/config/paths.test.ts`
-**Commit:** `5e293aa`
-**Applied fix:** Replaced the eager `export const paths =
-resolvePaths(process.env)` with a Proxy that defers resolution to first
-property access. Module load now always succeeds; the original
-"HOME or RECOVERY_LEDGER_HOME must be set" throw still surfaces, just on
-first `paths.X` access instead of at import time. This makes sandboxed
-test environments self-healing — a test runner can repair the env in
-`beforeEach` even after importing the consuming module. Added a regression
-test under an empty-env arm that imports `./paths.js`, asserts the import
-succeeds, then asserts the first property access produces the same throw.
-
-### WR-05: lockfile mock skips the real `proper-lockfile` contention path
+### WR-A: Real-lockfile tests do not exercise the cross-process contention they claim to test
 
 **Files modified:** `src/infrastructure/whoop/token-store.test.ts`
-**Commits:** `355661e` (tests), `b774eb1` (biome format fix follow-up)
-**Applied fix:** Added a `describe('real lockfile contention')` block at
-the end of the test file with two tests that deliberately do NOT install
-the lockfile mock. They use the real `proper-lockfile` against the tmpdir
-the suite already creates, exercising the cross-process gate's
-acquire+release cycle and asserting the `.lock` directory is cleaned up
-after release. A regression that drops `retries: 10` or breaks the
-release path would surface here at unit scope instead of relying on the
-30s-budgeted Plan 02-08 integration suite.
+**Commit:** `f26b634`
+**Applied fix:** Option (b) from the review — downgrade the describe-block
+header + per-test docs to what these tests actually verify, instead of
+spawning a worker_thread/child_process to manufacture cross-process
+contention.
 
-### WR-06: Doctor probe `detail` strings emit untrusted `err.message` without sanitization (CLI path)
+The original WR-05 describe-block header promised that LR-01/LR-02 would
+catch retry-policy regressions (e.g., `retries: 10 → retries: 0`) at unit
+scope. Investigation confirmed the review's analysis: both LR-01 calls
+share one `createTokenStore()` instance, so the in-process
+`inFlightRefresh` Promise-gate intercepts the second call BEFORE
+`doRefresh` runs — only ONE call ever reaches `proper-lockfile.lock`,
+uncontended. A retry-policy regression is detectable only by the
+cross-process integration test (`tests/integration/auth-concurrency.test.ts`),
+which spawns two real processes against a local mock server.
 
-**Files modified:** `src/services/doctor/checks/auth.ts`, `src/services/doctor/checks/token-freshness.ts`
-**Commit:** `78963d4`
-**Applied fix:** Imported the shared MCP `sanitize` function in both probe
-modules and wrapped the `err.message`/`String(err)` interpolation in the
-catch arms with `sanitize(...)`. The MCP transport path already sanitized
-via `register.ts`'s `sanitizeResult`; this closes the CLI gap where
-`runDoctorCommand` emits probe detail strings via `process.stdout.write`
-verbatim. Cross-layer import precedent (already established in
-`oauth.ts` and now `auth.ts`) preserved; deferred relocation to
-`src/infrastructure/observability/` is tracked as `PLAN-03-CROSS-LAYER`.
+Option (a) — spawning a worker_thread/child_process to hold the real lock
+— would duplicate the integration suite's coverage at unit scope with the
+same flakiness profile (TOCTOU on lock-directory creation, mtime
+granularity). The honest doc downgrade is the right fix.
 
-### WR-07: `runOAuth` race: `info.port` could differ from `opts.redirectPort` when port is 0
+The describe block now correctly scopes itself: LR-01 proves the real
+`proper-lockfile` module is reachable from `createTokenStore` (a wiring
+regression that no-op'd the import would fail), and LR-02 proves
+`release()` is actually called (a regression where the lock is acquired
+but never released would leave the `<target>.lock` directory and fail).
+Both useful, neither overclaiming.
 
-**Files modified:** `src/infrastructure/whoop/oauth.test.ts`
-**Commit:** `56bdd6b`
-**Applied fix:** Production code is already correct — `runOAuth` builds
-`redirectUri` from `info.port` (the OS-assigned port), not from
-`opts.redirectPort`. The gap was test-side: the existing R-01..R-03 tests
-all use `redirectPort: 0` and didn't pin which port appeared in the
-authorize URL. Added test `R-04` that explicitly asserts the
-`redirect_uri` query parameter contains `:${ready.port}/callback` where
-`ready.port` is the OS-assigned port (> 0), AND that the URL does NOT
-contain `:0/callback`. A regression that builds redirect_uri from
-`opts.redirectPort` would fail this test before reaching live WHOOP.
+### WR-B: `buildAuthorizeUrl` threw the wrong AuthError kind for invalid clientId shape
 
-### WR-08: `auth-concurrency.test.ts` runs `npm run build` inside `beforeAll`
+**Files modified:** `src/infrastructure/whoop/oauth.ts`, `src/infrastructure/whoop/oauth.test.ts`
+**Commit:** `7cfaa08`
+**Applied fix:** Changed the kind from `refresh_failed` to `auth_missing`
+with detail `'invalid clientId in config; re-run recovery-ledger init'`.
 
-**Files modified:** `tests/integration/auth-concurrency.test.ts`
-**Commit:** `45ea71f`
-**Applied fix:** Replaced the `await execAsync('npm run build', ...)` call
-in `beforeAll` with an `existsSync(BUILD_OUTPUT_PATH) &&
-existsSync(DIST_MCP)` precondition that throws a clear message pointing at
-`npm run build` if missing. CI's `.github/workflows/ci.yml` already runs
-`npm run build` BEFORE `npm run test`, so the precondition is satisfied
-in CI. Local developers running this test alone in watch mode no longer
-trigger a 5–10s rebuild on every save (the test now runs in ~2s instead
-of 5+ s). Removed now-unused imports: `exec`, `promisify`,
-`execAsync`, and the previously-dead `type ChildProcess` (IN-01 dead
-import — removed as a side-effect of cleaning up the `child_process`
-imports). IN-01 was out of scope but its dead import would have produced
-a lint error after the WR-08 cleanup, so it's resolved here.
+The pre-fix code threw `AuthError({kind: 'refresh_failed', detail:
+'invalid clientId shape'})`. `formatAuthError`'s `refresh_failed` arm maps
+to "Token refresh failed — run `recovery-ledger auth` to re-authorize."
+That remediation is wrong on three counts: (1) the user has no tokens yet
+at this point — there is nothing to refresh, (2) a malformed clientId is
+fixed by re-running `recovery-ledger init`, not by re-authorizing, (3)
+re-running `auth` would re-enter the same broken path.
 
-### WR-09: `child-get-token.mjs` exits with stale stdout buffer on `process.exit(0)`
+The right kind is `auth_missing`, whose remediation already points at
+`recovery-ledger init`. Adding a new `config_invalid` kind to the FROZEN
+six-kind AuthErrorKind union would have required updating
+`formatAuthError`, `AUTH_EXIT_CODES`, and the `recovery-ledger auth --help`
+block per MR-21 forcing-function discipline — explicitly out of scope per
+orchestrator context. `auth_missing` is the closest semantic fit and the
+detail string carries the specific cause.
 
-**Files modified:** `tests/integration/helpers/child-get-token.mjs`
-**Commit:** `8e874cf`
-**Applied fix:** Changed both `process.stdout.write(...) ;
-process.exit(0)` and `process.stderr.write(...) ; process.exit(1)` to use
-the callback form: `process.stdout.write(..., () => process.exit(0))`. The
-write callback fires after the OS buffer drains, eliminating the
-macOS/Node-22-with-silent-IPC race where `process.exit` could fire before
-the pipe drained and the parent received an empty buffer. Mirrors the
-pattern already used in `auth.ts` and `init.ts`.
+Pinned by new `U-06`: asserts the kind is `auth_missing` (not
+`refresh_failed`) and the detail mentions `init`. A future refactor that
+re-introduces `refresh_failed` here would surface the wrong remediation
+"Token refresh failed — run `recovery-ledger auth` to re-authorize" and
+this test would fail.
 
-### WR-10: Sanitize test `Test 9` asserts `JSON.stringify(AuthError)` doesn't leak `cause.message`
+**Logic-classification note:** Although the review describes this as a
+wrong remediation message, the fix is structural (a kind constant) and
+its correctness is pinned by the new test that asserts the post-fix kind.
+No human-verification flag needed.
 
-**Files modified:** `src/infrastructure/whoop/errors.test.ts`
-**Commit:** `7b8dd3c`
-**Applied fix:** Added `Test 9b` that pins the load-bearing layered defense
-directly: `serializeError(err)` produces a string containing the cause's
-`Authorization: Bearer ...` substring (the walker reads it — that's the
-contract), AND running that string through `sanitize()` produces a string
-containing `<redacted>` instead of the token bytes. The original `Test 9`
-(JSON.stringify-returns-{}) is preserved as a secondary defense pin; the
-new test is what would catch a future Error.toJSON polyfill or pino
-transport that invalidates the JSON.stringify property.
+### WR-C: `auth.ts` outer `instanceof AuthError` duck-type degraded the MR-21 forcing function
 
-### WR-11: AuthError `cause: undefined` round-trip is uncovered
+**Files modified:** `src/infrastructure/whoop/errors.ts`, `src/infrastructure/whoop/errors.test.ts`, `src/cli/commands/auth.ts`
+**Commit:** `e929c90`
+**Applied fix:** Option (a) from the review — export an `isAuthError`
+type guard from `errors.ts` that derives the duck-type set from the same
+tuple the `AuthErrorKind` union is derived from. `auth.ts` now imports
+and uses `isAuthError`; the local `isAuthErrorShape` helper + duplicate
+`AUTH_ERROR_KINDS` Set are deleted.
 
-**Files modified:** `src/infrastructure/whoop/errors.test.ts`
-**Commit:** `153768c`
-**Applied fix:** Added `Test 12` asserting `'cause' in err === false`
-AND `err.cause === undefined` when no cause is supplied, pinning that
-the constructor's conditional `init.cause === undefined ? undefined : {
-cause: init.cause }` never synthesizes `{ cause: undefined }` as an own
-property. Added `Test 13` as the mirror: when cause IS supplied,
-`'cause' in err === true` and `err.cause === inner`. This pins both
-arms of the AuthError serialization shape contract.
+The duck-type pattern (vs `instanceof`) is still required: Vitest's
+`vi.resetModules()` produces two module-graph instances of `errors.ts`
+with different `AuthError` class identities. Option (b) — converting
+`auth.test.ts` to the refresh-orchestrator F-01 pattern (dynamic import
+of `AuthError` after `resetModules()`) — would let us return to
+`instanceof`, but every test that currently constructs an `AuthError`
+would need to dynamic-import it after `resetModules()`, and the test
+file already has 12 tests using a top-level `import('./errors.js')`. The
+edit-blast radius was much larger than option (a) for a tactically
+equivalent result. Option (a) preserves test ergonomics AND moves the
+test-coupled smell out of `auth.ts` into `errors.ts` where the
+deserialization-safe `isAuthError` is the production-honest place for
+it.
+
+Structural changes:
+- `AUTH_ERROR_KINDS` is now a `readonly` tuple (`as const`) exported
+  from `errors.ts`.
+- `AuthErrorKind = (typeof AUTH_ERROR_KINDS)[number]` derives the union
+  from the tuple. Adding a kind means editing one tuple.
+- `isAuthError(err): err is AuthError` duck-types on `name ===
+  'AuthError'` AND `kind` membership in `AUTH_ERROR_KINDS`.
+- `auth.ts` imports `isAuthError` and the duplicate Set + local helper
+  are gone.
+
+Adding a kind now (a) extends the type union, (b) extends the duck-type
+guard, AND (c) trips `formatAuthError`'s exhaustive switch — MR-21
+restored end-to-end.
+
+Pinned by 7 new tests (`IS-01..IS-07`):
+- IS-01: real `AuthError` instance detected
+- IS-02: cross-module-graph shape (the literal `resetModules` scenario)
+  detected
+- IS-03: plain Error rejected
+- IS-04: null/undefined/primitives rejected
+- IS-05: name=AuthError + invalid kind rejected (defense-in-depth: a
+  synthesized object claiming to be AuthError but with a non-union kind
+  must not pass)
+- IS-06: `AUTH_ERROR_KINDS` contents pinned + every kind round-trips
+  through `formatAuthError` with non-empty output
+- IS-07: tuple shape (length 6, all strings)
+
+### WR-D: `writeUnderLock` leaves stale keychain blob when fallback path fires
+
+**Files modified:** `src/infrastructure/whoop/token-store.ts`, `src/infrastructure/whoop/token-store.test.ts`
+**Commit:** `39ed6f4`
+**Applied fix:** Best-effort `deletePassword()` call at the start of the
+file-fallback arm in `writeUnderLock`, gated on `!forceFile`. Symmetric
+with `clear()`, which already best-effort-deletes the keychain entry
+whenever the mode was `'keychain'`.
+
+When `setPassword` throws OR the round-trip read returns a mismatched
+blob (Pitfall F), the fallback path writes to the file backend and the
+storage-mode marker correctly flips to `'file'`. Pre-fix, the
+previously-written keychain entry (Pitfall F case) or any stale entry
+from a prior session was left in place. If a later session somehow
+reverted the storage-mode marker (manual edit, future bug, backup
+restore mid-session), the old keychain blob would silently re-emerge
+with an arbitrary version of the tokens — defeating defense-in-depth
+across this module.
+
+Severity remained low under current code (nothing in this phase toggles
+the marker), but the symmetry argument in the review is correct: the
+rest of the module is paranoid about cross-session state. Phase 3+
+modules consuming this token store should not need to know that
+`writeUnderLock` left a ghost blob behind.
+
+The `forceFile === true` skip is explicit: under
+`RECOVERY_LEDGER_FORCE_FILE_STORE=1` (D-25), the user has elected to
+keep the keychain untouched for this session; the delete-probe would
+itself be a touch.
+
+Pinned by 3 new tests:
+- B-05 (WR-D regression): `setPassword` throws → fallback fires →
+  `deletePassword` is called on the entry
+- B-06 (WR-D regression): Pitfall F round-trip mismatch → fallback
+  fires → `deletePassword` is called
+- B-07 (WR-D regression): `forceFile=true` → neither `setPassword` nor
+  `deletePassword` is called — keychain untouched
 
 ## Skipped Issues
 
-_None — all 15 in-scope findings were applied successfully._
+None. All four in-scope warnings were fixed with source changes plus
+pinning regression tests.
+
+## Out-of-Scope (Info findings — documented but not fixed)
+
+Per `fix_scope=critical_warning`, the 5 info findings (`IN-01..IN-05`)
+are documented in REVIEW.md but not addressed in this pass. They are:
+
+- **IN-01:** Pass-1 IN-01 fixed incidentally; pass-1 IN-02..IN-06 are
+  stable (informational, no action required).
+- **IN-02:** `storageMode` ordering in the child helper — currently fine
+  under `forceFileStore`, future-tightening note.
+- **IN-03:** `formatDuration` negative-input behavior — JSDoc-documented
+  precondition; one-line pinning test recommended for a future pass.
+- **IN-04:** `services/index.ts` `Services` interface uses `typeof` of
+  the singleton — clean-up opportunity, will compound in Phase 3 when DB
+  + HTTP singletons land.
+- **IN-05:** `auth.ts` `process.exit` callbacks ignore the optional
+  `Error` argument — benign in practice (broken-pipe is the only
+  realistic trigger); future ergonomics cleanup.
+
+None block phase exit; all are flagged for a future cleanup pass.
+
+## Verification Summary
+
+| Step | Result |
+|------|--------|
+| Per-fix test runs (`npx vitest run <affected file>`) | All passing |
+| Full `npm run test` after each commit | 258/258 in-scope passing (7 skipped, 1 pre-existing build-gated integration failure unrelated to this work) |
+| `npm run lint` after each commit | Clean (46 files checked, no fixes applied) |
+| `bash scripts/ci-grep-gates.sh` after each commit | All 5 gates green |
+| `npx tsc --noEmit` | No new errors introduced (3 pre-existing errors confirmed pre-existing via `git stash`) |
+| Commit format | One atomic commit per finding, `fix(02): WR-X <short summary>` |
+
+## Open Concerns
+
+None. The four warnings are now either source-fixed (WR-B, WR-C, WR-D)
+or honestly scoped (WR-A). The pass-2 review's read on the codebase is
+that no pass-2-blocker is created by these fixes; a pass-3 review (if
+run) should find only the 5 IN-* items as remaining work.
 
 ---
 
-**Out-of-scope notes (info findings, IN-01..IN-06):** Not applied per the
-`fix_scope: critical_warning` configuration. IN-01 (dead `type ChildProcess`
-import) was incidentally resolved as part of the WR-08 cleanup since the
-broader `child_process` import overhaul would have left a lint error
-otherwise. IN-02..IN-06 remain as documented in the original REVIEW.md
-findings for a future iteration.
-
-_Fixed: 2026-05-13T00:03:09Z_
-_Fixer: Claude (gsd-code-fixer)_
-_Iteration: 1_
+_Fixed: 2026-05-13T00:57:00Z_
+_Fixer: Claude (gsd-code-fixer), pass 2_
+_Iteration: 2_
