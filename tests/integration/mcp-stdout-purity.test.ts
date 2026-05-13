@@ -38,13 +38,13 @@ const FIXTURES = ['initialize', 'initialized', 'tools-list', 'whoop-doctor-call'
 // URL instead of process.cwd(). The doctor probe (CR-02) already uses
 // import.meta.url + fileURLToPath for the same reason: a test or probe that
 // reads from cwd silently misbehaves when run from outside the repo root
-// (e.g., `cd test && vitest run integration/...` or a future packaged smoke
+// (e.g., `cd tests && vitest run integration/...` or a future packaged smoke
 // test). Anchored at this file's location, two levels up resolves to the
 // repo root.
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.resolve(HERE, '..', '..');
 const DIST_MCP = path.resolve(REPO_ROOT, 'dist', 'mcp.mjs');
-const FIXTURES_DIR = path.resolve(REPO_ROOT, 'test', 'fixtures', 'mcp');
+const FIXTURES_DIR = path.resolve(REPO_ROOT, 'tests', 'fixtures', 'mcp');
 // After CR-01 the inner tools/call no longer recursively respawns another
 // dist/mcp.mjs (it short-circuits via skipSubprocessChecks), so the budget
 // can be tight. We use a response-driven wait keyed on the id=3 frame's

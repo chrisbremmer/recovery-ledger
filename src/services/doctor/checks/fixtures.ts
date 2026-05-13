@@ -3,7 +3,7 @@
 // Vendored as TypeScript literals (not read from disk) so the check works
 // from any cwd — particularly under `npx recovery-ledger` from outside the
 // source tree (CR-02 in 01-REVIEW.md). The on-disk fixtures under
-// test/fixtures/mcp/*.json remain the canonical artifacts driving the Plan 06
+// tests/fixtures/mcp/*.json remain the canonical artifacts driving the Plan 06
 // integration test; this module is their runtime mirror.
 //
 // Shapes must match the on-disk fixtures after JSON canonicalization

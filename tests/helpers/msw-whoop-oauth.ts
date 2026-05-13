@@ -18,18 +18,12 @@
 
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { http, HttpResponse, type HttpHandler } from 'msw';
-import { setupServer, type SetupServer } from 'msw/node';
+import { type HttpHandler, HttpResponse, http } from 'msw';
+import { type SetupServer, setupServer } from 'msw/node';
 
 export const WHOOP_TOKEN_URL = 'https://api.prod.whoop.com/oauth/oauth2/token';
 
-const TOKEN_200_FIXTURE_PATH = join(
-  process.cwd(),
-  'test',
-  'fixtures',
-  'oauth',
-  'token-200.json',
-);
+const TOKEN_200_FIXTURE_PATH = join(process.cwd(), 'tests', 'fixtures', 'oauth', 'token-200.json');
 
 interface NextResponse {
   body: unknown;

@@ -169,12 +169,12 @@ _(empty)_
   CLI code MUST resolve via `import.meta.url` +
   `path.dirname(fileURLToPath(import.meta.url))`, never
   `process.cwd()`. The same rule applies to integration tests that
-  spawn the built binary — `cd test && vitest run integration/...`
+  spawn the built binary — `cd tests && vitest run integration/...`
   must work.
 - **Where the rule lives:**
   [`src/services/doctor/checks/mcp-stdout-purity.ts`](../src/services/doctor/checks/mcp-stdout-purity.ts)
   (`HERE` constant via `import.meta.url`),
-  [`test/integration/mcp-stdout-purity.test.ts`](../test/integration/mcp-stdout-purity.test.ts)
+  [`tests/integration/mcp-stdout-purity.test.ts`](../tests/integration/mcp-stdout-purity.test.ts)
   (`HERE` + `REPO_ROOT` constants, MR-33).
 - **Triggered by:** PR #2 review — CR-02 + MR-33.
 - **Recurrences before pinning:** 1.
