@@ -51,14 +51,14 @@ export LC_ALL=C
 
 # Shared exclusions for repo-wide scans (Gate A).
 #
-# Policy (MR-04): exclude test SOURCE files (*.test.ts) but NOT the test/
+# Policy (MR-04): exclude test SOURCE files (*.test.ts) but NOT the tests/
 # directory wholesale. ADR-0005 (banned tone words) explicitly scopes the
 # rule to `src/formatters/`, `src/cli/`, AND `tests/fixtures/review/` — so
-# fixture JSON under test/fixtures/ must remain in scope. Excluding the
-# entire test/ directory (the WR-02 fix) silently skipped review fixtures
+# fixture JSON under tests/fixtures/ must remain in scope. Excluding the
+# entire tests/ directory (the WR-02 fix) silently skipped review fixtures
 # the ADR considers user-facing copy. We instead exclude only files
 # matching `*.test.ts` (the unit/integration test sources, which are not
-# user-facing copy) and let fixture files under test/fixtures/ stay in
+# user-facing copy) and let fixture files under tests/fixtures/ stay in
 # scope of the gate.
 #
 # Self-exempt files: CLAUDE.md and this script (each spell the banned
@@ -109,7 +109,7 @@ rm -f /tmp/gate-a-emoji.$$
 # Gate B — console.log / console.error / console.warn outside src/cli/** and
 # test files. Biome's noConsole catches these inside src/, but the grep gate
 # is the second layer that would catch (a) an inline `biome-ignore` and
-# (b) any console.* call that landed in scripts/ or test/integration/.
+# (b) any console.* call that landed in scripts/ or tests/integration/.
 # Test files (*.test.ts) are exempt by the biome.json override mirror.
 # ----------------------------------------------------------------------------
 CONSOLE_RE='\bconsole\.(log|error|warn)\s*\('

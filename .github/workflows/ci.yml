@@ -57,7 +57,7 @@ jobs:
         run: npm run lint
 
       # Build MUST precede test — the integration test in
-      # test/integration/mcp-stdout-purity.test.ts spawns `dist/mcp.mjs` as a
+      # tests/integration/mcp-stdout-purity.test.ts spawns `dist/mcp.mjs` as a
       # subprocess (Pattern 5(b) caveat + Pitfall 7).
       - name: Build
         run: npm run build

@@ -36,10 +36,10 @@
 // stderr is NEVER asserted clean of all output — Pino logs land there by
 // design (ADR-0001). The FORBIDDEN regex asserts no TOKEN MATERIAL leaks.
 
-import { spawn, type ChildProcessWithoutNullStreams, fork } from 'node:child_process';
+import { type ChildProcessWithoutNullStreams, fork, spawn } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import { mkdtemp, readFile, rm, stat, writeFile } from 'node:fs/promises';
-import { createServer, type Server, type IncomingMessage, type ServerResponse } from 'node:http';
+import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -50,8 +50,7 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, test } fr
 //   - JWT three-segment shape `eyJ...` (20+ char tail)
 //   - `Authorization:` header literal
 // Used across G-01..G-03.
-const FORBIDDEN =
-  /Bearer\s+[A-Za-z0-9._/+=-]{10,}|eyJ[A-Za-z0-9._-]{20,}|Authorization:/g;
+const FORBIDDEN = /Bearer\s+[A-Za-z0-9._/+=-]{10,}|eyJ[A-Za-z0-9._-]{20,}|Authorization:/g;
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.resolve(HERE, '..', '..');
@@ -229,7 +228,10 @@ interface ChildStdoutLine {
 }
 
 function parseChildStdout(stdout: string): ChildStdoutLine | null {
-  const line = stdout.trim().split('\n').find((l) => l.length > 0);
+  const line = stdout
+    .trim()
+    .split('\n')
+    .find((l) => l.length > 0);
   if (line === undefined) return null;
   try {
     return JSON.parse(line) as ChildStdoutLine;
@@ -239,7 +241,7 @@ function parseChildStdout(stdout: string): ChildStdoutLine | null {
 }
 
 // -----------------------------------------------------------------------------
-// MCP subprocess driver (G-03). Mirrors test/integration/mcp-stdout-purity.test.ts
+// MCP subprocess driver (G-03). Mirrors tests/integration/mcp-stdout-purity.test.ts
 // but parameterized for an arbitrary env override (so we can point at the
 // failing mock and the expired-token tmpdir).
 // -----------------------------------------------------------------------------
@@ -251,10 +253,8 @@ interface McpDriveResult {
   frames: Array<Record<string, unknown>>;
 }
 
-async function driveMcpWhoopDoctor(
-  envOverrides: Record<string, string>,
-): Promise<McpDriveResult> {
-  const fixturesDir = path.resolve(REPO_ROOT, 'test', 'fixtures', 'mcp');
+async function driveMcpWhoopDoctor(envOverrides: Record<string, string>): Promise<McpDriveResult> {
+  const fixturesDir = path.resolve(REPO_ROOT, 'tests', 'fixtures', 'mcp');
   const fixtures = ['initialize', 'initialized', 'tools-list', 'whoop-doctor-call'] as const;
 
   const child: ChildProcessWithoutNullStreams = spawn(process.execPath, [DIST_MCP], {
@@ -393,14 +393,11 @@ describe('auth concurrency (cross-process AUTH-05 + AUTH-06)', () => {
     await rm(tmpDir, { recursive: true, force: true });
   });
 
-  test(
-    'B-01: dist/infrastructure/whoop/token-store.mjs exists (PLAN-08-BUILD-DEP precondition)',
-    () => {
-      // Redundant with beforeAll's fast-fail, but pinning it as a named
-      // test makes the failure mode obvious in test output.
-      expect(existsSync(BUILD_OUTPUT_PATH)).toBe(true);
-    },
-  );
+  test('B-01: dist/infrastructure/whoop/token-store.mjs exists (PLAN-08-BUILD-DEP precondition)', () => {
+    // Redundant with beforeAll's fast-fail, but pinning it as a named
+    // test makes the failure mode obvious in test output.
+    expect(existsSync(BUILD_OUTPUT_PATH)).toBe(true);
+  });
 
   test(
     'I-01: 10 forked children refresh exactly once across the cross-process lock boundary',
@@ -440,7 +437,10 @@ describe('auth concurrency (cross-process AUTH-05 + AUTH-06)', () => {
       // stale snapshot).
       const tokens = results.map((r) => parseChildStdout(r.stdout));
       for (let i = 0; i < tokens.length; i += 1) {
-        expect(tokens[i], `child ${i} produced unparseable stdout: ${results[i]?.stdout}`).not.toBeNull();
+        expect(
+          tokens[i],
+          `child ${i} produced unparseable stdout: ${results[i]?.stdout}`,
+        ).not.toBeNull();
         expect(tokens[i]?.ok).toBe(true);
         expect(tokens[i]?.accessToken).toBeDefined();
       }
@@ -529,10 +529,7 @@ describe('auth concurrency (cross-process AUTH-05 + AUTH-06)', () => {
       const { readdir } = await import('node:fs/promises');
       const entries = await readdir(tmpDir);
       const unexpected = entries.filter(
-        (n) =>
-          n !== 'tokens.json' &&
-          n !== 'tokens.json.lock' &&
-          n !== 'storage-mode',
+        (n) => n !== 'tokens.json' && n !== 'tokens.json.lock' && n !== 'storage-mode',
       );
       expect(unexpected, `unexpected files in tmpDir: ${unexpected.join(', ')}`).toHaveLength(0);
     },
