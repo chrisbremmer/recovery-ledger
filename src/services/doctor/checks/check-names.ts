@@ -18,6 +18,12 @@ export const CHECK_NAMES = {
   BETTER_SQLITE3_LOAD: 'better_sqlite3_load',
   NAPI_KEYRING_LOAD: 'napi_keyring_load',
   MCP_STDOUT_PURITY: 'mcp_stdout_purity',
+  // Plan 02-06: two new offline-safe probes surface the Phase 2 auth state.
+  // `auth` reports which backend stores tokens (keychain / file / missing);
+  // `token_freshness` reports how close to expiry. Neither calls the WHOOP
+  // refresh endpoint — see D-22 + agent_docs/decisions/0002.
+  AUTH: 'auth',
+  TOKEN_FRESHNESS: 'token_freshness',
 } as const;
 
 export type CheckName = (typeof CHECK_NAMES)[keyof typeof CHECK_NAMES];

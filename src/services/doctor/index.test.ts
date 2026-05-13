@@ -148,17 +148,51 @@ describe('runDoctor — CR-01 skipSubprocessChecks contract', () => {
   // MR-36 — every probe surfaces under its canonical CHECK_NAMES literal.
   // A rename in CHECK_NAMES propagates to every consumer; this test catches
   // a probe that hardcoded the old string after a rename.
-  test('MR-36 — runDoctor() result includes all three canonical CHECK_NAMES', async () => {
+  //
+  // Plan 02-06: grown from three to five canonical names. The new probes
+  // (`auth` + `token_freshness`) are offline-safe and always emit checks
+  // regardless of `skipSubprocessChecks`.
+  test('MR-36 — runDoctor() result includes all five canonical CHECK_NAMES', async () => {
     const result = await runDoctor({ skipSubprocessChecks: true });
     const names = result.checks.map((c) => c.name);
     expect(names).toContain(CHECK_NAMES.BETTER_SQLITE3_LOAD);
     expect(names).toContain(CHECK_NAMES.NAPI_KEYRING_LOAD);
     expect(names).toContain(CHECK_NAMES.MCP_STDOUT_PURITY);
+    expect(names).toContain(CHECK_NAMES.AUTH);
+    expect(names).toContain(CHECK_NAMES.TOKEN_FRESHNESS);
     // No stray probe names that lost their CHECK_NAMES reference.
     const canonical = new Set<string>(Object.values(CHECK_NAMES));
     for (const name of names) {
       expect(canonical.has(name)).toBe(true);
     }
+  });
+
+  // D-02 / D-03: the two new probes are wired into runDoctor and the auth
+  // probe surfaces a deterministic fail when no tokens exist on disk.
+  test('D-02 — runDoctor surfaces the auth probe output (no tokens -> fail)', async () => {
+    const result = await runDoctor({ skipSubprocessChecks: true });
+    const authCheck = result.checks.find((c) => c.name === CHECK_NAMES.AUTH);
+    expect(authCheck).toBeDefined();
+    // With no `storage-mode` file under the test-env tmpdir-or-home, the
+    // probe must report fail. We don't pin the exact detail here — that
+    // contract lives in auth.test.ts — but we do pin the status.
+    expect(authCheck?.status).toBe('fail');
+  });
+
+  test('D-03 — runDoctor surfaces the token_freshness probe output', async () => {
+    const result = await runDoctor({ skipSubprocessChecks: true });
+    const freshness = result.checks.find((c) => c.name === CHECK_NAMES.TOKEN_FRESHNESS);
+    expect(freshness).toBeDefined();
+    // With no tokens on disk the freshness probe must report fail.
+    expect(freshness?.status).toBe('fail');
+  });
+
+  test('D-04 — auth=fail collapses overall to "fail" (precedence preserved with 5 probes)', async () => {
+    const result = await runDoctor({ skipSubprocessChecks: true });
+    // The auth probe fails when no tokens exist; overall must be fail
+    // regardless of the other probes' status. This pins the precedence
+    // rule across the broader 5-probe set.
+    expect(result.overall).toBe('fail');
   });
 
   // MR-14: the RL_INSIDE_MCP env-var fallback was removed from runDoctor()

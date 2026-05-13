@@ -7,12 +7,32 @@
 #         (which has to spell the words to grep for them).
 # Gate B: console.log / console.error / console.warn — banned outside src/cli/**
 #         and test files (CLAUDE.md §Critical Rules — MCP stdout purity).
-# Gate C: process.stdout.write — banned outside src/cli/commands/doctor.ts
-#         (the one CLI output point per 01-CONTEXT.md D-04 + D-11).
+# Gate C: process.stdout.write — banned outside src/cli/commands/**/*.ts
+#         (Phase 2 Plan 05 broadens from the single doctor.ts file to any
+#         CLI command file; init.ts and auth.ts both emit human-facing
+#         output via process.stdout.write per D-04 + D-11. ADR-0001's
+#         MCP-stdout-purity rule still holds: src/cli/commands/ is NOT
+#         reachable from src/mcp/, so widening the scope here does not
+#         break MCP framing).
 # Gate D: server.registerTool — banned outside src/mcp/register.ts (D-09 — the
 #         one chokepoint where the try/catch/sanitize wrapper applies). Any
 #         direct call from a tool module would bypass the sanitizer and risk
 #         leaking secrets through MCP error responses (PITFALLS.md Pitfall 17).
+# Gate E: only src/infrastructure/whoop/token-store.ts may reference the WHOOP
+#         refresh endpoint (oauth/oauth2/token). ADR-0002 §Enforcement: the
+#         token-store module is the sole consumer of the refresh endpoint.
+#         Biome's noRestrictedImports operates on import paths, not URL
+#         strings, so this grep gate is the load-bearing enforcement for
+#         literal URL references. Test files (*.test.ts) are excluded — the
+#         Plan 02-07 fixture in src/mcp/sanitize.test.ts deliberately
+#         includes the URL as a redaction-coverage test input, and
+#         src/infrastructure/whoop/oauth.test.ts has test cases that
+#         exercise the URL constant in error paths. Production-module
+#         enforcement intent is intact.
+#         Note: literal-string gate — URL-construction-via-concatenation
+#         bypass is documented as out-of-scope for Plan 02-06 (single-user
+#         personal tool; a developer concatenating the URL would be
+#         deliberately bypassing their own constraint).
 #
 # Exit-code semantics (Pitfall 10): grep returns 0 on match (= violation found).
 # Each gate inverts that: if grep -rEn matches, the gate prints ::error:: and
@@ -108,17 +128,22 @@ fi
 rm -f /tmp/gate-b.$$
 
 # ----------------------------------------------------------------------------
-# Gate C — process.stdout.write outside src/cli/commands/doctor.ts.
-# D-04 + D-11: the only approved CLI output point in v1 is the doctor command.
-# All other code must route through Pino (stderr) or MCP framing.
+# Gate C — process.stdout.write outside src/cli/commands/**/*.ts.
+# D-04 + D-11: CLI command files are the approved human-facing-output point.
+# Phase 2 Plan 05 broadened the scope from doctor.ts only to the entire
+# src/cli/commands/ directory so init.ts and auth.ts can emit user-facing
+# output too. All non-CLI-command code must route through Pino (stderr) or
+# MCP framing. The src/cli/commands/ directory is NOT reachable from
+# src/mcp/ — widening the scope here does not break ADR-0001's MCP-stdout
+# purity contract.
 # ----------------------------------------------------------------------------
 STDOUT_RE='\bprocess\.stdout\.write\s*\('
 
 if "$GREP" -rEn "$STDOUT_RE" --include='*.ts' src/ 2>/dev/null \
-   | "$GREP" -Ev '^src/cli/commands/doctor\.ts:' \
+   | "$GREP" -Ev '^src/cli/commands/[A-Za-z0-9._/-]+\.ts:' \
    > /tmp/gate-c.$$; then
   if [ -s /tmp/gate-c.$$ ]; then
-    echo "::error::Gate C — process.stdout.write outside src/cli/commands/doctor.ts:"
+    echo "::error::Gate C — process.stdout.write outside src/cli/commands/**/*.ts:"
     cat /tmp/gate-c.$$
     rm -f /tmp/gate-c.$$
     exit 1
@@ -151,6 +176,41 @@ if "$GREP" -rEn "$REGISTER_TOOL_RE" --include='*.ts' src/mcp/ 2>/dev/null \
   fi
 fi
 rm -f /tmp/gate-d.$$
+
+# ----------------------------------------------------------------------------
+# Gate E — only src/infrastructure/whoop/token-store.ts may reference the
+# WHOOP refresh endpoint. ADR-0002 §Enforcement (line 70): "Token-store
+# module is the only consumer of the refresh endpoint." Biome's
+# noRestrictedImports operates on import paths, not URL strings, so this
+# grep gate is the load-bearing enforcement for literal URL references.
+#
+# Test files (*.test.ts) are excluded for two reasons:
+#  - src/mcp/sanitize.test.ts has a Plan 02-07 fixture that includes the
+#    literal URL as a redaction-coverage test input.
+#  - src/infrastructure/whoop/oauth.test.ts has test cases that reference
+#    the URL constant in error paths (Plan 02-03).
+# Production-module enforcement intent is preserved (Plan 02-02 and 02-03
+# both flagged the test-file exclusion as a required Plan 06 input).
+#
+# URL-construction-via-concatenation bypass is intentionally out-of-scope:
+# Recovery Ledger is a single-user personal tool, and a developer
+# concatenating the endpoint URL to bypass this gate would be deliberately
+# bypassing their own constraint.
+# ----------------------------------------------------------------------------
+TOKEN_ENDPOINT_RE='oauth/oauth2/token'
+
+if "$GREP" -rEn "$TOKEN_ENDPOINT_RE" --include='*.ts' src/ 2>/dev/null \
+   | "$GREP" -Ev '^src/infrastructure/whoop/token-store\.ts:' \
+   | "$GREP" -Ev '\.test\.ts:' \
+   > /tmp/gate-e.$$; then
+  if [ -s /tmp/gate-e.$$ ]; then
+    echo "::error::Gate E — oauth/oauth2/token referenced outside src/infrastructure/whoop/token-store.ts:"
+    cat /tmp/gate-e.$$
+    rm -f /tmp/gate-e.$$
+    exit 1
+  fi
+fi
+rm -f /tmp/gate-e.$$
 
 echo "All grep gates passed."
 exit 0

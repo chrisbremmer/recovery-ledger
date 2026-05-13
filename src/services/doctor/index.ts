@@ -19,9 +19,11 @@
 // user's shell would have silently skipped the subprocess check when
 // they invoked `recovery-ledger doctor` from the CLI.
 
+import { probeAuth } from './checks/auth.js';
 import { CHECK_NAMES } from './checks/check-names.js';
 import { probeMcpStdoutPurity } from './checks/mcp-stdout-purity.js';
 import { probeBetterSqlite3, probeKeyring } from './checks/native-modules.js';
+import { probeTokenFreshness } from './checks/token-freshness.js';
 
 export interface DoctorCheck {
   name: string;
@@ -95,12 +97,22 @@ export function deriveOverall(checks: ReadonlyArray<DoctorCheck>): DoctorResult[
 // a DoctorCheck with status: 'fail' so the failing probe still appears in
 // the user-facing output with a useful detail string.
 // MR-36: positional names mirror the Promise.allSettled probe order below
-// (probeBetterSqlite3, probeKeyring, probeMcpStdoutPurity). Reference the
-// canonical CHECK_NAMES so a rename in one place propagates here.
+// (probeBetterSqlite3, probeKeyring, probeMcpStdoutPurity, probeAuth,
+// probeTokenFreshness). Reference the canonical CHECK_NAMES so a rename
+// in one place propagates here.
+//
+// Plan 02-06: extended from 3 to 5 names. `auth` and `token_freshness`
+// are offline-safe (D-22) — they do NOT receive the `skipSubprocess`
+// gate. Auth is listed before freshness because auth gates freshness:
+// when no tokens exist on disk, the doctor surface prefers the more
+// fundamental "no tokens" remediation over the derived "expired ... ago"
+// secondary signal.
 const PROBE_NAMES = [
   CHECK_NAMES.BETTER_SQLITE3_LOAD,
   CHECK_NAMES.NAPI_KEYRING_LOAD,
   CHECK_NAMES.MCP_STDOUT_PURITY,
+  CHECK_NAMES.AUTH,
+  CHECK_NAMES.TOKEN_FRESHNESS,
 ] as const;
 
 export async function runDoctor(opts: RunDoctorOptions = {}): Promise<DoctorResult> {
@@ -130,6 +142,9 @@ export async function runDoctor(opts: RunDoctorOptions = {}): Promise<DoctorResu
     probeBetterSqlite3(),
     probeKeyring(),
     probeMcpStdoutPurity({ skipSubprocess }),
+    // Plan 02-06: offline-safe probes — no subprocess gate needed.
+    probeAuth(),
+    probeTokenFreshness(),
   ]);
   const checks: DoctorCheck[] = settled.map((r, i) => {
     if (r.status === 'fulfilled') return r.value;

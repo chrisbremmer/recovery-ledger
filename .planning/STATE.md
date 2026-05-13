@@ -2,43 +2,43 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-current_plan: 6
+current_plan: 8
 status: ready_to_plan
-last_updated: "2026-05-12T18:25:00.581Z"
+last_updated: "2026-05-12T23:37:28.269Z"
 progress:
   total_phases: 5
-  completed_phases: 2
-  total_plans: 6
-  completed_plans: 6
-  percent: 40
+  completed_phases: 3
+  total_plans: 14
+  completed_plans: 14
+  percent: 60
 ---
 
 # State: Recovery Ledger
 
-**Last updated:** 2026-05-12 — completed Plan 01-06 (CI integration test + GitHub Actions workflow) — Phase 1 closed.
+**Last updated:** 2026-05-12 — completed Plan 02-08 (cross-process integration). Phase 2 is now CLOSED. Plan 02-08 ships the load-bearing AUTH-05 cross-process integration test in `tests/integration/auth-concurrency.test.ts` (7 tests: B-01 build-precondition + I-01..I-03 concurrency/atomic-write/lockfile + G-01..G-03 grep-v-Bearer across stderr, induced refresh failure, MCP whoop_doctor tools/call). 10 children forked via child_process.fork() against a real-HTTP mock in the parent assert exactly one POST to /oauth/oauth2/token AND all 10 children see the same fresh access_token. AUTH-06 end-to-end grep gate covers three surfaces (stderr / refresh-failure / MCP error returns). D-17 runtime attestation in G-03: tools/list returns EXACTLY one tool (whoop_doctor — Phase 2 added ZERO new MCP tools). D-25 CI matrix expanded to [macos-latest, ubuntu-latest]; Linux row sets RECOVERY_LEDGER_FORCE_FILE_STORE=1 via matrix-conditional env. tsup.config.ts extended with src/infrastructure/whoop/token-store.ts as an explicit entry per checker WARNING PLAN-08-BUILD-DEP. One Rule-3 deviation auto-fixed: vitest.config.ts include glob extended with tests/**/*.test.ts. Regression-lock TDD variant (Plan 02-07 precedent): 7 tests pass on first run as the EXPECTED outcome — production code is from Plans 02-01..02-06. 238 tests across 20 files; lint clean; CI grep gates clean.
 **Mode:** yolo
 **Granularity:** standard
 
 ## Project Reference
 
 - **Core Value:** Turn WHOOP data into a daily and weekly review loop that ends in 3 concrete decisions and a record of whether they helped — useful enough that Chris keeps using it.
-- **Current Focus:** Phase 01 — foundation-stdout-pure-mcp-bootstrap
+- **Current Focus:** Phase 02 — oauth-token-store-single-flight-refresh
 
 ## Current Position
 
 **Current Plan:** Not started
-**Total Plans in Phase:** 6
-Phase: 01 (foundation-stdout-pure-mcp-bootstrap) — COMPLETE
-Plan: 6 of 6
+**Total Plans in Phase:** 8
+Phase: 02 (oauth-token-store-single-flight-refresh) — COMPLETE (ready for verification)
+Plan: 8 of 8 — complete
 
 - **Milestone:** v1
-- **Phase:** 2
-- **Plan:** 01-06-ci-integration-PLAN.md (complete) — GitHub Actions workflow + dist/mcp.mjs subprocess round-trip integration test landed.
+- **Phase:** 3
+- **Plan:** 02-08-cross-process-integration-PLAN.md (complete) — load-bearing AUTH-05 cross-process integration test + AUTH-06 grep gate across 3 surfaces + D-17 runtime attestation + D-25 CI matrix + tsup.config.ts entry per checker WARNING PLAN-08-BUILD-DEP. 7 tests green; full suite 238/238 across 20 files; lint clean; CI grep gates clean. Phase 2 closed: all 8 plans complete; all 4 Phase 2 success criteria CI-enforced.
 - **Status:** Ready to plan
 - **Progress:** [██████████] 100%
 
 ```
-[████░░░░░░░░░░░░░░░░] 1 / 5 phases complete (6 / 6 plans complete in Phase 1)
+[████████░░░░░░░░░░░░] 2 / 5 phases complete (6 / 6 in Phase 1; 8 / 8 in Phase 2)
 ```
 
 ## Performance Metrics
@@ -46,11 +46,18 @@ Plan: 6 of 6
 | Metric | Value |
 |--------|-------|
 | Phases planned | 5 |
-| Phases complete | 1 |
+| Phases complete | 2 |
 | v1 requirements mapped | 49 / 49 |
-| v1 requirements complete | 7 / 49 |
-| Plans drafted | 6 (Phase 1) |
-| Plans complete | 6 |
+| v1 requirements complete | 12 / 49 |
+| Plans drafted | 6 (Phase 1) + 8 (Phase 2) |
+| Plans complete | 14 |
+| Phase 02 P07 | 2m 1s | 1 tasks | 1 files |
+| Phase 02 P02 | 5m 32s | 1 tasks | 2 files |
+| Phase 02 P03 | 4m 28s | 1 tasks | 2 files |
+| Phase 02 P04 | 3m 3s | 1 tasks | 3 files |
+| Phase 02 P05 | 4m 57s | 1 tasks | 7 files |
+| Phase 02-oauth-token-store-single-flight-refresh P06 | 6m 1s | - tasks | - files |
+| Phase 02-oauth-token-store-single-flight-refresh P08 | 4m 54s | 2 tasks | 5 files |
 
 ### Plan Execution History
 
@@ -62,6 +69,14 @@ Plan: 6 of 6
 | 01-04-sanitizer-lint | 3m 17s | 2 | 2 | Complete (2026-05-12) |
 | 01-05-cli-doctor   | 5m 18s | 3 | 15 | Complete (2026-05-12) |
 | 01-06-ci-integration | 4m 22s | 2 | 2 | Complete (2026-05-12) |
+| 02-01-wave0-infra | 5m 17s | 2 | 12 | Complete (2026-05-12) |
+| 02-07-sanitizer-fixtures | 2m 1s | 1 | 1 | Complete (2026-05-12) |
+| 02-02-token-store | 5m 32s | 1 | 2 | Complete (2026-05-12) |
+| 02-03-oauth-round-trip | 4m 28s | 1 | 2 | Complete (2026-05-12) |
+| 02-04-refresh-orchestrator | 3m 3s | 1 | 3 | Complete (2026-05-12) |
+| 02-05-cli-shims | 4m 57s | 1 | 7 | Complete (2026-05-12) |
+| 02-06-doctor-extensions | 6m 1s | 1 | 8 | Complete (2026-05-12) |
+| 02-08-cross-process-integration | 4m 54s | 2 | 5 | Complete (2026-05-12) — Phase 2 closed |
 
 ## Accumulated Context
 
@@ -98,6 +113,52 @@ Plan: 6 of 6
 - **[Phase 01] Plan 01-06 decision:** integration test does NOT import probeMcpStdoutPurity — it asserts against raw stdout bytes directly so a bug in the probe's framing logic is caught by a second independent eye.
 - **[Phase 01] Plan 01-06 deviation:** RESEARCH Pattern 5(b) writes `json.trim()` to stdin, but pretty-printed multi-line fixtures are silently dropped by the MCP line-delimited parser; adopted single-line collapse via `JSON.stringify(JSON.parse(body))` — same pattern as src/services/doctor/checks/mcp-stdout-purity.ts.
 - **[Phase 01] Plan 01-06 deviation (repeat from 01-05):** Vitest 4 `--reporter=basic` was removed; planner-template fix needed for the Vitest 4 pinned stack.
+- **[Phase 02] Plan 02-01 decision:** auth_port_in_use kind shipped in Wave 0 (originally Wave 2) — checker BLOCKER 1 fix keeps errors.ts stable across Plan 02-02 and Plan 02-03 same-wave consumers; AuthErrorKind FROZEN at 6 kinds.
+- **[Phase 02] Plan 02-01 decision:** canonical ConfigSchema centralized in src/infrastructure/config/schema.ts — checker WARNING PLAN-05-DRY-VIOLATION fix; init.ts and auth.ts both import single source in Plan 02-05.
+- **[Phase 02] Plan 02-01 decision:** WHOOP_TOKEN_URL hard-coded inside tests/helpers/msw-whoop-oauth.ts as single source for the phase — T-02.01-04 mitigation prevents a future test from accidentally pointing MSW at a different host.
+- **[Phase 02] Plan 02-01 deviation:** Biome formatter auto-fixed paths.ts configDir line-split and errors.ts super(...) collapse (Rule 3 — blocking format).
+- **[Phase 02] Plan 02-01 deviation:** rewrote paths.ts doc-comment mentions of process.env to 'env-global' so plan acceptance grep returns exactly the single export line (Rule 1 — comment regression).
+- **[Phase 02] Plan 02-01 deviation:** ran npm run build to rebuild stale dist/mcp.mjs (gitignored) before full-suite verify — pre-existing precondition, not Plan 02-01 regression; planner-template note worth recording.
+- **[Phase 02] Plan 02-07 decision:** D-19 collapsed to test-fixture-only work — RESEARCH lines 768-787 confirmed Phase 1 SECRET_KEY_NAMES already contains code + client_secret; plan ships fixtures only, no sanitize.ts regex changes.
+- **[Phase 02] Plan 02-07 decision:** D-18 attestation verified — src/mcp/register.ts NOT modified; new Phase 2 AuthError kinds (auth_port_in_use, auth_expired) flow through unchanged sanitize(serializeError(err)) pipeline; full-suite pass (127 tests / 12 files) exercises the wrapper end-to-end.
+- **[Phase 02] Plan 02-07 decision:** avoided F-number collision with Phase 1 D-10 fixtures — added Phase 2 fixtures as sibling describe blocks named 'F6 — Bearer/JWT/...' and 'F7 — D-20 ...' rather than renaming existing test('F6 ...') inside the D-10 describe block.
+- **[Phase 02] Plan 02-07 decision:** N-01 (code=12) uses permissive assertion — Pattern 2b has no length floor today; permissive shape documents intent without locking in a debatable choice.
+- **[Phase 02] Plan 02-07 deviation:** F6.02 fixture rewritten mid-execution — original D-20 verbatim eyJabc.eyJdef.signature123 too short for Pattern 3 floors (4/8/8); F6.02 now uses longer fixture; F7.01 retains D-20 verbatim because code= form-body catches it before Pattern 3 fires (Rule 1).
+- [Phase ?]: [Phase 02] Plan 02-02 decision: in-process gate lives INSIDE createTokenStore closure (per-instance) rather than module-level — gives tests isolated gates without vi.resetModules; production singleton still enforces ONE gate process-wide via the exported tokenStore.
+- [Phase ?]: [Phase 02] Plan 02-02 decision: Pitfall F (keyring roundtrip mismatch) implemented as cheap defense-in-depth — setPassword + getPassword + byte-equal verify; mismatch silently falls back to file backend; ADR-0002 does not mandate it; test B-04 pins the contract.
+- [Phase ?]: [Phase 02] Plan 02-02 decision: WHOOP_TOKEN_URL read at module load from process.env.WHOOP_TOKEN_URL ?? hardcoded default — test-only override seam for Plan 02-08 cross-process integration.
+- [Phase ?]: [Phase 02] Plan 02-02 decision: Removed speculative tokenFileExists helper in REFACTOR — Plan 02-06 will own its own existence-probe in doctor auth.ts; YAGNI cleanup.
+- [Phase ?]: [Phase 02] Plan 02-02 deviation: Biome import-sort + noNonNullAssertion auto-fixed via npm run format + manual guard substitution (Rule 3 blocking lint).
+- [Phase ?]: [Phase 02] Plan 02-02 deviation: rephrased token-store.ts doc-comment process.stdout.write to direct stdout writes so plan acceptance grep returns zero matches (Rule 1 — same precedent as Plan 02-01 paths.ts process.env).
+- [Phase ?]: [Phase 02] Plan 02-02 deviation: Plan acceptance grep oauth/oauth2/token outside token-store.ts returned 1 match in src/mcp/sanitize.test.ts (Plan 02-07 fixture) — Plan 02-06 input note: Gate E must exclude test files when wiring the rule (Rule 1).
+- [Phase ?]: [Phase 02] Plan 02-02 deviation: E-01 test restructured from chained .rejects.* to single try/catch — MSW setNextResponse is one-shot and chained rejects would consume it twice (Rule 1 — test-shape correction at RED-review).
+- [Phase ?]: [Phase 02] Plan 02-03 decision: errors.ts NOT mutated — AuthError union FROZEN at 6 kinds from Wave 0; this plan consumes auth_port_in_use unchanged. Verified by git diff returning empty for errors.ts.
+- [Phase ?]: [Phase 02] Plan 02-03 decision: OAuth error-code response policy (BLOCKER 4 / OPEN-Q-01) — RENDER invalid_scope/invalid_request/unsupported_response_type error_description verbatim after sanitize+escapeHtml; STRIP server_error/access_denied/unauthorized_client/temporarily_unavailable/default. OE-09 verbatim acceptance fixture pinned.
+- [Phase ?]: [Phase 02] Plan 02-03 decision: 127.0.0.1-only loopback binding (NOT 0.0.0.0); verified by Test L-06 reading the onListening callback's address field. ASVS V9 + Threat Pattern CSRF-on-loopback.
+- [Phase ?]: [Phase 02] Plan 02-03 decision: PKCE OFF by default per A1/D-12/Pitfall I — WHOOP PKCE support unconfirmed; usePkce flag threads S256 challenge+verifier when set.
+- [Phase ?]: [Phase 02] Plan 02-03 deviation: MSW onUnhandledRequest:'bypass' (not 'error') — runOAuth tests drive real fetch against loopback 127.0.0.1 server; helper still intercepts WHOOP_TOKEN_URL only (Rule 1 test correctness).
+- [Phase ?]: [Phase 02] Plan 02-03 deviation: settled-promise wrapper pattern for L-02 + OE-01..09 tests — Vitest treats single-tick rejection gap as unhandled; .then(ok,err) wrapper attaches handler before fetch round-trip (Rule 1 test correctness).
+- [Phase ?]: [Phase 02] Plan 02-03 deviation: plan acceptance grep 'oauth/oauth2/auth ... grep -v oauth.ts' returns matches in oauth.test.ts (oauth.ts is NOT a substring of oauth.test.ts); same precedent as Plan 02-02 Gate-E. Plan 02-06 input note: must --exclude='*.test.ts' (Rule 1 plan-text drift).
+- [Phase ?]: [Phase 02] Plan 02-04 decision: refresh orchestrator is the SOLE consumer of tokenStore.getValidAccessToken() outside token-store internals; grep-verified; Plan 02-06 Gate E will lock at CI time. 401-reactive retry policy chokepoint with budget = 1 per D-15.
+- [Phase ?]: [Phase 02] Plan 02-04 decision: FetchLikeResponse intentionally minimal — just {status: number}. Orchestrator only needs .status to decide retry; full Response shape is operation callback's concern. Decouples from globalThis.Response and lets Phase 3 WHOOP HTTP client pass any wrapper.
+- [Phase ?]: [Phase 02] Plan 02-04 decision: callWithAuth bound on singleton via .bind(refreshOrchestrator) — naked property reference would lose this binding for free-function import sites. Functionally equivalent to plan's <interfaces> wording; semantically more robust.
+- [Phase ?]: [Phase 02] Plan 02-04 deviation: dynamic-imported AuthError inside F-01/F-02 instead of top-level static import — vi.resetModules() creates fresh module-graph instances per test, so toBeInstanceOf against a top-level static class binding fails (same class name, different runtime identity). Planner-template note: any test using vi.resetModules + dynamic import + toBeInstanceOf must dynamic-import the class symbol too (Rule 1).
+- [Phase ?]: [Phase 02] Plan 02-04 deviation: orchestrator module-leading comment uses 'console calls' and 'direct stdout writes' phrasing rather than literal 'console.*' and 'process.stdout.write' to avoid plan-acceptance-grep collision — same precedent as Plan 02-01 paths.ts and Plan 02-02 token-store.ts (Rule 1).
+- [Phase ?]: [Phase 02] Plan 02-05 decision: both init.ts and auth.ts import canonical ConfigSchema + D13_SCOPES from src/infrastructure/config/schema.ts (Plan 02-01) — checker WARNING PLAN-05-DRY-VIOLATION fix; no inline z.object declarations in either file; Tests I-10 + A-10 grep the source to lock the contract.
+- [Phase ?]: [Phase 02] Plan 02-05 decision: auth.ts catch arm dispatches AuthError via duck-typing (err.name === 'AuthError' AND kind in AUTH_ERROR_KINDS) rather than instanceof — Vitest vi.resetModules() cross-module class identity issue (same pattern as Plan 02-04 deviation 1).
+- [Phase ?]: [Phase 02] Plan 02-05 decision: Gate C in scripts/ci-grep-gates.sh broadened from src/cli/commands/doctor.ts to src/cli/commands/**/*.ts via regex anchored at the directory prefix — ADR-0001 MCP-stdout-purity preserved because src/cli/commands/ is not reachable from src/mcp/.
+- [Phase ?]: [Phase 02] Plan 02-05 deviation (Rule 1): fixed Plan 02-01 latent bug in errors.ts — AuthError constructor never stored init.detail on instance. Plan 02-01 test 11 was permissive enough to hide it; Plan 02-05 A-04 forced the port number into assertion which surfaced it. Fix: readonly detail field; FROZEN 6-kind union preserved.
+- [Phase ?]: [Phase 02] Plan 02-05 deviation (Rule 3): Biome auto-fixed import-sort/line-collapse via npm run format. No semantic change.
+- [Phase ?]: Plan 02-06: Gate E uses per-line grep exclusion to skip *.test.ts files (mirrors Gate B + Gate D filtering shape).
+- [Phase ?]: Plan 02-06: Token-freshness boundary at delta === REFRESH_BUFFER_MS (5min) belongs to warn (not pass) — symmetric with token-store.ts strict-greater-than pass arm.
+- [Phase ?]: Plan 02-06: Type-system-as-forcing-function for offline-safety — AuthProbeDeps + TokenFreshnessProbeDeps expose ONLY read functions, no refresh seam.
+- [Phase ?]: Plan 02-06: Doc-comment plan-grep-criterion drift (3rd occurrence in Phase 2 after 02-01 process.env, 02-02 process.stdout.write); recommend a learnings.md entry.
+- [Phase 02]: [Phase 02] Plan 02-08 decision: regression-lock TDD variant applied (Plan 02-07 precedent) — cross-process gate already works from Plans 02-01..02-06; 7 tests pass on first run as the EXPECTED outcome; single test(...) commit rather than RED->GREEN->REFACTOR is the correct shape
+- [Phase 02]: [Phase 02] Plan 02-08 decision: tsup.config.ts extended with src/infrastructure/whoop/token-store.ts as explicit top-level entry — per checker WARNING PLAN-08-BUILD-DEP; default splitting:false does not emit internal modules
+- [Phase 02]: [Phase 02] Plan 02-08 decision: real node:http server in parent + child_process.fork() (NOT MSW) — MSW intercepts fetch within a process and cannot bridge fork() boundaries
+- [Phase 02]: [Phase 02] Plan 02-08 decision: D-25 CI matrix expanded to [macos-latest, ubuntu-latest] with fail-fast:false; ubuntu-latest row sets RECOVERY_LEDGER_FORCE_FILE_STORE=1 via matrix-conditional env idiom
+- [Phase 02]: [Phase 02] Plan 02-08 decision: G-03 inlines the MCP subprocess driver rather than reusing probeMcpStdoutPurity — needed full frame capture + parameterized env + tools/list shape assertion (D-17 runtime attestation: exactly one whoop_doctor tool)
+- [Phase 02]: [Phase 02] Plan 02-08 deviation (Rule 3 blocking): vitest.config.ts include glob extended with tests/**/*.test.ts so the new integration test is discoverable; Phase 1 test/integration/ (singular) remains discoverable too
 
 ### Open Todos
 
@@ -120,11 +181,17 @@ None.
 
 ### Last Session Summary
 
-Executed Plan 01-06 (CI integration — closes Phase 1). Shipped 2 created files across two task commits. Created: `test/integration/mcp-stdout-purity.test.ts` (124 lines — spawns `dist/mcp.mjs`, drives the four-fixture JSON-RPC sequence, asserts every stdout line parses as JSON-RPC 2.0, asserts no `Bearer/Authorization/eyJ` substrings, asserts the id=3 tools/call response carries `result` not `error`, exit code ≤ 0). Created: `.github/workflows/ci.yml` (51 lines — single `macos-latest` job, Node 22, `actions/checkout@v4` + `actions/setup-node@v4` with npm cache, steps `npm ci → lint → build → test → bash scripts/ci-grep-gates.sh` in that exact order, concurrency block cancels in-flight runs on the same ref). Full local pipeline green: `npm ci → npm run lint → npm run build → npm run test → bash scripts/ci-grep-gates.sh` — 30 tests / 6 files, 2.49s; integration test alone 2.32s. Three Rule 1 deviations all auto-fixed before commit: (1) pretty-printed multi-line fixtures silently dropped by MCP line-delimited parser → adopted `JSON.stringify(JSON.parse(body))` collapse pattern; (2) final drain too short for the inner mcp_stdout_purity subprocess (~1.1s round-trip) → bumped to 1500ms; (3) plan's verify command uses Vitest-4-removed `--reporter=basic` → substituted default reporter (second occurrence — worth a planner-template fix). Commits: `fa9bc52` (test — integration test), `354ed7c` (chore — CI workflow). Phase 1 closed: all seven FND-* requirements now CI-enforced (see `01-06-SUMMARY.md` § "Phase 1 Completion Status" for the mapping table). Ready for verifier sign-off; first post-merge GitHub Actions run on `main` is the final acceptance gate.
+Executed Plan 02-08 (cross-process integration) — the final plan in Phase 2. Two tasks: Task 0 (build-dependency precondition — extend tsup.config.ts so `dist/infrastructure/whoop/token-store.mjs` is emitted as an explicit top-level entry per checker WARNING PLAN-08-BUILD-DEP); Task 1 (the load-bearing AUTH-05 cross-process integration test + AUTH-06 end-to-end grep gate + D-25 CI matrix expansion). Landed `tests/integration/auth-concurrency.test.ts` (628 LOC, 7 tests: B-01 build-precondition + I-01 ten-fork concurrency + I-02 atomic write + I-03 lockfile-released + G-01 stderr no-Bearer + G-02 induced-refresh-failure no-Bearer + G-03 MCP tools/call no-Bearer with tools.length===1 D-17 attestation) + `tests/integration/helpers/child-get-token.mjs` (41 LOC; child fork helper that imports compiled tokenStore from dist/infrastructure/whoop/token-store.mjs, calls getValidAccessToken, prints JSON line to stdout). Modified `tsup.config.ts` (entry map gains `'infrastructure/whoop/token-store': 'src/infrastructure/whoop/token-store.ts'` so dist emits the path at `dist/infrastructure/whoop/token-store.mjs` — mirrors src tree). Modified `.github/workflows/ci.yml` (matrix expanded to `[macos-latest, ubuntu-latest]` with `fail-fast: false`; ubuntu-latest row sets `RECOVERY_LEDGER_FORCE_FILE_STORE=1` on the Test step via matrix-conditional env `${{ matrix.os == 'ubuntu-latest' && '1' || '' }}` — file-fallback path now CI-enforced on Linux; macOS continues to exercise the keyring backend). Modified `vitest.config.ts` (include glob extended with `tests/**/*.test.ts` — Rule 3 blocking deviation auto-fixed; Phase 1's `test/integration/` singular tree remains discoverable). 10 children forked via `child_process.fork()` against a real-HTTP mock in the parent (NOT MSW — MSW intercepts fetch within a process and cannot bridge fork() boundaries; the integration test stands a real `node:http` server on 127.0.0.1:0 with hit counter + one-shot override) and the parent asserts exactly one POST to /oauth/oauth2/token AND all 10 children see the same fresh access_token. D-17 runtime attestation in G-03: tools/list returns EXACTLY one tool (whoop_doctor — Phase 2 added ZERO new MCP tools; verified at both source-grep level via `grep -rEn 'server.registerTool' src/mcp/` AND wire level via `tools.length === 1` assertion). Regression-lock TDD variant applied (Plan 02-07 precedent): the production code is from Plans 02-01..02-06; passing on first run is the EXPECTED outcome — a failing test would be a Phase 2 actual-vs-research delta requiring escalation. Single test(...) commit per Plan 02-07 precedent. One Rule-3 deviation auto-fixed: vitest.config.ts glob extension (Phase 1's test/integration/ singular vs Plan 02-08's tests/integration/ plural — both now in the include glob). errors.ts/token-store.ts/oauth.ts/refresh-orchestrator.ts/sanitize.ts/register.ts UNMODIFIED — D-18 attestation preserved across all 8 Phase 2 plans; AuthError FROZEN at 6 kinds since Plan 02-01 Wave 0. Tests: 231 → 238 across 19 → 20 files; lint clean; CI grep gates clean (Gate E ADR-0002 enforcement stays green). Commits: `19104de` (Task 0 build — tsup entry), `a7c77da` (Task 1 test — integration suite + CI matrix). Phase 2 closed: all 8 plans complete; all four Phase 2 success criteria CI-enforced (#1 token-store + single-flight from Plans 02-02 + 02-03 + 02-04; #2 concurrent-load 10-parallel-401 from Plan 02-08; #3 Linux file-fallback from Plan 02-06 + Plan 02-08; #4 grep -v Bearer from Plan 02-07 + Plan 02-08).
+
+Previously executed Plan 02-06 (doctor-extensions). Single TDD task across RED → GREEN (REFACTOR skipped). Two new offline-safe doctor probes (auth + token_freshness) extended PROBE_NAMES from 3 to 5; Gate E added to scripts/ci-grep-gates.sh enforcing ADR-0002 §Enforcement at CI time (only src/infrastructure/whoop/token-store.ts may reference the literal 'oauth/oauth2/token' URL; test files excluded). 22 new probe-specific tests + 4 new index.test.ts wiring assertions. Tests: 206 → 231 across 17 → 19 files.
+
+Previously executed Plan 02-05 (cli-shims). Single TDD task across RED → GREEN (REFACTOR skipped — implementation matched planned shape). Landed `src/cli/commands/init.ts` (131 LOC, 3 named exports: runInitCommand + INIT_EXIT_CODES + type re-export InitConfig) + `src/cli/commands/init.test.ts` (235 LOC, 11 tests) + `src/cli/commands/auth.ts` (132 LOC, 2 named exports: runAuthCommand + AUTH_EXIT_CODES) + `src/cli/commands/auth.test.ts` (293 LOC, 12 tests including Commander wiring grep). Modified `src/cli/index.ts` (42 → 73 LOC) — Commander program registers init + auth subcommands with MR-22 --help blocks documenting exit codes (init: 0 success / 1 invalid input / 1 write failed; auth: six 1-codes mapped to FROZEN AuthError kinds + 0 success). Modified `scripts/ci-grep-gates.sh` — Gate C scope broadened from `src/cli/commands/doctor.ts` (Phase 1 single-file) to `src/cli/commands/**/*.ts` (any CLI command file) via regex anchored at directory prefix; ADR-0001 MCP-stdout-purity invariant preserved because src/cli/commands/ is NOT reachable from src/mcp/. Modified `src/infrastructure/whoop/errors.ts` — fixed Plan 02-01 latent bug: AuthError constructor now stores `init.detail` on the instance as a readonly field so `formatAuthError` can interpolate the colliding port number in the auth_port_in_use remediation (Plan 02-01 errors.test.ts test 11 was permissive enough to hide the bug; Plan 05 test A-04 forced the port number into the assertion, surfacing it); AuthError union FROZEN at 6 kinds preserved. AUTH-01 (`recovery-ledger init` writes ~/.recovery-ledger/config.json mode 0600 with D-06 env-var precedence + D-02 verbatim instructions + atomic temp-and-rename + Zod validation via canonical ConfigSchema) and AUTH-02 (`recovery-ledger auth` reads config.json via canonical ConfigSchema, applies D-06 env-var precedence at auth time, runs Plan 02-03's runOAuth, persists Tokens via Plan 02-02's tokenStore.write, prints `Authorization complete.`) fully wired end-to-end. Both init.ts and auth.ts import canonical ConfigSchema + D13_SCOPES from `src/infrastructure/config/schema.ts` (DRY-fix per checker WARNING PLAN-05-DRY-VIOLATION); no inline `z.object` declarations in either file (Tests I-10 + A-10 grep the source to lock the contract). auth.ts catch arm dispatches AuthError via duck-typing (`err.name === 'AuthError' && AUTH_ERROR_KINDS.has(err.kind)`) rather than `instanceof` — Vitest `vi.resetModules()` cross-module class identity workaround (same pattern as Plan 02-04 deviation 1; planner-template note now applies to both refresh-orchestrator test AND auth.ts production code). Two deviations all auto-fixed: 1 Rule-3 Biome import-sort/line-collapse auto-fix via `npm run format`; 1 Rule-1 latent Plan 02-01 errors.ts bug fix (AuthError instance field). REFACTOR skipped — same precedent as Plan 02-01 Task 2, Plan 02-04, Plan 02-07. Tests: 183 → 206 across 15 → 17 files; lint clean; CI grep gates clean. `node dist/cli.mjs --help` lists init + auth subcommands. Commits: `ed5c455` (RED — 23 tests fail with module-not-found), `0f7a60d` (GREEN — 23/23 tests pass after duck-type AuthError dispatch fix and errors.ts Rule-1 bug fix, both applied before staging).
+
+Previously executed Plan 02-04 (refresh-orchestrator). Single TDD task across RED → GREEN (REFACTOR skipped — implementation matched planned shape; same precedent as Plan 02-01 Task 2 + Plan 02-07 Task 1). Landed `src/services/refresh-orchestrator.ts` (133 LOC, 7 named exports: callWithAuth + createRefreshOrchestrator + refreshOrchestrator + 4 type interfaces FetchLikeResponse/AuthedOperation/CallWithAuthOptions/RefreshOrchestrator) + `refresh-orchestrator.test.ts` (296 LOC, 9 tests across 4 describe blocks). Extended `src/services/index.ts` (19 → 34 LOC) — Services interface now includes refreshOrchestrator alongside runDoctor; createServices() returns both; type re-exports for orchestrator surface. 401-reactive retry policy chokepoint per D-14/D-15/D-16 + ADR-0002 §Consequences: attempt 1 → tokenStore.getValidAccessToken() + op(at) → if 401, re-read tokens (sibling may have refreshed) → if fresh, retry with current.accessToken (no force-refresh — getValidAccessToken called only once in this path); else force getValidAccessToken() through three-layer gate, retry once with fresh token, return result regardless of status (retry budget = 1). Refresh failure (token-store throws AuthError({kind: 'refresh_failed'})) wraps as AuthError({kind: 'auth_expired', cause: refreshErr}) and does NOT retry the operation (STACK.md §Token refresh point 4 — retry budget 0 on refresh). The orchestrator is the SOLE consumer of tokenStore.getValidAccessToken() outside of token-store internals (grep-verified — `grep -rEn "tokenStore\.getValidAccessToken" src/` outside refresh-orchestrator.ts + token-store.ts + their tests returns 0; Plan 02-06's Gate E will lock at CI time). Consumer scope corrected per checker WARNING PLAN-04-CIRCULAR-NOTE: Phase 3's WHOOP sync service is the FIRST runtime consumer; Plan 02-05's auth.ts does NOT consume (auth-code grant has no 401-reactive boundary — auth.ts imports infrastructure directly). FetchLikeResponse intentionally minimal — just `{status: number}` — orchestrator only inspects `.status` to decide retry; full Response shape is operation callback's concern (decouples from globalThis.Response, lets Phase 3 WHOOP HTTP client pass any wrapper). callWithAuth bound on singleton via `.bind(refreshOrchestrator)` so free-function `import { callWithAuth }` preserves `this`. 9 tests green: H-01/H-02 (happy path; access-token plumbing), R-01/R-02/R-03 (sibling re-read, force refresh path, retry budget exhausted), F-01/F-02 (auth_expired wrap with cause; formatAuthError remediation), S-01/S-02 (services-barrel wiring + end-to-end). Two deviations all auto-fixed: 1 Rule-1 cross-module class identity (top-level static `import { AuthError }` resolves a pre-vi.resetModules() module-graph instance — toBeInstanceOf fails against the orchestrator's caught class; fix: dynamic-import AuthError inside F-01/F-02 matching the orchestrator's lifecycle — planner-template note: any test using vi.resetModules + dynamic import + toBeInstanceOf must dynamic-import the class too); 1 Rule-1 doc-comment phrasing precedent (used `console calls` / `direct stdout writes` rather than literal `console.*` / `process.stdout.write` to dodge plan-acceptance-grep collision — same precedent as Plan 02-01 paths.ts + Plan 02-02 token-store.ts). errors.ts unchanged (FROZEN at 6 kinds — Wave 0 contract preserved); token-store.ts unchanged; sanitize.ts/register.ts unchanged (D-18 attestation preserved across Plans 02-07 + 02-02 + 02-03 + 02-04). REFACTOR skipped — module-leading comment, retry policy, AuthError wrap, services-barrel wiring all matched `<interfaces>` and `<action>` verbatim. Tests: 174 → 183 across 14 → 15 files; lint clean; CI grep gates clean. Commits: `ea6735a` (RED — 9 tests; 8 fail with module-not-found, F-02 passes against existing errors.ts contract as expected), `63c5f10` (GREEN — 9/9 tests pass after class-identity fix).
 
 ### Next Session
 
-Run the verifier agent on Phase 1 (six Plan summaries + integration test + CI workflow). Awaiting verifier sign-off before planning Phase 2 (auth). STATE.md flags two research-deepen-before-planning questions for Phase 2 — cross-process file-lock semantics for single-flight refresh + replay-on-401 contract — the orchestrator should choose deepen-research-or-skip before `/gsd-plan-phase 2`. First post-merge GitHub Actions run is the external acceptance gate (`gh run list --limit 1 --json conclusion --jq '.[0].conclusion'`); not yet runnable because CI has not been invoked.
+Phase 2 is CLOSED. Run the verifier on Phase 2 (`/gsd-verify-phase 2`) to confirm all 8 plan summaries + ROADMAP table + REQUIREMENTS table + CI gates are coherent. Phase 2 leaves three external acceptance gates to confirm post-merge: (1) first GitHub Actions run on `main` is green across BOTH the macos-latest and ubuntu-latest matrix rows (`gh run list --limit 1 --json conclusion --jq '.[0].conclusion'`); (2) the cross-process AUTH-05 test passes on both rows (the Linux row exercises the file-fallback backend); (3) the AUTH-06 grep gate stays green across the broader stderr surface CI produces. The Phase 1 verifier run also remains pending (open todo carried forward from the end of Phase 1). Once Phase 2 is verified, the next phase to plan is Phase 3 (Data + Sync — WHOOP HTTP client + Drizzle schema + sync command). Phase 3's WHOOP sync service is the FIRST runtime consumer of `callWithAuth` from `src/services/refresh-orchestrator.ts` (Plan 02-04); the orchestrator wraps every WHOOP GET, refresh failures throw `AuthError({kind: 'auth_expired'})` with cause chain preserved. The HTTP client (Plan 03-?? TBD) MUST pin requests to api.prod.whoop.com per ADR-0007 — the orchestrator trusts callers; pinning lives in the HTTP client. Phase 3 may also need to extend the MSW helper convention from `tests/helpers/msw-whoop-oauth.ts` (Plan 02-01) to one helper per WHOOP resource under `tests/fixtures/whoop/<resource>/<scenario>.json` (conventions.md §Testing). AuthError union remains FROZEN at 6 kinds; D-18 attestation is preserved across all 8 Phase 2 plans (sanitize.ts + register.ts UNMODIFIED throughout). D-17 attestation is preserved at runtime by Plan 02-08's G-03 test: tools/list returns EXACTLY one tool (whoop_doctor — Phase 2 added ZERO new MCP tools).
 
 ---
 *State initialized: 2026-05-11*
@@ -135,3 +202,11 @@ Run the verifier agent on Phase 1 (six Plan summaries + integration test + CI wo
 *Plan 01-04 complete: 2026-05-12 (3m 17s, 2 files)*
 *Plan 01-05 complete: 2026-05-12 (5m 18s, 15 files — 13 created + 2 modified)*
 *Plan 01-06 complete: 2026-05-12 (4m 22s, 2 files) — Phase 1 closed.*
+*Plan 02-01 complete: 2026-05-12 (5m 17s, 12 files — 10 created + 2 modified) — Phase 2 Wave 0 done.*
+*Plan 02-07 complete: 2026-05-12 (2m 1s, 1 file — sanitizer fixtures + D-18 attestation; 12 new tests; no production-code changes).*
+*Plan 02-02 complete: 2026-05-12 (5m 32s, 2 files — token-store.ts + token-store.test.ts; 17 unit tests; ADR-0002 three-layer gate landed) — Phase 2 Wave 2 chokepoint in place.*
+*Plan 02-03 complete: 2026-05-12 (4m 28s, 2 files — oauth.ts + oauth.test.ts; 30 unit tests; OAuth Authorization-Code surface + BLOCKER 4 / OPEN-Q-01 error-code policy; errors.ts FROZEN) — Phase 2 Wave 3 round-trip in place.*
+*Plan 02-04 complete: 2026-05-12 (3m 3s, 3 files — refresh-orchestrator.ts + refresh-orchestrator.test.ts + services/index.ts; 9 unit tests; 401-reactive retry chokepoint with budget = 1; SOLE consumer of tokenStore.getValidAccessToken() outside token-store internals; services barrel extended with refreshOrchestrator) — Phase 2 Wave 3 chokepoint complete.*
+*Plan 02-05 complete: 2026-05-12 (4m 57s, 7 files — init.ts + init.test.ts + auth.ts + auth.test.ts + index.ts + ci-grep-gates.sh + errors.ts; 23 unit tests; AUTH-01 + AUTH-02 fully wired; canonical ConfigSchema imported by both CLI shims — DRY-fix; Gate C broadened to src/cli/commands/**/*.ts; Plan 02-01 latent AuthError.detail bug fixed under Rule 1) — Phase 2 Wave 4 chokepoint complete.*
+*Plan 02-06 complete: 2026-05-12 (6m 1s, 8 files — auth.ts + auth.test.ts + token-freshness.ts + token-freshness.test.ts + check-names.ts + index.ts + index.test.ts + ci-grep-gates.sh; 22 probe-specific tests + 4 wiring assertions; PROBE_NAMES extended 3 → 5; Gate E enforces ADR-0002 single-consumer at CI time with test-file exclusion).*
+*Plan 02-08 complete: 2026-05-12 (4m 54s, 5 files — auth-concurrency.test.ts + child-get-token.mjs + tsup.config.ts + ci.yml + vitest.config.ts; 7 integration tests; cross-process AUTH-05 load-bearing + AUTH-06 grep gate across 3 surfaces + D-17 runtime attestation + D-25 CI matrix expanded to [macos-latest, ubuntu-latest]; tsup entry per checker WARNING PLAN-08-BUILD-DEP; regression-lock TDD variant per Plan 02-07 precedent) — Phase 2 CLOSED.*

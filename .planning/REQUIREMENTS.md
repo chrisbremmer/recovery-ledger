@@ -19,12 +19,12 @@ Requirements for the initial release. Each maps to roadmap phases.
 
 ### Authentication
 
-- [ ] **AUTH-01**: BYO WHOOP developer credentials configured via `recovery-ledger init` with dynamic loopback-port OAuth callback
-- [ ] **AUTH-02**: `recovery-ledger auth` initiates OAuth Authorization Code flow, opens browser, exchanges code for tokens, and reports success
-- [ ] **AUTH-03**: OAuth tokens stored at rest via `@napi-rs/keyring` with `chmod 600` file fallback when keychain is unavailable, surfaced clearly by `doctor`
-- [ ] **AUTH-04**: Token-refresh wrapper transparently refreshes expired access tokens and retries the originating request on 401
-- [ ] **AUTH-05**: Single-flight refresh: in-process module-level `Promise<Tokens> | null` plus cross-process file advisory lock plus atomic temp-file-and-rename token write — concurrent CLI + MCP refresh never burns the refresh-token family
-- [ ] **AUTH-06**: Token-leak prevention: error messages and MCP tool error returns never expose token material (covered by FND-06)
+- [x] **AUTH-01**: BYO WHOOP developer credentials configured via `recovery-ledger init` with dynamic loopback-port OAuth callback
+- [x] **AUTH-02**: `recovery-ledger auth` initiates OAuth Authorization Code flow, opens browser, exchanges code for tokens, and reports success
+- [x] **AUTH-03**: OAuth tokens stored at rest via `@napi-rs/keyring` with `chmod 600` file fallback when keychain is unavailable, surfaced clearly by `doctor`
+- [x] **AUTH-04**: Token-refresh wrapper transparently refreshes expired access tokens and retries the originating request on 401
+- [x] **AUTH-05**: Single-flight refresh: in-process module-level `Promise<Tokens> | null` plus cross-process file advisory lock plus atomic temp-file-and-rename token write — concurrent CLI + MCP refresh never burns the refresh-token family
+- [x] **AUTH-06**: Token-leak prevention: error messages and MCP tool error returns never expose token material (covered by FND-06)
 
 ### Data Model & DB
 
@@ -132,12 +132,12 @@ Explicitly excluded. Gated behind the hard scope guardrail in PROJECT.md (≥ 12
 | FND-05 | Phase 1 | Complete (Plan 01-04, 2026-05-12 — 20 Vitest cases pin sanitizer; scripts/ci-grep-gates.sh enforces tone + console.* + process.stdout.write rules) |
 | FND-06 | Phase 1 | Complete (Plan 01-03, 2026-05-12 — 4 D-07 patterns + D-08 cause walker in src/mcp/sanitize.ts; Plan 01-04 added 20-case Vitest spec) |
 | FND-07 | Phase 1 | Complete |
-| AUTH-01 | Phase 2 | Pending |
-| AUTH-02 | Phase 2 | Pending |
-| AUTH-03 | Phase 2 | Pending |
-| AUTH-04 | Phase 2 | Pending |
-| AUTH-05 | Phase 2 | Pending |
-| AUTH-06 | Phase 2 | Pending |
+| AUTH-01 | Phase 2 | Complete |
+| AUTH-02 | Phase 2 | Complete |
+| AUTH-03 | Phase 2 | Complete |
+| AUTH-04 | Phase 2 | Complete |
+| AUTH-05 | Phase 2 | Complete |
+| AUTH-06 | Phase 2 | Complete |
 | DATA-01 | Phase 3 | Pending |
 | DATA-02 | Phase 3 | Pending |
 | DATA-03 | Phase 3 | Pending |
