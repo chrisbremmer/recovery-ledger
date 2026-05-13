@@ -60,6 +60,29 @@ describe('AuthError', () => {
     const err = new AuthError({ kind: 'auth_port_in_use', detail: 'port 4321' });
     expect(err.kind).toBe('auth_port_in_use');
   });
+
+  test('Test 12 (WR-11): AuthError without cause has no own `cause` property', () => {
+    // WR-11: the Error constructor conditional `init.cause === undefined ?
+    // undefined : { cause: init.cause }` avoids synthesizing `{ cause:
+    // undefined }`. Pin the carrier shape so a future Node version that
+    // materializes the option differently — or a refactor that drops the
+    // conditional — surfaces here. The sanitizer's cause-walker checks
+    // `err.cause` truthiness; both "no cause property" and "cause:
+    // undefined" produce identical truthiness, but a `{ cause: null }`
+    // would not. This test pins the literal absence.
+    const err = new AuthError({ kind: 'auth_missing' });
+    expect('cause' in err).toBe(false);
+    expect(err.cause).toBeUndefined();
+  });
+
+  test('Test 13 (WR-11): AuthError with cause has the cause as an own property', () => {
+    // Mirror assertion: when cause IS supplied, `'cause' in err` must be
+    // true and the value must round-trip.
+    const inner = new Error('inner');
+    const err = new AuthError({ kind: 'refresh_failed', cause: inner });
+    expect('cause' in err).toBe(true);
+    expect(err.cause).toBe(inner);
+  });
 });
 
 describe('formatAuthError', () => {
