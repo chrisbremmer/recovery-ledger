@@ -16,14 +16,13 @@ Turn WHOOP data into a daily and weekly review loop that ends in 3 concrete deci
 
 <!-- Shipped and confirmed valuable. -->
 
-(None yet — ship to validate)
+- [x] BYO WHOOP OAuth setup with safe token refresh (concurrency-protected) — Validated in Phase 2: `recovery-ledger init` + `recovery-ledger auth` ship; three-layer single-flight refresh (in-process Promise + proper-lockfile + atomic write) ADR-0002 implementation; keychain-primary + chmod-600 file fallback; cross-process integration test (10-fork concurrency) green; sanitizer covers all OAuth leak shapes.
 
 ### Active
 
 <!-- Current scope. Building toward these. -->
 
 - [ ] Local-first SQLite cache for WHOOP API v2 cycles, recovery, sleep, workouts, profile, body measurements
-- [ ] BYO WHOOP OAuth setup with safe token refresh (concurrency-protected)
 - [ ] `recovery-ledger sync --days N` command with partial-failure reporting and rate-limit backoff
 - [ ] `recovery-ledger review daily` — today vs trailing 30-day baseline + anomalies + top 3 actions
 - [ ] `recovery-ledger review weekly` — worst-recovery days this week + plausible preceding patterns (or "no reliable pattern detected")
@@ -113,4 +112,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-05-11 after initialization*
+*Last updated: 2026-05-13 after Phase 2 (oauth-token-store-single-flight-refresh) completion*
