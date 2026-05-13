@@ -36,18 +36,14 @@
 // stderr is NEVER asserted clean of all output — Pino logs land there by
 // design (ADR-0001). The FORBIDDEN regex asserts no TOKEN MATERIAL leaks.
 
-import { spawn, type ChildProcess, type ChildProcessWithoutNullStreams, fork } from 'node:child_process';
+import { spawn, type ChildProcessWithoutNullStreams, fork } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import { mkdtemp, readFile, rm, stat, writeFile } from 'node:fs/promises';
 import { createServer, type Server, type IncomingMessage, type ServerResponse } from 'node:http';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { promisify } from 'node:util';
-import { exec } from 'node:child_process';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, test } from 'vitest';
-
-const execAsync = promisify(exec);
 
 // Forbidden token-material patterns. Matches:
 //   - `Bearer <something>` with 10+ chars of the value
@@ -359,22 +355,25 @@ describe('auth concurrency (cross-process AUTH-05 + AUTH-06)', () => {
   let tmpDir: string;
 
   beforeAll(async () => {
-    // Build-dependency precondition (checker WARNING PLAN-08-BUILD-DEP).
-    // Run `npm run build` so dist/ reflects the current src tree, then
-    // assert the explicit token-store entry was emitted. If missing, the
-    // failure message points at tsup.config.ts.
-    await execAsync('npm run build', { cwd: REPO_ROOT });
-    if (!existsSync(BUILD_OUTPUT_PATH)) {
+    // Build-dependency precondition (WR-08): CI runs `npm run build` BEFORE
+    // `npm run test` (.github/workflows/ci.yml). Previously this beforeAll
+    // ran the build itself, which (a) raced any concurrent test file that
+    // also depends on dist/ — Vitest's pool: 'forks' parallelizes across
+    // files — and (b) forced a 5-10s full rebuild on every save under
+    // `vitest watch`, eating the 30s test budget. The build now happens
+    // exactly once in CI before the test process starts; a developer who
+    // runs this test file standalone without building gets a fast-fail
+    // pointer to the npm script.
+    if (!existsSync(BUILD_OUTPUT_PATH) || !existsSync(DIST_MCP)) {
       throw new Error(
         [
-          `tsup.config.ts must emit ${BUILD_OUTPUT_PATH} as a top-level entry.`,
-          'Add `src/infrastructure/whoop/token-store.ts` to the entry map.',
-          'See checker WARNING PLAN-08-BUILD-DEP in 02-08-...-PLAN.md.',
+          `dist artifacts missing — run \`npm run build\` before this test.`,
+          `Expected: ${BUILD_OUTPUT_PATH} AND ${DIST_MCP}.`,
+          'If the build succeeds but `BUILD_OUTPUT_PATH` is missing, check',
+          'tsup.config.ts emits src/infrastructure/whoop/token-store.ts as a',
+          'top-level entry (checker WARNING PLAN-08-BUILD-DEP in 02-08 PLAN).',
         ].join(' '),
       );
-    }
-    if (!existsSync(DIST_MCP)) {
-      throw new Error(`${DIST_MCP} missing after build`);
     }
 
     mock = await startMockServer();
