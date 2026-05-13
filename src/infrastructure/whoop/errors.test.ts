@@ -6,6 +6,7 @@
 // Wave 2 plans (02-02 token-store + 02-03 oauth).
 
 import { describe, expect, test } from 'vitest';
+import { sanitize, serializeError } from '../../mcp/sanitize.js';
 import { AuthError, type AuthErrorKind, formatAuthError } from './errors.js';
 
 describe('AuthError', () => {
@@ -32,6 +33,27 @@ describe('AuthError', () => {
     const err = new AuthError({ kind: 'refresh_failed', cause: inner });
     const serialized = JSON.stringify(err);
     expect(serialized).not.toContain('secret-token-leak');
+  });
+
+  test('Test 9b (WR-10): the load-bearing defense is the sanitizer pipeline, not Error.toJSON defaults', () => {
+    // WR-10: Test 9 pins a "fragile by design" property — Error.toJSON
+    // returning {} by default. A future ES change, polyfill, or framework
+    // (e.g., a pino transport) that adds toJSON would silently invalidate it.
+    // The real defense is the serializeError + sanitize pipeline that
+    // register.ts runs every tool result through. This test pins the
+    // pipeline directly: serializeError DOES emit cause.message (the walker
+    // reads it; that's the whole point), AND `sanitize()` then redacts any
+    // token-bearing shape inside that message. The layered defense is what
+    // matters; defaults are a distant secondary.
+    const inner = new Error('Authorization: Bearer abc123.def456.ghi789xyzlong');
+    const err = new AuthError({ kind: 'refresh_failed', cause: inner });
+    const serialized = serializeError(err);
+    // The walker exposes the cause message — that is the contract.
+    expect(serialized).toContain('Authorization');
+    // sanitize then redacts the secret-bearing portion.
+    const sanitized = sanitize(serialized);
+    expect(sanitized).toContain('<redacted>');
+    expect(sanitized).not.toContain('abc123.def456.ghi789xyzlong');
   });
 
   test('Test 10: auth_port_in_use kind is constructible (moved from Plan 02-03)', () => {
