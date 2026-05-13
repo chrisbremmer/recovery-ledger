@@ -161,7 +161,20 @@ const TokenResponseSchema = z
 
 export function buildAuthorizeUrl(input: BuildAuthorizeUrlInput): string {
   if (!CLIENT_ID_SHAPE.test(input.clientId)) {
-    throw new AuthError({ kind: 'refresh_failed', detail: 'invalid clientId shape' });
+    // WR-B: kind is `auth_missing` (not `refresh_failed`) — a malformed
+    // clientId in config is fixed by re-running `recovery-ledger init`,
+    // not by re-authorizing tokens that do not exist yet. This check is
+    // also a defense-in-depth duplicate of the canonical ConfigSchema
+    // validation in init.ts; when it fires the schema has already let a
+    // bad value through (config edited by hand, or schema weakened). The
+    // remediation that points the user at `init` is the correct one.
+    // (The FROZEN AuthErrorKind union has no `config_invalid` kind;
+    // adding one would require updating formatAuthError, AUTH_EXIT_CODES,
+    // and the --help block per MR-21 — out of scope for this fix.)
+    throw new AuthError({
+      kind: 'auth_missing',
+      detail: 'invalid clientId in config; re-run recovery-ledger init',
+    });
   }
   const params = new URLSearchParams({
     response_type: 'code',

@@ -89,6 +89,29 @@ describe('buildAuthorizeUrl', () => {
       }),
     ).toThrow(AuthError);
   });
+
+  test('U-06 (WR-B regression): invalid clientId throws AuthError{kind: auth_missing}, NOT refresh_failed', () => {
+    // WR-B: a malformed clientId is a config problem fixed by `recovery-ledger
+    // init`, not by re-authorizing. Pin the kind so a future refactor that
+    // re-introduces `refresh_failed` here (which would surface the wrong
+    // remediation "Token refresh failed — run `recovery-ledger auth`") fails
+    // this test. The user at this point has NO tokens yet — `auth` would
+    // re-enter the same broken path.
+    let thrown: unknown;
+    try {
+      buildAuthorizeUrl({
+        clientId: 'cid&injected=evil',
+        redirectUri: 'http://127.0.0.1:4321/callback',
+        scopes: ['offline'],
+        state: 'st',
+      });
+    } catch (err) {
+      thrown = err;
+    }
+    expect(thrown).toBeInstanceOf(AuthError);
+    expect((thrown as AuthError).kind).toBe('auth_missing');
+    expect((thrown as AuthError).detail).toMatch(/init/);
+  });
 });
 
 // ---------------------------------------------------------------------------
