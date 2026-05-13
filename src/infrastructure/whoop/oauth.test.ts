@@ -688,6 +688,47 @@ describe('runOAuth', () => {
       stderrSpy.mockRestore();
     }
   });
+
+  test('R-04 (WR-07 regression): redirect_uri embeds info.port (OS-assigned), NOT opts.redirectPort', async () => {
+    // WR-07: runOAuth builds the redirect_uri from the loopback server's
+    // ACTUAL port (info.port from onListening), not from opts.redirectPort.
+    // This is correct under port-0 — the OS assigns a port — but the test
+    // suite previously did not pin the contract. A regression that builds
+    // redirect_uri from opts.redirectPort would render `http://127.0.0.1:0/
+    // callback`, which would fail under live WHOOP with redirect_uri_mismatch
+    // and pass the mock-based tests silently.
+    let capturedUrl: string | null = null;
+    let info: ListeningInfo | undefined;
+    const oauthPromise = runOAuth({
+      clientId: 'cid',
+      clientSecret: 'secret',
+      redirectPort: 0,
+      scopes: ['offline'],
+      openBrowser: async (url) => {
+        capturedUrl = url;
+      },
+      onListening: (i) => {
+        info = i;
+      },
+    });
+    const ready = await waitFor(() => info);
+    const url = await waitFor(() => capturedUrl ?? undefined);
+    const parsed = new URL(url);
+    const redirectUri = parsed.searchParams.get('redirect_uri');
+    expect(redirectUri).not.toBeNull();
+    // The redirect_uri must reference info.port (a real OS-assigned port —
+    // > 1024 in practice), NOT opts.redirectPort (which is 0). If the bug
+    // regressed, this test would render `:0/callback`.
+    expect(redirectUri).toBe(`http://127.0.0.1:${ready.port}/callback`);
+    expect(redirectUri).not.toContain(':0/callback');
+    expect(ready.port).toBeGreaterThan(0);
+
+    // Clean up: drive the callback so the listenForCallback promise resolves
+    // and the server closes.
+    const state = parsed.searchParams.get('state');
+    await fetch(`http://127.0.0.1:${ready.port}/callback?code=xyz&state=${state}`);
+    await oauthPromise;
+  });
 });
 
 // Quieter test: ensure listenForCallback is invoked many times without leaking
