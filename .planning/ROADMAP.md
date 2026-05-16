@@ -8,8 +8,8 @@
 ## Phases
 
 - [x] **Phase 1: Foundation & Stdout-Pure MCP Bootstrap** - Bootstrapped TypeScript repo, empty CLI + MCP stdio shells, stderr-only logging, MCP error-sanitizer contract, native-module load verification
-- [ ] **Phase 2: OAuth, Token Store & Single-Flight Refresh** - WHOOP OAuth flow, keychain-backed token store with chmod 600 fallback, in-process + cross-process single-flight refresh, MCP error sanitizer wired through
-- [ ] **Phase 3: Data Model, DB Layer & Sync Loop** - Three-layer types with discriminated-union Score, Drizzle schema + atomic migrator with pre-migration backup, WHOOP HTTP client with rate limiting + pagination, idempotent sync with DST/tz flagging and partial-failure reporting
+- [x] **Phase 2: OAuth, Token Store & Single-Flight Refresh** - WHOOP OAuth flow, keychain-backed token store with chmod 600 fallback, in-process + cross-process single-flight refresh, MCP error sanitizer wired through
+- [x] **Phase 3: Data Model, DB Layer & Sync Loop** - Three-layer types with discriminated-union Score, Drizzle schema + atomic migrator with pre-migration backup, WHOOP HTTP client with rate limiting + pagination, idempotent sync with DST/tz flagging and partial-failure reporting
 - [ ] **Phase 4: Domain Math, Reviews, Decision Ledger & MCP Surface** - Median+MAD baselines, confidence-tier gating, FDR-corrected weekly patterns, daily + weekly reviews, decision ledger, 8 MCP tools + 6 resources + 4 prompts, banned-word tone lint
 - [ ] **Phase 5: Doctor Polish, Install Guide & <20-Minute Setup Validation** - Full doctor checks, per-client install guides, API-gap docs, launchd template, CI stopwatch test asserting clean-clone-to-first-review under 20 minutes
 
@@ -77,7 +77,7 @@
 - [x] 03-10-contract-tests-PLAN.md — 6 fixture-based contract tests anchoring Pitfall G + Pitfall H + idempotency per resource (SYNC-07 / DATA-05 / DATA-06)
 - [x] 03-11-sync-orchestration-PLAN.md — runSync orchestrator + bootstrap composition root + idempotency/partial-failure/DST integration tests (SYNC-01..06 / DATA-01 / DATA-04 / DATA-06)
 - [x] 03-12-cli-sync-formatter-PLAN.md — Commander `recovery-ledger sync` shim + formatter; D-33 + D-34 attestation preserved (SYNC-01 / SYNC-05)
-- [ ] 03-13-phase-close-PLAN.md — full-suite green + 7 grep gates + attestation matrix + STATE/REQUIREMENTS/ROADMAP/VALIDATION updates (all 13 REQ-IDs)
+- [x] 03-13-phase-close-PLAN.md — full-suite green + 7 grep gates + attestation matrix + STATE/REQUIREMENTS/ROADMAP/VALIDATION updates (all 13 REQ-IDs) — completed 2026-05-16
 **UI hint**: no
 
 ### Phase 4: Domain Math, Reviews, Decision Ledger & MCP Surface
@@ -110,8 +110,8 @@
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Foundation & Stdout-Pure MCP Bootstrap | 6/6 | Complete | 2026-05-12 |
-| 2. OAuth, Token Store & Single-Flight Refresh | 6/8 | In Progress|  |
-| 3. Data Model, DB Layer & Sync Loop | 12/13 | In Progress|  |
+| 2. OAuth, Token Store & Single-Flight Refresh | 8/8 | Complete | 2026-05-12 |
+| 3. Data Model, DB Layer & Sync Loop | 13/13 | Complete | 2026-05-16 |
 | 4. Domain Math, Reviews, Decision Ledger & MCP Surface | 0/? | Not started | - |
 | 5. Doctor Polish, Install Guide & <20-Minute Setup Validation | 0/? | Not started | - |
 
@@ -138,4 +138,4 @@ Concerns originate in the phase where the first vulnerable code is introduced; t
 
 ---
 *Roadmap created: 2026-05-11*
-*Last updated: 2026-05-12 — Plan 02-01 complete (Wave-0 infra: paths.ts + schema.ts + 6-kind AuthError union + MSW helper + OAuth fixtures + 4 npm deps). 7 / 14 plans complete (50%).*
+*Last updated: 2026-05-16 — Phase 3 (data-model-db-layer-sync-loop) complete. 27 / 27 plans complete across Phases 1 + 2 + 3 (formula-based; Phase 4 plan count TBD).*

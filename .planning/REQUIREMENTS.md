@@ -138,19 +138,19 @@ Explicitly excluded. Gated behind the hard scope guardrail in PROJECT.md (≥ 12
 | AUTH-04 | Phase 2 | Complete |
 | AUTH-05 | Phase 2 | Complete |
 | AUTH-06 | Phase 2 | Complete |
-| DATA-01 | Phase 3 | Complete |
-| DATA-02 | Phase 3 | Complete |
-| DATA-03 | Phase 3 | Complete |
-| DATA-04 | Phase 3 | Complete |
-| DATA-05 | Phase 3 | Complete |
-| DATA-06 | Phase 3 | Complete |
-| SYNC-01 | Phase 3 | Complete |
-| SYNC-02 | Phase 3 | Complete |
-| SYNC-03 | Phase 3 | Complete |
-| SYNC-04 | Phase 3 | Complete |
-| SYNC-05 | Phase 3 | Complete |
-| SYNC-06 | Phase 3 | Complete |
-| SYNC-07 | Phase 3 | Complete |
+| DATA-01 | Phase 3 | Complete (Plan 03-05, 2026-05-16) |
+| DATA-02 | Phase 3 | Complete (Plan 03-02, 2026-05-16) |
+| DATA-03 | Phase 3 | Complete (Plan 03-02, 2026-05-16) |
+| DATA-04 | Phase 3 | Complete (Plan 03-05, 2026-05-16) |
+| DATA-05 | Phase 3 | Complete (Plan 03-03, 2026-05-16) |
+| DATA-06 | Phase 3 | Complete (Plan 03-09, 2026-05-16) |
+| SYNC-01 | Phase 3 | Complete (Plan 03-11, 2026-05-16) |
+| SYNC-02 | Phase 3 | Complete (Plan 03-06, 2026-05-16) |
+| SYNC-03 | Phase 3 | Complete (Plan 03-06, 2026-05-16) |
+| SYNC-04 | Phase 3 | Complete (Plan 03-04, 2026-05-16) |
+| SYNC-05 | Phase 3 | Complete (Plan 03-08, 2026-05-16) |
+| SYNC-06 | Phase 3 | Complete (Plan 03-05, 2026-05-16) |
+| SYNC-07 | Phase 3 | Complete (Plan 03-07, 2026-05-16) |
 | REV-01 | Phase 4 | Pending |
 | REV-02 | Phase 4 | Pending |
 | REV-03 | Phase 4 | Pending |
@@ -180,8 +180,8 @@ Explicitly excluded. Gated behind the hard scope guardrail in PROJECT.md (≥ 12
 - v1 requirements: 49 total
 - Mapped to phases: 49
 - Unmapped: 0 ✓
-- Complete: 2 / 49 (FND-01, FND-04)
+- Complete: 26 / 49 (7 FND + 6 AUTH + 13 DATA/SYNC; Phases 1 + 2 + 3 closed)
 
 ---
 *Requirements defined: 2026-05-11*
-*Last updated: 2026-05-12 — FND-04 complete via Plan 01-02 (unit half); 2 / 49 requirements done*
+*Last updated: 2026-05-16 — Phase 3 closed (13 REQ-IDs flipped to Complete: DATA-01..06 + SYNC-01..07); 26 / 49 requirements done*
