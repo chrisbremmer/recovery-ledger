@@ -1,0 +1,154 @@
+// Sync-runs repository unit tests — locks the D-24 lifecycle contract.
+// Each test starts from a fresh in-memory DB.
+
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { createInMemoryDb, type InMemoryDbResult } from '../../../../tests/helpers/in-memory-db.js';
+import type { ResourceSyncOutcome } from '../../../domain/types/sync.js';
+import { createSyncRunsRepo } from './sync-runs.repo.js';
+
+const STARTED_AT_BASE = '2026-05-16T12:00:00.000Z';
+const FINISHED_AT_BASE = '2026-05-16T12:05:00.000Z';
+
+describe('sync-runs repo — insertRunning() lifecycle entry', () => {
+  let mem: InMemoryDbResult;
+
+  beforeEach(() => {
+    mem = createInMemoryDb();
+  });
+  afterEach(() => mem.close());
+
+  it('Test 1: returns a numeric id; subsequent inserts return strictly increasing ids', () => {
+    const repo = createSyncRunsRepo(mem.db);
+    const id1 = repo.insertRunning({ startedAt: STARTED_AT_BASE, flags: null });
+    const id2 = repo.insertRunning({
+      startedAt: '2026-05-16T12:01:00.000Z',
+      flags: '{"days":30}',
+    });
+    expect(typeof id1).toBe('number');
+    expect(typeof id2).toBe('number');
+    expect(id2).toBeGreaterThan(id1);
+  });
+
+  it("Test 2: inserts with status='running', per_resource='{}', gaps_detected=0", () => {
+    const repo = createSyncRunsRepo(mem.db);
+    const id = repo.insertRunning({ startedAt: STARTED_AT_BASE, flags: null });
+    const row = mem.sqlite
+      .prepare('SELECT status, per_resource, gaps_detected, started_at FROM sync_runs WHERE id = ?')
+      .get(id) as {
+      status: string;
+      per_resource: string;
+      gaps_detected: number;
+      started_at: string;
+    };
+    expect(row.status).toBe('running');
+    expect(row.per_resource).toBe('{}');
+    expect(row.gaps_detected).toBe(0);
+    expect(row.started_at).toBe(STARTED_AT_BASE);
+  });
+});
+
+describe('sync-runs repo — updatePerResource() JSON merge', () => {
+  let mem: InMemoryDbResult;
+
+  beforeEach(() => {
+    mem = createInMemoryDb();
+  });
+  afterEach(() => mem.close());
+
+  it('Test 3: merges a per-resource outcome into the JSON blob', () => {
+    const repo = createSyncRunsRepo(mem.db);
+    const id = repo.insertRunning({ startedAt: STARTED_AT_BASE, flags: null });
+    const outcome: ResourceSyncOutcome = {
+      status: 'success',
+      fetched: 42,
+      upserted: 42,
+      errors: 0,
+      durationMs: 1200,
+    };
+    repo.updatePerResource(id, 'cycles', outcome);
+    const row = mem.sqlite.prepare('SELECT per_resource FROM sync_runs WHERE id = ?').get(id) as {
+      per_resource: string;
+    };
+    const parsed = JSON.parse(row.per_resource);
+    expect(parsed.cycles).toEqual(outcome);
+  });
+
+  it('Test 4: second updatePerResource preserves the first entry (merge, not overwrite)', () => {
+    const repo = createSyncRunsRepo(mem.db);
+    const id = repo.insertRunning({ startedAt: STARTED_AT_BASE, flags: null });
+    repo.updatePerResource(id, 'cycles', { status: 'success', fetched: 10, upserted: 10 });
+    repo.updatePerResource(id, 'workouts', { status: 'partial_429', fetched: 5, upserted: 3 });
+    const row = mem.sqlite.prepare('SELECT per_resource FROM sync_runs WHERE id = ?').get(id) as {
+      per_resource: string;
+    };
+    const parsed = JSON.parse(row.per_resource);
+    expect(parsed.cycles).toEqual({ status: 'success', fetched: 10, upserted: 10 });
+    expect(parsed.workouts).toEqual({ status: 'partial_429', fetched: 5, upserted: 3 });
+  });
+});
+
+describe('sync-runs repo — finalize() terminal state', () => {
+  let mem: InMemoryDbResult;
+
+  beforeEach(() => {
+    mem = createInMemoryDb();
+  });
+  afterEach(() => mem.close());
+
+  it('Test 5: finalize sets status, gaps_detected, finished_at', () => {
+    const repo = createSyncRunsRepo(mem.db);
+    const id = repo.insertRunning({ startedAt: STARTED_AT_BASE, flags: null });
+    repo.finalize(id, 'ok', 0, FINISHED_AT_BASE);
+    const row = mem.sqlite
+      .prepare('SELECT status, finished_at, gaps_detected FROM sync_runs WHERE id = ?')
+      .get(id) as { status: string; finished_at: string; gaps_detected: number };
+    expect(row.status).toBe('ok');
+    expect(row.finished_at).toBe(FINISHED_AT_BASE);
+    expect(row.gaps_detected).toBe(0);
+  });
+});
+
+describe('sync-runs repo — listRecent() ordering + entity mapping', () => {
+  let mem: InMemoryDbResult;
+
+  beforeEach(() => {
+    mem = createInMemoryDb();
+  });
+  afterEach(() => mem.close());
+
+  it('Test 6: returns rows ordered by started_at DESC', () => {
+    const repo = createSyncRunsRepo(mem.db);
+    repo.insertRunning({ startedAt: '2026-05-14T12:00:00.000Z', flags: null });
+    repo.insertRunning({ startedAt: '2026-05-16T12:00:00.000Z', flags: null });
+    repo.insertRunning({ startedAt: '2026-05-15T12:00:00.000Z', flags: null });
+    const rows = repo.listRecent(5);
+    expect(rows.map((r) => r.startedAt)).toEqual([
+      '2026-05-16T12:00:00.000Z',
+      '2026-05-15T12:00:00.000Z',
+      '2026-05-14T12:00:00.000Z',
+    ]);
+  });
+
+  it('Test 7: parses per_resource back into the typed map shape', () => {
+    const repo = createSyncRunsRepo(mem.db);
+    const id = repo.insertRunning({ startedAt: STARTED_AT_BASE, flags: '{"days":30}' });
+    repo.updatePerResource(id, 'cycles', { status: 'success', fetched: 7, upserted: 7 });
+    repo.updatePerResource(id, 'sleeps', { status: 'skipped' });
+    repo.finalize(id, 'ok', 0, FINISHED_AT_BASE);
+    const [run] = repo.listRecent(1);
+    expect(run).toBeDefined();
+    if (!run) throw new Error('expected at least one run');
+    expect(run.id).toBe(id);
+    expect(run.status).toBe('ok');
+    expect(run.gapsDetected).toBe(0);
+    expect(run.startedAt).toBe(STARTED_AT_BASE);
+    expect(run.finishedAt).toBe(FINISHED_AT_BASE);
+    expect(run.flags).toBe('{"days":30}');
+    expect(run.perResource.cycles).toEqual({
+      status: 'success',
+      fetched: 7,
+      upserted: 7,
+    });
+    expect(run.perResource.sleeps).toEqual({ status: 'skipped' });
+  });
+});
