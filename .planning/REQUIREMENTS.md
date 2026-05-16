@@ -29,11 +29,11 @@ Requirements for the initial release. Each maps to roadmap phases.
 ### Data Model & DB
 
 - [x] **DATA-01**: SQLite database opens in WAL mode with `busy_timeout=5000`, `journal_size_limit=64MB`, `wal_autocheckpoint=1000` pragmas at default `~/.recovery-ledger/recovery-ledger.sqlite`
-- [ ] **DATA-02**: Drizzle schema for `oauth_tokens`, `sync_runs`, `cycles`, `recoveries`, `sleeps`, `workouts`, `daily_summaries`, `decisions` with hybrid normalized columns + `raw_json` per entity
-- [ ] **DATA-03**: Index on `(score_state, start)` on each scored entity to support the SCORED-only baseline queries
+- [x] **DATA-02**: Drizzle schema for `oauth_tokens`, `sync_runs`, `cycles`, `recoveries`, `sleeps`, `workouts`, `daily_summaries`, `decisions` with hybrid normalized columns + `raw_json` per entity
+- [x] **DATA-03**: Index on `(score_state, start)` on each scored entity to support the SCORED-only baseline queries
 - [x] **DATA-04**: Drizzle migrator runs at every connection inside `BEGIN IMMEDIATE`, takes a pre-migration backup of `.sqlite`/`-wal`/`-shm`, and fails closed on partial migration
-- [ ] **DATA-05**: Three-layer types — raw WHOOP responses (Zod), normalized entities (Drizzle), and view types for review outputs — with `Score = discriminatedUnion('score_state', …)` enforcing `SCORED` discipline in domain code
-- [ ] **DATA-06**: DST / time-zone-shift detection during sync flags affected cycles for baseline exclusion while keeping them visible in raw views
+- [x] **DATA-05**: Three-layer types — raw WHOOP responses (Zod), normalized entities (Drizzle), and view types for review outputs — with `Score = discriminatedUnion('score_state', …)` enforcing `SCORED` discipline in domain code
+- [x] **DATA-06**: DST / time-zone-shift detection during sync flags affected cycles for baseline exclusion while keeping them visible in raw views
 
 ### Sync
 
@@ -139,11 +139,11 @@ Explicitly excluded. Gated behind the hard scope guardrail in PROJECT.md (≥ 12
 | AUTH-05 | Phase 2 | Complete |
 | AUTH-06 | Phase 2 | Complete |
 | DATA-01 | Phase 3 | Complete |
-| DATA-02 | Phase 3 | Pending |
-| DATA-03 | Phase 3 | Pending |
+| DATA-02 | Phase 3 | Complete |
+| DATA-03 | Phase 3 | Complete |
 | DATA-04 | Phase 3 | Complete |
-| DATA-05 | Phase 3 | Pending |
-| DATA-06 | Phase 3 | Pending |
+| DATA-05 | Phase 3 | Complete |
+| DATA-06 | Phase 3 | Complete |
 | SYNC-01 | Phase 3 | Pending |
 | SYNC-02 | Phase 3 | Complete |
 | SYNC-03 | Phase 3 | Pending |

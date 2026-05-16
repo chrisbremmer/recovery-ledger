@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-current_plan: 2
+current_plan: 3
 status: executing
-last_updated: "2026-05-16T19:07:47.334Z"
+last_updated: "2026-05-16T19:18:59.227Z"
 progress:
   total_phases: 5
   completed_phases: 2
   total_plans: 27
-  completed_plans: 15
-  percent: 56
+  completed_plans: 16
+  percent: 59
 ---
 
 # State: Recovery Ledger
@@ -26,16 +26,16 @@ progress:
 
 ## Current Position
 
-**Current Plan:** 2
+**Current Plan:** 3
 **Total Plans in Phase:** 13
 Phase: 3 (data-model-db-layer-sync-loop) — EXECUTING
-Plan: 2 of 13
+Plan: 3 of 13
 
 - **Milestone:** v1
 - **Phase:** 3
 - **Plan:** 03-CONTEXT.md — 34 implementation decisions (D-01 through D-34) locked across schema scope, migration crash-recovery, `updated_at` delta + 7-day re-window, DST/tz-shift exclusion, WHOOP client structure, sync orchestration, SQLite pragmas + WAL hygiene, repository pattern, and MCP attestation carry-forward. Next step: `/gsd-plan-phase 3` (or research-deepen first per D-12 + page-size pins research items).
 - **Status:** Ready to execute
-- **Progress:** [██████░░░░] 56%
+- **Progress:** [██████░░░░] 59%
 
 ```
 [████████░░░░░░░░░░░░] 2 / 5 phases complete (6 / 6 in Phase 1; 8 / 8 in Phase 2)
@@ -59,6 +59,7 @@ Plan: 2 of 13
 | Phase 02-oauth-token-store-single-flight-refresh P06 | 6m 1s | - tasks | - files |
 | Phase 02-oauth-token-store-single-flight-refresh P08 | 4m 54s | 2 tasks | 5 files |
 | Phase 03 P01 | 5m | 3 tasks | 9 files |
+| Phase 03 P02 | 4m | 2 tasks | 5 files |
 
 ### Plan Execution History
 
@@ -163,6 +164,10 @@ Plan: 2 of 13
 - [Phase ?]: [Phase 03] Plan 03-01 decision: package.json caret ranges normalized to plan must_haves verbatim (^12.9.0, ^7, ^1) after npm install — lockfile pins resolved patches; keeps grep-acceptance criteria portable
 - [Phase ?]: [Phase 03] Plan 03-01 decision: top-of-file summary block in ci-grep-gates.sh mirrors Gates A-E precedent (count=2 per gate, not the planner's 1) — established convention beats planner-template drift; Rule 1 plan-text correction precedent
 - [Phase ?]: [Phase 03] Plan 03-01 deviation: doc-comment phrasing in errors.ts avoids literal 'console.*' / 'process.stdout.write' / 'oauth/oauth2/token' to dodge plan-grep collisions (4th-time precedent: Plans 02-01, 02-02, 02-04, 02-06); learnings.md entry deferred
+- [Phase ?]: [Phase 03] Plan 03-02 decision: schema.ts uses Drizzle 0.45.x array-return callback form (t) => [...] instead of the plan-quoted deprecated object-return form — drizzle-orm@0.45.2 marks the object form @deprecated in TS types; identical SQL emitted
+- [Phase ?]: [Phase 03] Plan 03-02 decision: recoveries covering index on (score_state, created_at) not start — recoveries has no start field on the wire; index name retained as recoveries_score_state_start_idx
+- [Phase ?]: [Phase 03] Plan 03-02 decision: drizzle-kit@0.31.10 --name initial honors the name deterministically — no rename/journal-tag fix-up needed
+- [Phase ?]: [Phase 03] Plan 03-02 decision: schema introspection tests use getTableConfig() live runtime types (notNull/dataType/enumValues/indexes) — strictly stronger than source-grep fallback
 
 ### Open Todos
 

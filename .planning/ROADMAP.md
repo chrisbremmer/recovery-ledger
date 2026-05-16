@@ -66,7 +66,7 @@
   5. A partial-failure sync (e.g., workouts 429s but cycles succeed) records per-resource success/fail/skipped counts in a `sync_runs` row, exits with `status: 'partial'`, and runs `wal_checkpoint(TRUNCATE)` after every successful run; the fixture-based contract test suite covers every WHOOP resource with zero live API calls and finishes in under 60 seconds.
 **Plans**: 13 plans
 - [x] 03-01-wave0-infra-PLAN.md — Wave-0 precondition: 5 npm deps + drizzle.config.ts + paths.ts extension + WhoopApiError union + Gate F + Gate G
-- [ ] 03-02-schema-PLAN.md — Drizzle schema for 9 tables + drizzle-kit generate + introspection tests (DATA-02 / DATA-03 / DATA-05 / DATA-06)
+- [x] 03-02-schema-PLAN.md — Drizzle schema for 9 tables + drizzle-kit generate + introspection tests (DATA-02 / DATA-03 / DATA-05 / DATA-06)
 - [ ] 03-03-domain-types-PLAN.md — ScoreState + entity types + raw Zod schemas + page wrappers + DU forcing-function tests (DATA-05 / DATA-06)
 - [ ] 03-04-sync-types-cursor-PLAN.md — RunSyncInput/Result/Outcome + RESOURCES tuple + computeWindow pure function (SYNC-01 / SYNC-04)
 - [ ] 03-05-db-connection-migrator-PLAN.md — openDb + hand-rolled BEGIN IMMEDIATE migrator + pre-migration backup + migration-crash + pragma-roundtrip integration tests (DATA-01 / DATA-04 / SYNC-06)
@@ -111,7 +111,7 @@
 |-------|----------------|--------|-----------|
 | 1. Foundation & Stdout-Pure MCP Bootstrap | 6/6 | Complete | 2026-05-12 |
 | 2. OAuth, Token Store & Single-Flight Refresh | 6/8 | In Progress|  |
-| 3. Data Model, DB Layer & Sync Loop | 1/13 | In Progress|  |
+| 3. Data Model, DB Layer & Sync Loop | 2/13 | In Progress|  |
 | 4. Domain Math, Reviews, Decision Ledger & MCP Surface | 0/? | Not started | - |
 | 5. Doctor Polish, Install Guide & <20-Minute Setup Validation | 0/? | Not started | - |
 
