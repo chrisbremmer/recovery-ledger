@@ -64,7 +64,20 @@
   3. Cycles whose `start`/`end` straddle a DST transition or differ in `timezone_offset` from the adjacent cycle are flagged as excluded from baseline aggregation while remaining visible in raw views.
   4. The Drizzle migrator runs inside `BEGIN IMMEDIATE`, takes a pre-migration backup of `.sqlite`/`-wal`/`-shm`, and a crash-mid-migration test (process killed between statements) is recoverable from the auto-backup; the `__drizzle_migrations` table matches the on-disk schema.
   5. A partial-failure sync (e.g., workouts 429s but cycles succeed) records per-resource success/fail/skipped counts in a `sync_runs` row, exits with `status: 'partial'`, and runs `wal_checkpoint(TRUNCATE)` after every successful run; the fixture-based contract test suite covers every WHOOP resource with zero live API calls and finishes in under 60 seconds.
-**Plans**: TBD
+**Plans**: 13 plans
+- [ ] 03-01-wave0-infra-PLAN.md — Wave-0 precondition: 5 npm deps + drizzle.config.ts + paths.ts extension + WhoopApiError union + Gate F + Gate G
+- [ ] 03-02-schema-PLAN.md — Drizzle schema for 9 tables + drizzle-kit generate + introspection tests (DATA-02 / DATA-03 / DATA-05 / DATA-06)
+- [ ] 03-03-domain-types-PLAN.md — ScoreState + entity types + raw Zod schemas + page wrappers + DU forcing-function tests (DATA-05 / DATA-06)
+- [ ] 03-04-sync-types-cursor-PLAN.md — RunSyncInput/Result/Outcome + RESOURCES tuple + computeWindow pure function (SYNC-01 / SYNC-04)
+- [ ] 03-05-db-connection-migrator-PLAN.md — openDb + hand-rolled BEGIN IMMEDIATE migrator + pre-migration backup + migration-crash + pragma-roundtrip integration tests (DATA-01 / DATA-04 / SYNC-06)
+- [ ] 03-06-whoop-client-PLAN.md — httpGet chokepoint + paginateAll + rate-limit semaphore-of-4 + 429-Reset-honoring retry (SYNC-02 / SYNC-03)
+- [ ] 03-07-msw-fixtures-PLAN.md — 6 MSW helpers + 15+ fixtures including DST/tz set + in-memory-db helper (SYNC-07 / DATA-06)
+- [ ] 03-08-repositories-PLAN.md — 9 repositories with SCORED-only default filter + ON CONFLICT idempotency + sync_runs lifecycle + body-measurements append-on-change (DATA-02 / DATA-03 / DATA-05 / DATA-06 / SYNC-04 / SYNC-05)
+- [ ] 03-09-resources-normalizers-dst-PLAN.md — 6 per-resource modules + 6 normalizers + DST/tz detector with two OR-ed rules (SYNC-01 / SYNC-02 / SYNC-04 / DATA-05 / DATA-06)
+- [ ] 03-10-contract-tests-PLAN.md — 6 fixture-based contract tests anchoring Pitfall G + Pitfall H + idempotency per resource (SYNC-07 / DATA-05 / DATA-06)
+- [ ] 03-11-sync-orchestration-PLAN.md — runSync orchestrator + bootstrap composition root + idempotency/partial-failure/DST integration tests (SYNC-01..06 / DATA-01 / DATA-04 / DATA-06)
+- [ ] 03-12-cli-sync-formatter-PLAN.md — Commander `recovery-ledger sync` shim + formatter; D-33 + D-34 attestation preserved (SYNC-01 / SYNC-05)
+- [ ] 03-13-phase-close-PLAN.md — full-suite green + 7 grep gates + attestation matrix + STATE/REQUIREMENTS/ROADMAP/VALIDATION updates (all 13 REQ-IDs)
 **UI hint**: no
 
 ### Phase 4: Domain Math, Reviews, Decision Ledger & MCP Surface
