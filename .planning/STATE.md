@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-current_plan: 6
+current_plan: 7
 status: executing
-last_updated: "2026-05-16T20:42:15.756Z"
+last_updated: "2026-05-16T21:27:50.414Z"
 progress:
   total_phases: 5
   completed_phases: 2
   total_plans: 27
-  completed_plans: 19
-  percent: 70
+  completed_plans: 20
+  percent: 74
 ---
 
 # State: Recovery Ledger
@@ -26,19 +26,19 @@ progress:
 
 ## Current Position
 
-**Current Plan:** 6
+**Current Plan:** 7
 **Total Plans in Phase:** 13
 Phase: 3 (data-model-db-layer-sync-loop) — EXECUTING
-Plan: 6 of 13
+Plan: 7 of 13
 
 - **Milestone:** v1
 - **Phase:** 3
-- **Plan:** Wave 2b complete (Plan 03-05 db-connection-migrator — openDb() six-pragma factory + canonical drizzle re-export + hand-rolled BEGIN IMMEDIATE migrator + MigrationError + pre-migration backup with chmod-600 + retention-3 + DATA-04 SIGKILL-mid-`db.exec()` integration test + SYNC-06 wal_checkpoint(TRUNCATE) integration test; 27 new assertions, 343 → 370). Next: Wave 3 (Plan 03-06 whoop-client — httpGet wrapping callWithAuth + pagination + rate-limit semaphore-of-4 + 429 X-RateLimit-Reset handling).
+- **Plan:** Wave 3a complete (Plan 03-06 whoop-client — `src/infrastructure/whoop/client.ts` `httpGet<T>(path, query, schema)` chokepoint wrapping `callWithAuth` EXACTLY ONCE per call (D-18 runtime attestation in C-10) + `WHOOP_API_BASE = 'https://api.prod.whoop.com'` pinned + GET-only (ADR-0007/D-21); `pagination.ts` `paginateAll<T>(fetchPage, keyFn?)` with optional compound-key seam for recoveries (Plan 03-09 contract locked here in P-08/P-09); `rate-limit.ts` module-level semaphore-of-4 + `X-RateLimit-Remaining<10` throttle with `_resetForTest` seam; `retry.ts` `withRetry<T>` 429 `X-RateLimit-Reset`-honoring + 5xx jittered exp backoff with `RATE_LIMIT_RESET_SLEEP_CAP_MS = 60_000` (A5) + retry budget = 1; `errors.ts` extended additively with `classifyHttpError({status, statusText?})` — `WhoopApiError` union stays FROZEN at 6 kinds; 36 new tests, 370 → 406; Gate F now satisfied with three real allowlisted fetch sites). Next: Wave 3b (Plan 03-07 msw-fixtures — 6 per-resource MSW helpers + 15+ fixtures + in-memory-db helper).
 - **Status:** Ready to execute
-- **Progress:** [███████░░░] 70%
+- **Progress:** [███████░░░] 74%
 
 ```
-[████████░░░░░░░░░░░░] 2 / 5 phases complete (6 / 6 in Phase 1; 8 / 8 in Phase 2; 5 / 13 in Phase 3)
+[████████░░░░░░░░░░░░] 2 / 5 phases complete (6 / 6 in Phase 1; 8 / 8 in Phase 2; 6 / 13 in Phase 3)
 ```
 
 ## Performance Metrics
@@ -63,6 +63,7 @@ Plan: 6 of 13
 | Phase 03 P04 | 4m 24s | 2 tasks | 3 files |
 | Phase 03 P03 | 3m | 2 tasks | 8 files |
 | Phase 03 P05 | 11m | 3 tasks | 8 files |
+| Phase 03 P06 | 8m | 2 tasks | 9 files |
 
 ### Plan Execution History
 
@@ -87,6 +88,7 @@ Plan: 6 of 13
 | 03-04-sync-types-cursor | 4m 24s | 2 | 3 | Complete (2026-05-16) — Wave 1a |
 | 03-03-domain-types | 3m | 2 | 7 | Complete (2026-05-16) — Wave 1b |
 | 03-05-db-connection-migrator | 11m | 3 | 8 | Complete (2026-05-16) — Wave 2b |
+| 03-06-whoop-client | 8m | 2 | 9 | Complete (2026-05-16) — Wave 3a |
 
 ## Accumulated Context
 
@@ -192,6 +194,11 @@ Plan: 6 of 13
 - [Phase ?]: [Phase 03] Plan 03-05 deviation: SQLite is permissive about column types (TYPE affinity, not strict types) — Rule 1 fix swapped INVALID_TYPE for XYZGARBAGE syntax error so sqlite.exec() actually throws SQLITE_ERROR
 - [Phase ?]: [Phase 03] Plan 03-05 deviation: Test 8 chmod assertion needed a real SQLite file seed — Rule 1 fix used two-phase Database seed/migrate flow (better-sqlite3 rejects synthetic byte strings on open)
 - [Phase ?]: [Phase 03] Plan 03-05 attestation: 370 / 370 tests across 28 files (+27 from this plan); all 7 CI grep gates green; sanitize.ts + register.ts byte-identical to origin/main; AuthError + WhoopApiError unions FROZEN at 6 kinds each; MigrationError is a sibling union in migrate.ts
+- [Phase ?]: [Phase 03] Plan 03-06 decision: httpGet wraps callWithAuth EXACTLY ONCE per call (D-18) — runtime attestation locked at client.test.ts C-10; Gate F satisfied with three real allowlisted fetch sites.
+- [Phase ?]: [Phase 03] Plan 03-06 decision: paginateAll signature includes optional keyFn — default String((row as {id?:unknown}).id) covers cycles/sleeps/workouts; recovery (Plan 03-09) passes (row) => row.cycle_id + ':' + row.sleep_id without mutating pagination.ts. P-08 + P-09 lock the contract.
+- [Phase ?]: [Phase 03] Plan 03-06 decision: RATE_LIMIT_RESET_SLEEP_CAP_MS = 60_000 (A5 defense-in-depth) clamps absurd X-RateLimit-Reset values. retry.test.ts Y-06 locks the cap at header value 999999.
+- [Phase ?]: [Phase 03] Plan 03-06 decision: retry budget = 1 (D-20); second 429 or 5xx returns the result and lets classifyHttpError surface the kind. DI seams on withRetry({sleep, jitter}) keep tests deterministic without real timers.
+- [Phase ?]: [Phase 03] Plan 03-06 decision: comments in client.ts avoid the literal 'fetch(' substring so plan-level grep -c "fetch(" client.ts === 1 (the actual call site only); 8th-occurrence doc-comment-vs-plan-grep precedent. agent_docs/learnings.md codification remains deferred.
 
 ### Open Todos
 
@@ -263,3 +270,5 @@ Phase 3 context is locked in `.planning/phases/03-data-model-db-layer-sync-loop/
 *Plan 03-02 complete: 2026-05-16 (4m, 5 files — schema.ts + introspection tests + drizzle-kit migration).*
 *Plan 03-04 complete: 2026-05-16 (4m 24s, 3 files — sync.ts + cursor.ts + cursor.test.ts) — Wave 1a.*
 *Plan 03-03 complete: 2026-05-16 (3m, 7 files — score.ts + entities.ts + 3 schemas + 2 tests; +35 tests; ADR-0003 DU forcing function locked) — Wave 1b.*
+*Plan 03-05 complete: 2026-05-16 (11m, 8 files — connection.ts + migrate.ts + tests + integration tests; +27 tests; DATA-04 + SYNC-06 anchors green; MigrationError sibling union; backup chmod-600 retention-3) — Wave 2b.*
+*Plan 03-06 complete: 2026-05-16 (8m, 9 files — client.ts + pagination.ts + rate-limit.ts + retry.ts + 4 test files + errors.ts additive classifyHttpError; +36 tests; D-18 runtime attestation locked; Gate F satisfied with three real allowlisted fetch sites; SYNC-02 + SYNC-03 marked complete) — Wave 3a.*
