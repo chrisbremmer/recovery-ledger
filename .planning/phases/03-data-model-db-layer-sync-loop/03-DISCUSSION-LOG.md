@@ -80,7 +80,7 @@
 | Option | Description | Selected |
 |--------|-------------|----------|
 | Computed at query time | No new schema column; recompute per query. | |
-| Flag column on cycles row (`baseline_excluded BOOLEAN` + reason) | Computed at upsert; cached. | ✓ |
+| Flag column on cycles row (`baseline_excluded INTEGER NOT NULL DEFAULT 0` + reason) | Computed at upsert; cached. | ✓ |
 
 **Notes:** Flag column is faster (no per-query DST recomputation), explainable (data-quality resource lists excluded days with reasons), and survives retroactive WHOOP updates (re-flag on upsert). Only `cycles` carries the flag; recovery/sleep/workouts inherit via `cycle_id`.
 

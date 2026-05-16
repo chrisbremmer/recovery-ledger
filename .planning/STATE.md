@@ -2,7 +2,7 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-current_plan: Not started
+current_plan: 0
 status: planning
 last_updated: "2026-05-16T01:21:59.778Z"
 progress:
@@ -10,7 +10,7 @@ progress:
   completed_phases: 2
   total_plans: 14
   completed_plans: 14
-  percent: 100
+  percent: 40
 ---
 
 # State: Recovery Ledger
