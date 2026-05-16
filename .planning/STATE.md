@@ -2,20 +2,20 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-current_plan: 3
+current_plan: 4
 status: executing
-last_updated: "2026-05-16T19:18:59.227Z"
+last_updated: "2026-05-16T19:25:18Z"
 progress:
   total_phases: 5
   completed_phases: 2
   total_plans: 27
-  completed_plans: 16
-  percent: 59
+  completed_plans: 17
+  percent: 63
 ---
 
 # State: Recovery Ledger
 
-**Last updated:** 2026-05-16 — gathered Phase 3 context via `/gsd-discuss-phase 3`. Four gray areas presented; user delegated all four to Claude's Discretion ("Discuss them all amongst yourself, come to me if there isn't a clear winner") matching the Phase 1 + Phase 2 pattern. Worked through each area and landed clear winners on 34 numbered decisions (D-01 through D-34) plus seven sub-decisions, no escalation. Schema scope: 8 tables (oauth_tokens stays in keyring/file per Phase 2 + ARCHITECTURE.md line 802, NOT a SQLite table). Migration crash-recovery: hand-rolled `BEGIN IMMEDIATE` wrapper in `src/infrastructure/db/migrate.ts` (NOT Drizzle's default `migrate()` because it uses `BEGIN DEFERRED` per Pitfall 13); pre-migration backup of `.sqlite`/`-wal`/`-shm` to `~/.recovery-ledger/backups/` keeping last 3 at `chmod 600`; fails-closed-on-partial-migration with structured `MigrationError({kind, backupPath, latestSafeMigration})` — no auto-restore (too dangerous for a personal tool whose decision ledger is irreplaceable). `updated_at` delta: per-resource cursor = `MAX(updated_at) FROM <resource_table>` (no separate cursor table); 7-day re-window in addition (interpretation B per ARCHITECTURE.md anti-pattern 15 + Pitfall 15); `since = min(cursor, now() - 7d)`. DST/tz-shift: two sub-rules OR'd (DST straddle via `@date-fns/tz` + tz_drift via prior cycle's `timezone_offset`); flag column `baseline_excluded INTEGER NOT NULL DEFAULT 0` + `exclusion_reason TEXT` on cycles row (recovery/sleep/workouts inherit via cycle_id); fixtures committed for Mar/Nov DST boundaries + SFO→JFK trip. WHOOP client: per-resource modules over shared `httpGet` in `client.ts`; `callWithAuth` from Plan 02-04 wraps inside `httpGet` exactly once (Gate E preserved); semaphore-of-4 + `X-RateLimit-Remaining<10` throttle + 429 `X-RateLimit-Reset` sleep; pinned to `https://api.prod.whoop.com` per ADR-0007 (GET-only). One research item flagged for `gsd-phase-researcher`: D-12 — does WHOOP v2 accept an `updated_since` filter param on resource list endpoints? Plus current page-size pins per resource. Phase 3 success-criteria: D-17 attestation continues (zero new MCP tools — `whoop_sync` lands in Phase 4); D-18 attestation continues (`src/mcp/sanitize.ts` + `src/mcp/register.ts` UNMODIFIED). New CI grep gates planned: Gate F (no `fetch(` outside whoop/client.ts + token-store.ts + oauth.ts) and Gate G (no `drizzle-orm/*` import outside `src/infrastructure/db/`). Per AGENTS.md §Branch policy, the commit ships via worktree-free feature branch `docs/03-phase-context` → PR (Phase 0 `.planning/**` carve-out has expired since `src/` is tracked on origin/main). **Previously** (2026-05-15): completed Phase 1 + Phase 2 Nyquist validation audits (PR #8 merged at 2026-05-15T01:55:03Z, merge commit `4d192f1`). Both phases verified Nyquist-compliant with zero gaps. Audit captured live evidence: `npm run lint` clean (49 files); `npm run test` → 266 / 266 across 20 files (up from 238 at Phase 2 close); `npm run build` → 3 ESM entries emitted (cli, mcp, infrastructure/whoop/token-store); `bash scripts/ci-grep-gates.sh` → all 5 gates pass; `gh run list --limit 5` → 5 / 5 success including `main` at 2026-05-13T01:15:26Z across both macos-latest and ubuntu-latest matrix rows. Phase 1 VALIDATION.md: all 12 anchor rows flipped ⬜ → ✅ green; Wave 0 checkboxes ticked with Phase-2-extension annotations (tsup entries, vitest glob, ci-grep-gates expanded 3 → 5, CI matrix expanded macos → macos+ubuntu). Phase 2 VALIDATION.md: all 10 task rows flipped ⬜ → ✅ green; third manual-only row (post-merge CI matrix on `main`) resolved live and struck through; D-17 runtime attestation (one MCP tool: whoop_doctor) and D-18 attestation (sanitize.ts + register.ts unchanged across all 8 Phase 2 plans) both preserved. Path drift fixed in both files: `test/integration/...` and `test/fixtures/oauth/...` → `tests/...` per PR #7 directory consolidation. **Previously** (2026-05-12): completed Plan 02-08 (cross-process integration). Phase 2 closed with the load-bearing AUTH-05 cross-process integration test in `tests/integration/auth-concurrency.test.ts`; 238 tests across 20 files; lint clean; CI grep gates clean. Suite has since grown to 266 — confirm via `npm run test`.
+**Last updated:** 2026-05-16 — completed Plan 03-04 (sync-types-cursor, Wave 1a). Landed `src/domain/types/sync.ts` (8 exports: RESOURCES tuple in D-23 order, ResourceName, RESOURCE_NAMES_SET, ResourceSyncStatus per D-25, RunSyncStatus per D-24, ResourceSyncOutcome, RunSyncInput, RunSyncResult) + `src/services/sync/cursor.ts` (pure `computeWindow` with injected clock; MS_PER_DAY + EPOCH_ZERO_ISO constants; override precedence per D-26: --since > --days > default 7-day re-window per D-10; strict-less-than at the 7d boundary) + `src/services/sync/cursor.test.ts` (11 unit tests across 4 describe groups: 4 default-branch + 3 --days + 2 --since + 2 purity-incl-`vi.spyOn(Date, 'now').not.toHaveBeenCalled`). Tests 297 → 308 (+11). All 7 CI grep gates green. Lint clean. Two Rule-1/Rule-3 auto-fixed deviations: planner's loose `Date.now\|process.env` regex matched `new Date(now.getTime()...)` as false positive → refactored to `clockMs = opts.clock.getTime()` once at function entry (semantics + return values byte-identical); Biome import-sort on cursor.test.ts (auto-fixed via `npm run format`). 3 pre-existing TS strict-mode errors (src/cli/commands/auth.ts + tests/helpers/msw-whoop-oauth.ts) logged to `.planning/phases/03-data-model-db-layer-sync-loop/deferred-items.md` as out-of-scope (predate this plan; reproducible on the pre-03-04 HEAD; CI does not currently run `tsc --noEmit` so they have been latent). D-17 + D-18 attestation extends — no MCP tools added, `sanitize.ts` + `register.ts` byte-identical to origin/main. AuthError + WhoopApiError unions remain FROZEN at 6 kinds each. entities.ts UNTOUCHED — Plan 03-03 (Wave 1b) imports `ResourceSyncOutcome` from `sync.ts` after this plan lands; ordering verified by `git diff src/domain/types/entities.ts → empty`. Plan 03-11 (Wave 4) sync orchestrator now has its full type surface + cursor function on disk. **Previously** (2026-05-16): gathered Phase 3 context via `/gsd-discuss-phase 3`. Four gray areas presented; user delegated all four to Claude's Discretion ("Discuss them all amongst yourself, come to me if there isn't a clear winner") matching the Phase 1 + Phase 2 pattern. Worked through each area and landed clear winners on 34 numbered decisions (D-01 through D-34) plus seven sub-decisions, no escalation. Schema scope: 8 tables (oauth_tokens stays in keyring/file per Phase 2 + ARCHITECTURE.md line 802, NOT a SQLite table). Migration crash-recovery: hand-rolled `BEGIN IMMEDIATE` wrapper in `src/infrastructure/db/migrate.ts` (NOT Drizzle's default `migrate()` because it uses `BEGIN DEFERRED` per Pitfall 13); pre-migration backup of `.sqlite`/`-wal`/`-shm` to `~/.recovery-ledger/backups/` keeping last 3 at `chmod 600`; fails-closed-on-partial-migration with structured `MigrationError({kind, backupPath, latestSafeMigration})` — no auto-restore (too dangerous for a personal tool whose decision ledger is irreplaceable). `updated_at` delta: per-resource cursor = `MAX(updated_at) FROM <resource_table>` (no separate cursor table); 7-day re-window in addition (interpretation B per ARCHITECTURE.md anti-pattern 15 + Pitfall 15); `since = min(cursor, now() - 7d)`. DST/tz-shift: two sub-rules OR'd (DST straddle via `@date-fns/tz` + tz_drift via prior cycle's `timezone_offset`); flag column `baseline_excluded INTEGER NOT NULL DEFAULT 0` + `exclusion_reason TEXT` on cycles row (recovery/sleep/workouts inherit via cycle_id); fixtures committed for Mar/Nov DST boundaries + SFO→JFK trip. WHOOP client: per-resource modules over shared `httpGet` in `client.ts`; `callWithAuth` from Plan 02-04 wraps inside `httpGet` exactly once (Gate E preserved); semaphore-of-4 + `X-RateLimit-Remaining<10` throttle + 429 `X-RateLimit-Reset` sleep; pinned to `https://api.prod.whoop.com` per ADR-0007 (GET-only). One research item flagged for `gsd-phase-researcher`: D-12 — does WHOOP v2 accept an `updated_since` filter param on resource list endpoints? Plus current page-size pins per resource. Phase 3 success-criteria: D-17 attestation continues (zero new MCP tools — `whoop_sync` lands in Phase 4); D-18 attestation continues (`src/mcp/sanitize.ts` + `src/mcp/register.ts` UNMODIFIED). New CI grep gates planned: Gate F (no `fetch(` outside whoop/client.ts + token-store.ts + oauth.ts) and Gate G (no `drizzle-orm/*` import outside `src/infrastructure/db/`). Per AGENTS.md §Branch policy, the commit ships via worktree-free feature branch `docs/03-phase-context` → PR (Phase 0 `.planning/**` carve-out has expired since `src/` is tracked on origin/main). **Previously** (2026-05-15): completed Phase 1 + Phase 2 Nyquist validation audits (PR #8 merged at 2026-05-15T01:55:03Z, merge commit `4d192f1`). Both phases verified Nyquist-compliant with zero gaps. Audit captured live evidence: `npm run lint` clean (49 files); `npm run test` → 266 / 266 across 20 files (up from 238 at Phase 2 close); `npm run build` → 3 ESM entries emitted (cli, mcp, infrastructure/whoop/token-store); `bash scripts/ci-grep-gates.sh` → all 5 gates pass; `gh run list --limit 5` → 5 / 5 success including `main` at 2026-05-13T01:15:26Z across both macos-latest and ubuntu-latest matrix rows. Phase 1 VALIDATION.md: all 12 anchor rows flipped ⬜ → ✅ green; Wave 0 checkboxes ticked with Phase-2-extension annotations (tsup entries, vitest glob, ci-grep-gates expanded 3 → 5, CI matrix expanded macos → macos+ubuntu). Phase 2 VALIDATION.md: all 10 task rows flipped ⬜ → ✅ green; third manual-only row (post-merge CI matrix on `main`) resolved live and struck through; D-17 runtime attestation (one MCP tool: whoop_doctor) and D-18 attestation (sanitize.ts + register.ts unchanged across all 8 Phase 2 plans) both preserved. Path drift fixed in both files: `test/integration/...` and `test/fixtures/oauth/...` → `tests/...` per PR #7 directory consolidation. **Previously** (2026-05-12): completed Plan 02-08 (cross-process integration). Phase 2 closed with the load-bearing AUTH-05 cross-process integration test in `tests/integration/auth-concurrency.test.ts`; 238 tests across 20 files; lint clean; CI grep gates clean. Suite has since grown to 266 — confirm via `npm run test`.
 **Mode:** yolo
 **Granularity:** standard
 
@@ -26,19 +26,19 @@ progress:
 
 ## Current Position
 
-**Current Plan:** 3
+**Current Plan:** 4
 **Total Plans in Phase:** 13
 Phase: 3 (data-model-db-layer-sync-loop) — EXECUTING
-Plan: 3 of 13
+Plan: 4 of 13 complete; Plan 5 next
 
 - **Milestone:** v1
 - **Phase:** 3
-- **Plan:** 03-CONTEXT.md — 34 implementation decisions (D-01 through D-34) locked across schema scope, migration crash-recovery, `updated_at` delta + 7-day re-window, DST/tz-shift exclusion, WHOOP client structure, sync orchestration, SQLite pragmas + WAL hygiene, repository pattern, and MCP attestation carry-forward. Next step: `/gsd-plan-phase 3` (or research-deepen first per D-12 + page-size pins research items).
-- **Status:** Ready to execute
-- **Progress:** [██████░░░░] 59%
+- **Plan:** Wave 1a complete (Plan 03-04 sync-types-cursor). Next: Wave 1b (Plan 03-03 domain-types — score discriminated union + entity types; imports ResourceSyncOutcome from sync.ts).
+- **Status:** Ready to execute next plan
+- **Progress:** [██████░░░░] 63%
 
 ```
-[████████░░░░░░░░░░░░] 2 / 5 phases complete (6 / 6 in Phase 1; 8 / 8 in Phase 2)
+[████████░░░░░░░░░░░░] 2 / 5 phases complete (6 / 6 in Phase 1; 8 / 8 in Phase 2; 3 / 13 in Phase 3)
 ```
 
 ## Performance Metrics
@@ -60,6 +60,7 @@ Plan: 3 of 13
 | Phase 02-oauth-token-store-single-flight-refresh P08 | 4m 54s | 2 tasks | 5 files |
 | Phase 03 P01 | 5m | 3 tasks | 9 files |
 | Phase 03 P02 | 4m | 2 tasks | 5 files |
+| Phase 03 P04 | 4m 24s | 2 tasks | 3 files |
 
 ### Plan Execution History
 
@@ -79,6 +80,9 @@ Plan: 3 of 13
 | 02-05-cli-shims | 4m 57s | 1 | 7 | Complete (2026-05-12) |
 | 02-06-doctor-extensions | 6m 1s | 1 | 8 | Complete (2026-05-12) |
 | 02-08-cross-process-integration | 4m 54s | 2 | 5 | Complete (2026-05-12) — Phase 2 closed |
+| 03-01-wave0-infra | 5m | 3 | 9 | Complete (2026-05-16) |
+| 03-02-schema | 4m | 2 | 5 | Complete (2026-05-16) |
+| 03-04-sync-types-cursor | 4m 24s | 2 | 3 | Complete (2026-05-16) — Wave 1a |
 
 ## Accumulated Context
 
@@ -168,6 +172,13 @@ Plan: 3 of 13
 - [Phase ?]: [Phase 03] Plan 03-02 decision: recoveries covering index on (score_state, created_at) not start — recoveries has no start field on the wire; index name retained as recoveries_score_state_start_idx
 - [Phase ?]: [Phase 03] Plan 03-02 decision: drizzle-kit@0.31.10 --name initial honors the name deterministically — no rename/journal-tag fix-up needed
 - [Phase ?]: [Phase 03] Plan 03-02 decision: schema introspection tests use getTableConfig() live runtime types (notNull/dataType/enumValues/indexes) — strictly stronger than source-grep fallback
+- [Phase 03] Plan 03-04 decision: refactored computeWindow body to bind `clockMs = opts.clock.getTime()` once at function entry (instead of the plan's verbatim `const now = opts.clock` style) — planner's loose-regex acceptance criterion `grep -c "Date.now\|process.env"` matched `new Date(now.getTime()` as a false positive. Semantics + return values byte-identical; tests 11/11 still green. Rule-1 plan-text correction.
+- [Phase 03] Plan 03-04 decision: `biome-ignore format:` pragma on the RESOURCES tuple line — D-23 order must remain on one line for the planner's verbatim acceptance grep. Single-line suppression scoped to the next line only.
+- [Phase 03] Plan 03-04 decision: computeWindow does NOT inject a `--days` default value — `0`/`null`/`undefined` all fall through to the 7-day re-window. D-26 puts the default `30` at the CLI shim (Plan 03-12). Test Group B's `flagDaysN=0 falls through` test locks this.
+- [Phase 03] Plan 03-04 decision: strict-less-than at the 7d boundary (`opts.cursor < sevenDaysAgo`, not `<=`). Tie goes to sevenDaysAgo via the else branch. Test Group A's `cursor exactly 7d old` test pins the branch.
+- [Phase 03] Plan 03-04 deviation: Biome import-sort auto-fixed cursor.test.ts via `npm run format` (Rule-3 blocking lint). No semantic change.
+- [Phase 03] Plan 03-04 deferred: 3 pre-existing TS strict-mode errors (`src/cli/commands/auth.ts:97:35` TS2379 + `tests/helpers/msw-whoop-oauth.ts:74,82` TS2345) — out of scope per `files_modified` frontmatter; reproducible on pre-03-04 HEAD; logged to `.planning/phases/03-data-model-db-layer-sync-loop/deferred-items.md` with recommendation to add `tsc --noEmit` as a CI gate after fixing.
+- [Phase 03] Plan 03-04 5th-precedent: doc-comment phrasing avoids literal `Date.now`/`process.env`/`console.*`/`process.stdout.write` substrings (Plans 02-01 / 02-02 / 02-04 / 02-06 / 03-01 / now 03-04). The `agent_docs/learnings.md` entry codifying this rule remains deferred.
 
 ### Open Todos
 
