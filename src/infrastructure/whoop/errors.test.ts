@@ -12,7 +12,12 @@ import {
   AuthError,
   type AuthErrorKind,
   formatAuthError,
+  formatWhoopApiError,
   isAuthError,
+  isWhoopApiError,
+  WHOOP_API_ERROR_KINDS,
+  WhoopApiError,
+  type WhoopApiErrorKind,
 } from './errors.js';
 
 describe('AuthError', () => {
@@ -189,5 +194,165 @@ describe('isAuthError (WR-C)', () => {
     for (const k of AUTH_ERROR_KINDS) {
       expect(typeof k).toBe('string');
     }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Phase 3 D-22: WhoopApiError sibling discriminated union. Mirrors the
+// AuthError test shape exactly so a future refactor that touches one
+// without the other surfaces here.
+// ---------------------------------------------------------------------------
+
+describe('WhoopApiError', () => {
+  test('WAE-01: kind is preserved and the instance is an Error subclass', () => {
+    const err = new WhoopApiError({ kind: 'unauthorized' });
+    expect(err.kind).toBe('unauthorized');
+    expect(err).toBeInstanceOf(Error);
+    expect(err.name).toBe('WhoopApiError');
+    expect(typeof err.stack).toBe('string');
+  });
+
+  test('WAE-02: optional detail is stored on the instance', () => {
+    const err = new WhoopApiError({ kind: 'rate_limited', detail: 'reset in 12s' });
+    expect(err.detail).toBe('reset in 12s');
+    expect(err.message).toBe('reset in 12s');
+  });
+
+  test('WAE-03: cause chain is preserved for the sanitize.ts walker', () => {
+    const inner = new Error('upstream');
+    const err = new WhoopApiError({ kind: 'server', cause: inner });
+    expect(err.cause).toBeInstanceOf(Error);
+    expect((err.cause as Error).message).toBe('upstream');
+  });
+
+  test('WAE-04: WhoopApiError without cause has no own `cause` property (mirrors AuthError WR-11)', () => {
+    // Same carrier-shape invariant as AuthError: the conditional-spread
+    // in the constructor avoids synthesizing `{ cause: undefined }`. The
+    // sanitizer's cause-walker checks `err.cause` truthiness; both "no
+    // cause property" and "cause: undefined" produce identical truthiness,
+    // but a `{ cause: null }` would not. Pin literal absence.
+    const err = new WhoopApiError({ kind: 'network' });
+    expect('cause' in err).toBe(false);
+    expect(err.cause).toBeUndefined();
+  });
+
+  test('WAE-05: WhoopApiError with cause has the cause as an own property', () => {
+    const inner = new Error('inner');
+    const err = new WhoopApiError({ kind: 'network', cause: inner });
+    expect('cause' in err).toBe(true);
+    expect(err.cause).toBe(inner);
+  });
+
+  test('WAE-06: JSON.stringify of a WhoopApiError does NOT leak the cause message', () => {
+    // Same defense-in-depth pin as AuthError Test 9. The load-bearing
+    // sanitizer pipeline lives in src/mcp/sanitize.ts; this assertion
+    // pins Error.toJSON's default behavior so a future override surfaces.
+    const inner = new Error('secret-token-leak');
+    const err = new WhoopApiError({ kind: 'server', cause: inner });
+    expect(JSON.stringify(err)).not.toContain('secret-token-leak');
+  });
+
+  test('WAE-07: WhoopApiError flows through serializeError + sanitize unchanged (D-34 attestation)', () => {
+    // Phase 3 D-34: src/mcp/sanitize.ts is UNMODIFIED. Pin that a
+    // Bearer-bearing cause message routes through the existing pipeline
+    // and lands redacted, identical to AuthError Test 9b.
+    const inner = new Error('Authorization: Bearer abc123.def456.ghi789xyzlong');
+    const err = new WhoopApiError({ kind: 'unauthorized', cause: inner });
+    const serialized = serializeError(err);
+    expect(serialized).toContain('Authorization');
+    const sanitized = sanitize(serialized);
+    expect(sanitized).toContain('<redacted>');
+    expect(sanitized).not.toContain('abc123.def456.ghi789xyzlong');
+  });
+});
+
+describe('formatWhoopApiError', () => {
+  test('WAE-08: exhaustive switch over all six kinds returns a non-empty remediation string', () => {
+    const kinds: readonly WhoopApiErrorKind[] = [
+      'unauthorized',
+      'rate_limited',
+      'network',
+      'validation',
+      'server',
+      'unknown',
+    ] as const;
+    for (const kind of kinds) {
+      const err = new WhoopApiError({ kind });
+      const msg = formatWhoopApiError(err);
+      expect(msg.length).toBeGreaterThan(0);
+    }
+  });
+});
+
+describe('isWhoopApiError', () => {
+  test('IWAE-01: real WhoopApiError instance is detected', () => {
+    const err = new WhoopApiError({ kind: 'unauthorized' });
+    expect(isWhoopApiError(err)).toBe(true);
+  });
+
+  test('IWAE-02: structurally-shaped WhoopApiError (resetModules-cross-graph) is detected', () => {
+    // Same vi.resetModules() cross-module identity scenario as
+    // isAuthError IS-02. Duck-typing on name + kind membership is the
+    // load-bearing contract.
+    const shaped = { name: 'WhoopApiError', kind: 'rate_limited' };
+    expect(isWhoopApiError(shaped)).toBe(true);
+    expect(shaped).not.toBeInstanceOf(WhoopApiError);
+  });
+
+  test('IWAE-03: AuthError instance is rejected (name mismatch disambiguates the two unions)', () => {
+    // Even though AuthError and WhoopApiError share the same field
+    // shape (kind, detail, cause), the `name` field disambiguates. An
+    // AuthError must NOT pass isWhoopApiError, and vice versa.
+    const auth = new AuthError({ kind: 'auth_missing' });
+    expect(isWhoopApiError(auth)).toBe(false);
+    expect(isAuthError(auth)).toBe(true);
+    const wae = new WhoopApiError({ kind: 'unauthorized' });
+    expect(isAuthError(wae)).toBe(false);
+    expect(isWhoopApiError(wae)).toBe(true);
+  });
+
+  test('IWAE-04: null / undefined / non-object are rejected', () => {
+    expect(isWhoopApiError(null)).toBe(false);
+    expect(isWhoopApiError(undefined)).toBe(false);
+    expect(isWhoopApiError('WhoopApiError')).toBe(false);
+    expect(isWhoopApiError(42)).toBe(false);
+  });
+
+  test('IWAE-05: object with name=WhoopApiError but invalid kind is rejected', () => {
+    const fake = { name: 'WhoopApiError', kind: 'not_a_real_kind' };
+    expect(isWhoopApiError(fake)).toBe(false);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Tuple-length locks — pin the FROZEN contract for both unions so a future
+// addition to either tuple surfaces here AND fails the exhaustive switch
+// in the matching formatter. MR-21 forcing function preserved across the
+// AuthError/WhoopApiError pair.
+// ---------------------------------------------------------------------------
+
+describe('discriminated-union tuple length locks', () => {
+  test('TLL-01: AUTH_ERROR_KINDS is FROZEN at 6 (Phase 2 Plan 02-01 Wave 0 contract)', () => {
+    expect(AUTH_ERROR_KINDS.length).toBe(6);
+    expect([...AUTH_ERROR_KINDS]).toEqual([
+      'auth_missing',
+      'auth_expired',
+      'auth_state_mismatch',
+      'auth_timeout',
+      'auth_port_in_use',
+      'refresh_failed',
+    ]);
+  });
+
+  test('TLL-02: WHOOP_API_ERROR_KINDS is exactly 6 (Phase 3 D-22 contract)', () => {
+    expect(WHOOP_API_ERROR_KINDS.length).toBe(6);
+    expect([...WHOOP_API_ERROR_KINDS]).toEqual([
+      'unauthorized',
+      'rate_limited',
+      'network',
+      'validation',
+      'server',
+      'unknown',
+    ]);
   });
 });

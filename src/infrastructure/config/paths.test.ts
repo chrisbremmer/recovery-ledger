@@ -30,6 +30,30 @@ describe('resolvePaths', () => {
     expect(p.storageModeFile).toBe('/home/u/.recovery-ledger/storage-mode');
   });
 
+  test('Phase 3 D-14 / D-30 / D-32: dbFile + dbWalFile + dbShmFile + backupsDir resolve under configDir', () => {
+    // Phase 3 extends ResolvedPaths with the DB-layer surface. dbFile is
+    // the canonical SQLite path; the -wal / -shm companions must be
+    // sibling files (NOT files in a `wal/` subdirectory) because SQLite
+    // hardcodes the naming convention. backupsDir holds the three
+    // most-recent pre-migration backups (D-07).
+    const p = resolvePaths({ HOME: '/tmp/test' });
+    expect(p.dbFile).toBe('/tmp/test/.recovery-ledger/db.sqlite');
+    expect(p.dbWalFile).toBe('/tmp/test/.recovery-ledger/db.sqlite-wal');
+    expect(p.dbShmFile).toBe('/tmp/test/.recovery-ledger/db.sqlite-shm');
+    expect(p.backupsDir).toBe('/tmp/test/.recovery-ledger/backups');
+  });
+
+  test('Phase 3: DB-layer paths honor RECOVERY_LEDGER_HOME override (parallel to existing override case)', () => {
+    // Same override semantics as configFile/tokensFile — the env var fully
+    // overrides the home directory, so the DB-layer paths must land under
+    // the overridden root, not under HOME.
+    const p = resolvePaths({ HOME: '/home/u', RECOVERY_LEDGER_HOME: '/tmp/r' });
+    expect(p.dbFile).toBe('/tmp/r/db.sqlite');
+    expect(p.dbWalFile).toBe('/tmp/r/db.sqlite-wal');
+    expect(p.dbShmFile).toBe('/tmp/r/db.sqlite-shm');
+    expect(p.backupsDir).toBe('/tmp/r/backups');
+  });
+
   test('tokensLockFile basename is exactly tokens.json.lock (D-07)', () => {
     const p = resolvePaths({ HOME: '/home/u' });
     expect(p.tokensLockFile).toBe('/home/u/.recovery-ledger/tokens.json.lock');
