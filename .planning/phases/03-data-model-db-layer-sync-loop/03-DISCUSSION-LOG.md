@@ -3,7 +3,7 @@
 > **Audit trail only.** Do not use as input to planning, research, or execution agents.
 > Decisions are captured in CONTEXT.md — this log preserves the alternatives considered.
 
-**Date:** 2026-05-15
+**Date:** 2026-05-16
 **Phase:** 03-data-model-db-layer-sync-loop
 **Areas discussed:** Migration crash-recovery contract, `updated_at` delta + 7-day re-window, DST/tz-shift exclusion, WHOOP client structure
 
