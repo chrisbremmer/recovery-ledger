@@ -28,17 +28,17 @@ Requirements for the initial release. Each maps to roadmap phases.
 
 ### Data Model & DB
 
-- [ ] **DATA-01**: SQLite database opens in WAL mode with `busy_timeout=5000`, `journal_size_limit=64MB`, `wal_autocheckpoint=1000` pragmas at default `~/.recovery-ledger/recovery-ledger.sqlite`
+- [x] **DATA-01**: SQLite database opens in WAL mode with `busy_timeout=5000`, `journal_size_limit=64MB`, `wal_autocheckpoint=1000` pragmas at default `~/.recovery-ledger/recovery-ledger.sqlite`
 - [ ] **DATA-02**: Drizzle schema for `oauth_tokens`, `sync_runs`, `cycles`, `recoveries`, `sleeps`, `workouts`, `daily_summaries`, `decisions` with hybrid normalized columns + `raw_json` per entity
 - [ ] **DATA-03**: Index on `(score_state, start)` on each scored entity to support the SCORED-only baseline queries
-- [ ] **DATA-04**: Drizzle migrator runs at every connection inside `BEGIN IMMEDIATE`, takes a pre-migration backup of `.sqlite`/`-wal`/`-shm`, and fails closed on partial migration
+- [x] **DATA-04**: Drizzle migrator runs at every connection inside `BEGIN IMMEDIATE`, takes a pre-migration backup of `.sqlite`/`-wal`/`-shm`, and fails closed on partial migration
 - [ ] **DATA-05**: Three-layer types — raw WHOOP responses (Zod), normalized entities (Drizzle), and view types for review outputs — with `Score = discriminatedUnion('score_state', …)` enforcing `SCORED` discipline in domain code
 - [ ] **DATA-06**: DST / time-zone-shift detection during sync flags affected cycles for baseline exclusion while keeping them visible in raw views
 
 ### Sync
 
 - [ ] **SYNC-01**: `recovery-ledger sync --days N` (default 30) fetches profile, body measurements, cycles, recovery, sleep, and workouts for the requested window
-- [ ] **SYNC-02**: WHOOP HTTP client honors pagination, normalizes snake_case → camelCase, and enforces a semaphore-of-4 concurrent-request limit
+- [x] **SYNC-02**: WHOOP HTTP client honors pagination, normalizes snake_case → camelCase, and enforces a semaphore-of-4 concurrent-request limit
 - [ ] **SYNC-03**: 429 responses back off honoring `Retry-After` / `X-RateLimit-Reset`; rate-limit state is reported on the CLI
 - [ ] **SYNC-04**: Sync is idempotent via `ON CONFLICT DO UPDATE`; deltas use `updated_at` with a 7-day re-window to catch late-scored cycles
 - [ ] **SYNC-05**: Partial-failure reporting — sync exit reports which resources succeeded, failed, or were skipped, recorded in a `sync_runs` row
@@ -138,14 +138,14 @@ Explicitly excluded. Gated behind the hard scope guardrail in PROJECT.md (≥ 12
 | AUTH-04 | Phase 2 | Complete |
 | AUTH-05 | Phase 2 | Complete |
 | AUTH-06 | Phase 2 | Complete |
-| DATA-01 | Phase 3 | Pending |
+| DATA-01 | Phase 3 | Complete |
 | DATA-02 | Phase 3 | Pending |
 | DATA-03 | Phase 3 | Pending |
-| DATA-04 | Phase 3 | Pending |
+| DATA-04 | Phase 3 | Complete |
 | DATA-05 | Phase 3 | Pending |
 | DATA-06 | Phase 3 | Pending |
 | SYNC-01 | Phase 3 | Pending |
-| SYNC-02 | Phase 3 | Pending |
+| SYNC-02 | Phase 3 | Complete |
 | SYNC-03 | Phase 3 | Pending |
 | SYNC-04 | Phase 3 | Pending |
 | SYNC-05 | Phase 3 | Pending |

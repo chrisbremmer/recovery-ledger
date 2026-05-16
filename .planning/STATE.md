@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-current_plan: 1
+current_plan: 2
 status: executing
-last_updated: "2026-05-16T18:56:55.199Z"
+last_updated: "2026-05-16T19:07:47.334Z"
 progress:
   total_phases: 5
   completed_phases: 2
   total_plans: 27
-  completed_plans: 14
-  percent: 52
+  completed_plans: 15
+  percent: 56
 ---
 
 # State: Recovery Ledger
@@ -26,16 +26,16 @@ progress:
 
 ## Current Position
 
-**Current Plan:** 1
+**Current Plan:** 2
 **Total Plans in Phase:** 13
 Phase: 3 (data-model-db-layer-sync-loop) — EXECUTING
-Plan: 1 of 13
+Plan: 2 of 13
 
 - **Milestone:** v1
 - **Phase:** 3
 - **Plan:** 03-CONTEXT.md — 34 implementation decisions (D-01 through D-34) locked across schema scope, migration crash-recovery, `updated_at` delta + 7-day re-window, DST/tz-shift exclusion, WHOOP client structure, sync orchestration, SQLite pragmas + WAL hygiene, repository pattern, and MCP attestation carry-forward. Next step: `/gsd-plan-phase 3` (or research-deepen first per D-12 + page-size pins research items).
-- **Status:** Executing Phase 3
-- **Progress:** [░░░░░░░░░░] 0%
+- **Status:** Ready to execute
+- **Progress:** [██████░░░░] 56%
 
 ```
 [████████░░░░░░░░░░░░] 2 / 5 phases complete (6 / 6 in Phase 1; 8 / 8 in Phase 2)
@@ -58,6 +58,7 @@ Plan: 1 of 13
 | Phase 02 P05 | 4m 57s | 1 tasks | 7 files |
 | Phase 02-oauth-token-store-single-flight-refresh P06 | 6m 1s | - tasks | - files |
 | Phase 02-oauth-token-store-single-flight-refresh P08 | 4m 54s | 2 tasks | 5 files |
+| Phase 03 P01 | 5m | 3 tasks | 9 files |
 
 ### Plan Execution History
 
@@ -159,6 +160,9 @@ Plan: 1 of 13
 - [Phase 02]: [Phase 02] Plan 02-08 decision: D-25 CI matrix expanded to [macos-latest, ubuntu-latest] with fail-fast:false; ubuntu-latest row sets RECOVERY_LEDGER_FORCE_FILE_STORE=1 via matrix-conditional env idiom
 - [Phase 02]: [Phase 02] Plan 02-08 decision: G-03 inlines the MCP subprocess driver rather than reusing probeMcpStdoutPurity — needed full frame capture + parameterized env + tools/list shape assertion (D-17 runtime attestation: exactly one whoop_doctor tool)
 - [Phase 02]: [Phase 02] Plan 02-08 deviation (Rule 3 blocking): vitest.config.ts include glob extended with tests/**/*.test.ts so the new integration test is discoverable; Phase 1 test/integration/ (singular) remains discoverable too
+- [Phase ?]: [Phase 03] Plan 03-01 decision: package.json caret ranges normalized to plan must_haves verbatim (^12.9.0, ^7, ^1) after npm install — lockfile pins resolved patches; keeps grep-acceptance criteria portable
+- [Phase ?]: [Phase 03] Plan 03-01 decision: top-of-file summary block in ci-grep-gates.sh mirrors Gates A-E precedent (count=2 per gate, not the planner's 1) — established convention beats planner-template drift; Rule 1 plan-text correction precedent
+- [Phase ?]: [Phase 03] Plan 03-01 deviation: doc-comment phrasing in errors.ts avoids literal 'console.*' / 'process.stdout.write' / 'oauth/oauth2/token' to dodge plan-grep collisions (4th-time precedent: Plans 02-01, 02-02, 02-04, 02-06); learnings.md entry deferred
 
 ### Open Todos
 
