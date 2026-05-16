@@ -244,3 +244,44 @@ export function formatWhoopApiError(err: WhoopApiError): string {
       return 'unknown WHOOP API error';
   }
 }
+
+/**
+ * Map an HTTP response status to a `WhoopApiError` kind. This is the SOLE
+ * place response-status → WhoopApiError mapping happens — `httpGet` in
+ * `client.ts` calls it on every non-OK response after the `retry.ts`
+ * wrapper has exhausted its budget. Keeping the mapping in one switch
+ * preserves the MR-21 forcing function: a new status arm requires
+ * adding an explicit case here AND the corresponding `WhoopApiError`
+ * kind already exists in the (frozen at six) union.
+ *
+ * 401 normally never reaches here: `callWithAuth` (Plan 02-04) refreshes
+ * + retries on 401, and a 401 that escapes its budget surfaces as an
+ * `AuthError({kind: 'auth_expired'})`. The defense-in-depth arm exists
+ * so a 401 that somehow escapes still maps to a non-empty kind.
+ */
+export function classifyHttpError(res: { status: number; statusText?: string }): WhoopApiError {
+  if (res.status === 401) {
+    return new WhoopApiError({
+      kind: 'unauthorized',
+      detail: 'WHOOP returned 401 — token may have been revoked',
+    });
+  }
+  if (res.status === 429) {
+    return new WhoopApiError({
+      kind: 'rate_limited',
+      detail: 'WHOOP rate-limited (429); sync retried once',
+    });
+  }
+  if (res.status >= 500 && res.status < 600) {
+    return new WhoopApiError({
+      kind: 'server',
+      detail: `WHOOP returned ${res.status}`,
+    });
+  }
+  // 400, 403, 404, 422, and anything else — surface as unknown so the
+  // CLI/MCP layer prints the status without claiming a specific cause.
+  return new WhoopApiError({
+    kind: 'unknown',
+    detail: `WHOOP returned ${res.status}`,
+  });
+}
