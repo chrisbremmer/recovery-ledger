@@ -33,6 +33,14 @@
 #         bypass is documented as out-of-scope for Plan 02-06 (single-user
 #         personal tool; a developer concatenating the URL would be
 #         deliberately bypassing their own constraint).
+# Gate F: no fetch( outside src/infrastructure/whoop/{client,token-store,oauth}.ts.
+#         Phase 3 D-21 + ADR-0007: the WHOOP HTTPS boundary is monolithic.
+#         Any other fetch( call site bypasses callWithAuth, the rate-limit
+#         semaphore (D-20), retry, and Zod validation. Test files exempt.
+# Gate G: no drizzle-orm/* import outside src/infrastructure/db/. Phase 3 D-28
+#         + ARCHITECTURE.md Anti-Pattern 3: Drizzle row types never in
+#         src/domain/ or src/services/; repositories map at the boundary.
+#         Test files exempt.
 #
 # Exit-code semantics (Pitfall 10): grep returns 0 on match (= violation found).
 # Each gate inverts that: if grep -rEn matches, the gate prints ::error:: and
@@ -211,6 +219,76 @@ if "$GREP" -rEn "$TOKEN_ENDPOINT_RE" --include='*.ts' src/ 2>/dev/null \
   fi
 fi
 rm -f /tmp/gate-e.$$
+
+# ----------------------------------------------------------------------------
+# Gate F — no fetch( outside src/infrastructure/whoop/client.ts,
+# src/infrastructure/whoop/token-store.ts, src/infrastructure/whoop/oauth.ts.
+# D-21 + ADR-0007 (read-only WHOOP, GET-only) + ADR-0002 §Enforcement: the
+# WHOOP HTTPS boundary is monolithic. Any other fetch( call site bypasses
+# callWithAuth (the Plan 02-04 401-reactive chokepoint), the rate-limit
+# semaphore (D-20), retry, and Zod validation.
+#
+# At Wave 0 land time this gate is green-on-empty: client.ts does not
+# exist yet; token-store.ts and oauth.ts are the only files in src/
+# that call fetch( and both are allowlisted. The gate's value lands the
+# moment Wave 2 Plan 03-06 writes client.ts with the third fetch( site.
+#
+# Test files (*.test.ts) are excluded — mirrors Gate E rationale: a
+# contract test for client.ts will naturally reference fetch in MSW
+# fixtures, and that is fine; the chokepoint applies to production
+# modules, not their unit tests.
+# ----------------------------------------------------------------------------
+FETCH_RE='\bfetch\s*\('
+
+if "$GREP" -rEn "$FETCH_RE" --include='*.ts' src/ 2>/dev/null \
+   | "$GREP" -Ev '^src/infrastructure/whoop/client\.ts:' \
+   | "$GREP" -Ev '^src/infrastructure/whoop/token-store\.ts:' \
+   | "$GREP" -Ev '^src/infrastructure/whoop/oauth\.ts:' \
+   | "$GREP" -Ev '\.test\.ts:' \
+   > /tmp/gate-f.$$; then
+  if [ -s /tmp/gate-f.$$ ]; then
+    echo "::error::Gate F — fetch( outside src/infrastructure/whoop/{client,token-store,oauth}.ts:"
+    cat /tmp/gate-f.$$
+    rm -f /tmp/gate-f.$$
+    exit 1
+  fi
+fi
+rm -f /tmp/gate-f.$$
+
+# ----------------------------------------------------------------------------
+# Gate G — no drizzle-orm/* import outside src/infrastructure/db/.
+# ARCHITECTURE.md Anti-Pattern 3 + D-28: Drizzle row types must never appear
+# in src/domain/ or src/services/. Repositories return domain entity types;
+# the snake_case-to-camelCase mapping + JSON parse + score-state narrowing
+# all live inside the repository file at the boundary. A drizzle-orm/*
+# import anywhere else means a Drizzle row type has leaked out of the
+# infrastructure layer.
+#
+# Regex matches `from '...drizzle-orm...'` (and `from "..."`) only --
+# bare identifier mentions of "drizzle-orm" in comments or strings do not
+# trip the gate. Directory-prefix exclude is anchored at
+# `^src/infrastructure/db/` so a sibling directory cannot match by
+# substring.
+#
+# At Wave 0 land time this gate is green-on-empty: there are zero
+# drizzle-orm/* imports anywhere in src/ yet. The gate's value lands the
+# moment Wave 1 Plan 03-02 writes src/infrastructure/db/schema.ts with
+# the first `from 'drizzle-orm/sqlite-core'` import.
+# ----------------------------------------------------------------------------
+DRIZZLE_IMPORT_RE="from\s+['\"]drizzle-orm"
+
+if "$GREP" -rEn "$DRIZZLE_IMPORT_RE" --include='*.ts' src/ 2>/dev/null \
+   | "$GREP" -Ev '^src/infrastructure/db/' \
+   | "$GREP" -Ev '\.test\.ts:' \
+   > /tmp/gate-g.$$; then
+  if [ -s /tmp/gate-g.$$ ]; then
+    echo "::error::Gate G — drizzle-orm/* imported outside src/infrastructure/db/:"
+    cat /tmp/gate-g.$$
+    rm -f /tmp/gate-g.$$
+    exit 1
+  fi
+fi
+rm -f /tmp/gate-g.$$
 
 echo "All grep gates passed."
 exit 0
