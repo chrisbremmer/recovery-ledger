@@ -37,7 +37,7 @@ Requirements for the initial release. Each maps to roadmap phases.
 
 ### Sync
 
-- [ ] **SYNC-01**: `recovery-ledger sync --days N` (default 30) fetches profile, body measurements, cycles, recovery, sleep, and workouts for the requested window
+- [x] **SYNC-01**: `recovery-ledger sync --days N` (default 30) fetches profile, body measurements, cycles, recovery, sleep, and workouts for the requested window
 - [x] **SYNC-02**: WHOOP HTTP client honors pagination, normalizes snake_case → camelCase, and enforces a semaphore-of-4 concurrent-request limit
 - [x] **SYNC-03**: 429 responses back off honoring `Retry-After` / `X-RateLimit-Reset`; rate-limit state is reported on the CLI
 - [x] **SYNC-04**: Sync is idempotent via `ON CONFLICT DO UPDATE`; deltas use `updated_at` with a 7-day re-window to catch late-scored cycles
@@ -144,7 +144,7 @@ Explicitly excluded. Gated behind the hard scope guardrail in PROJECT.md (≥ 12
 | DATA-04 | Phase 3 | Complete |
 | DATA-05 | Phase 3 | Complete |
 | DATA-06 | Phase 3 | Complete |
-| SYNC-01 | Phase 3 | Pending |
+| SYNC-01 | Phase 3 | Complete |
 | SYNC-02 | Phase 3 | Complete |
 | SYNC-03 | Phase 3 | Complete |
 | SYNC-04 | Phase 3 | Complete |
