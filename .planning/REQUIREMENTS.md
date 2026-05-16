@@ -40,8 +40,8 @@ Requirements for the initial release. Each maps to roadmap phases.
 - [ ] **SYNC-01**: `recovery-ledger sync --days N` (default 30) fetches profile, body measurements, cycles, recovery, sleep, and workouts for the requested window
 - [x] **SYNC-02**: WHOOP HTTP client honors pagination, normalizes snake_case → camelCase, and enforces a semaphore-of-4 concurrent-request limit
 - [x] **SYNC-03**: 429 responses back off honoring `Retry-After` / `X-RateLimit-Reset`; rate-limit state is reported on the CLI
-- [ ] **SYNC-04**: Sync is idempotent via `ON CONFLICT DO UPDATE`; deltas use `updated_at` with a 7-day re-window to catch late-scored cycles
-- [ ] **SYNC-05**: Partial-failure reporting — sync exit reports which resources succeeded, failed, or were skipped, recorded in a `sync_runs` row
+- [x] **SYNC-04**: Sync is idempotent via `ON CONFLICT DO UPDATE`; deltas use `updated_at` with a 7-day re-window to catch late-scored cycles
+- [x] **SYNC-05**: Partial-failure reporting — sync exit reports which resources succeeded, failed, or were skipped, recorded in a `sync_runs` row
 - [x] **SYNC-06**: Sync issues a `wal_checkpoint(TRUNCATE)` at the end of a successful run
 - [x] **SYNC-07**: Fixture-based contract tests cover every WHOOP resource (cycles, recovery, sleep, workouts, profile, body measurements); no live API calls in the default test run
 
@@ -147,8 +147,8 @@ Explicitly excluded. Gated behind the hard scope guardrail in PROJECT.md (≥ 12
 | SYNC-01 | Phase 3 | Pending |
 | SYNC-02 | Phase 3 | Complete |
 | SYNC-03 | Phase 3 | Complete |
-| SYNC-04 | Phase 3 | Pending |
-| SYNC-05 | Phase 3 | Pending |
+| SYNC-04 | Phase 3 | Complete |
+| SYNC-05 | Phase 3 | Complete |
 | SYNC-06 | Phase 3 | Complete |
 | SYNC-07 | Phase 3 | Complete |
 | REV-01 | Phase 4 | Pending |

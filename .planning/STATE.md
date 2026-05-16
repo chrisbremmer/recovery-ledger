@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-current_plan: 8
+current_plan: 9
 status: executing
-last_updated: "2026-05-16T21:43:08.171Z"
+last_updated: "2026-05-16T22:05:33.717Z"
 progress:
   total_phases: 5
   completed_phases: 2
   total_plans: 27
-  completed_plans: 21
-  percent: 78
+  completed_plans: 22
+  percent: 81
 ---
 
 # State: Recovery Ledger
@@ -26,16 +26,16 @@ progress:
 
 ## Current Position
 
-**Current Plan:** 8
+**Current Plan:** 9
 **Total Plans in Phase:** 13
 Phase: 3 (data-model-db-layer-sync-loop) — EXECUTING
-Plan: 8 of 13
+Plan: 9 of 13
 
 - **Milestone:** v1
 - **Phase:** 3
 - **Plan:** Wave 3b complete (Plan 03-07 msw-fixtures — 6 per-resource MSW helpers + `in-memory-db.ts` + 15 fixture JSONs including D-15 DST/tz fixtures; all helpers mirror Plan 02-01 msw-whoop-oauth.ts shape verbatim; all fixtures parse cleanly through Plan 03-03 raw Zod schemas; Gate G discipline locked at test-helper layer via Plan 03-05 canonical drizzle re-export). Next: Wave 4 (Plan 03-08 DST detector + Plan 03-09 resource modules — both consume this wave's fixtures + helpers).
 - **Status:** Ready to execute
-- **Progress:** [████████░░] 78%
+- **Progress:** [████████░░] 81%
 
 ```
 [████████░░░░░░░░░░░░] 2 / 5 phases complete (6 / 6 in Phase 1; 8 / 8 in Phase 2; 6 / 13 in Phase 3)
@@ -65,6 +65,7 @@ Plan: 8 of 13
 | Phase 03 P05 | 11m | 3 tasks | 8 files |
 | Phase 03 P06 | 8m | 2 tasks | 9 files |
 | Phase 03 P07 | 16min | 2 tasks | 22 files |
+| Phase 03 P08 | 25min | 2 tasks | 13 files |
 
 ### Plan Execution History
 
@@ -203,6 +204,9 @@ Plan: 8 of 13
 - [Phase 3]: Mirror msw-whoop-oauth.ts shape verbatim across 6 per-resource MSW helpers (D-23.1) — One mental model for WHOOP HTTP fakes across all test files; conventions.md §Testing locked one helper file per resource
 - [Phase 3]: JsonBodyType cast at fixture-load boundary keeps exactOptionalPropertyTypes-strict tsconfig clean — Project tsconfig sets exactOptionalPropertyTypes: true + strict: true; MSW's JsonBodyType excludes unknown so JSON.parse output must be cast at the boundary
 - [Phase 3]: DST fixtures use Mar 8 2026 spring forward + Nov 1 2026 fall back + tz-trip SFO->JFK -08:00->-05:00->-05:00 (D-15) — Realistic 2026 calendar DST boundaries for America/Los_Angeles; third tz-trip cycle offset matches second so it is NOT flagged (validates non-flagged path)
+- [Phase 3]: Used drizzle-orm 0.45.2's db.transaction(fn, { behavior: 'immediate' }) API for BEGIN IMMEDIATE in every repository write site (Plan 03-08)
+- [Phase 3]: Recovery byRange JOINs onto cycles for D-14 + D-16 baseline_excluded inheritance (Plan 03-08); sleep + workouts accept includeExcluded as a no-op for API symmetry until Phase 4 adds a cycle_id denormalization
+- [Phase 3]: BEGIN IMMEDIATE forcing-function asserted via source-grep on the literal { behavior: 'immediate' } substring in cycles.repo.test.ts Test 10 (Plan 03-08) — catches any future refactor that silently regresses to BEGIN DEFERRED
 
 ### Open Todos
 

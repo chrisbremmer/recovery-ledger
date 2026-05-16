@@ -72,7 +72,7 @@
 - [x] 03-05-db-connection-migrator-PLAN.md — openDb + hand-rolled BEGIN IMMEDIATE migrator + pre-migration backup + migration-crash + pragma-roundtrip integration tests (DATA-01 / DATA-04 / SYNC-06)
 - [x] 03-06-whoop-client-PLAN.md — httpGet chokepoint + paginateAll + rate-limit semaphore-of-4 + 429-Reset-honoring retry (SYNC-02 / SYNC-03)
 - [x] 03-07-msw-fixtures-PLAN.md — 6 MSW helpers + 15+ fixtures including DST/tz set + in-memory-db helper (SYNC-07 / DATA-06)
-- [ ] 03-08-repositories-PLAN.md — 9 repositories with SCORED-only default filter + ON CONFLICT idempotency + sync_runs lifecycle + body-measurements append-on-change (DATA-02 / DATA-03 / DATA-05 / DATA-06 / SYNC-04 / SYNC-05)
+- [x] 03-08-repositories-PLAN.md — 9 repositories with SCORED-only default filter + ON CONFLICT idempotency + sync_runs lifecycle + body-measurements append-on-change (DATA-02 / DATA-03 / DATA-05 / DATA-06 / SYNC-04 / SYNC-05)
 - [ ] 03-09-resources-normalizers-dst-PLAN.md — 6 per-resource modules + 6 normalizers + DST/tz detector with two OR-ed rules (SYNC-01 / SYNC-02 / SYNC-04 / DATA-05 / DATA-06)
 - [ ] 03-10-contract-tests-PLAN.md — 6 fixture-based contract tests anchoring Pitfall G + Pitfall H + idempotency per resource (SYNC-07 / DATA-05 / DATA-06)
 - [ ] 03-11-sync-orchestration-PLAN.md — runSync orchestrator + bootstrap composition root + idempotency/partial-failure/DST integration tests (SYNC-01..06 / DATA-01 / DATA-04 / DATA-06)
@@ -111,7 +111,7 @@
 |-------|----------------|--------|-----------|
 | 1. Foundation & Stdout-Pure MCP Bootstrap | 6/6 | Complete | 2026-05-12 |
 | 2. OAuth, Token Store & Single-Flight Refresh | 6/8 | In Progress|  |
-| 3. Data Model, DB Layer & Sync Loop | 7/13 | In Progress|  |
+| 3. Data Model, DB Layer & Sync Loop | 8/13 | In Progress|  |
 | 4. Domain Math, Reviews, Decision Ledger & MCP Surface | 0/? | Not started | - |
 | 5. Doctor Polish, Install Guide & <20-Minute Setup Validation | 0/? | Not started | - |
 
