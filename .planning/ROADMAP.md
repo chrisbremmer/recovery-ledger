@@ -75,7 +75,7 @@
 - [x] 03-08-repositories-PLAN.md — 9 repositories with SCORED-only default filter + ON CONFLICT idempotency + sync_runs lifecycle + body-measurements append-on-change (DATA-02 / DATA-03 / DATA-05 / DATA-06 / SYNC-04 / SYNC-05)
 - [x] 03-09-resources-normalizers-dst-PLAN.md — 6 per-resource modules + 6 normalizers + DST/tz detector with two OR-ed rules (SYNC-01 / SYNC-02 / SYNC-04 / DATA-05 / DATA-06)
 - [x] 03-10-contract-tests-PLAN.md — 6 fixture-based contract tests anchoring Pitfall G + Pitfall H + idempotency per resource (SYNC-07 / DATA-05 / DATA-06)
-- [ ] 03-11-sync-orchestration-PLAN.md — runSync orchestrator + bootstrap composition root + idempotency/partial-failure/DST integration tests (SYNC-01..06 / DATA-01 / DATA-04 / DATA-06)
+- [x] 03-11-sync-orchestration-PLAN.md — runSync orchestrator + bootstrap composition root + idempotency/partial-failure/DST integration tests (SYNC-01..06 / DATA-01 / DATA-04 / DATA-06)
 - [ ] 03-12-cli-sync-formatter-PLAN.md — Commander `recovery-ledger sync` shim + formatter; D-33 + D-34 attestation preserved (SYNC-01 / SYNC-05)
 - [ ] 03-13-phase-close-PLAN.md — full-suite green + 7 grep gates + attestation matrix + STATE/REQUIREMENTS/ROADMAP/VALIDATION updates (all 13 REQ-IDs)
 **UI hint**: no
