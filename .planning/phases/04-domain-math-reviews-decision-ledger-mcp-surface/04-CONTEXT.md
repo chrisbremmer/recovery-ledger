@@ -356,6 +356,33 @@ Key resolution moments where I had to do real thinking (vs. mechanical applicati
 
 </deferred>
 
+<decisions_addendum>
+## Decisions Addendum (Post-Research, 2026-05-16)
+
+Three open questions surfaced by `04-RESEARCH.md` were resolved after the user delegated each to the recommended option. These decisions are load-bearing for planning and extend the original D-01..D-33 set without contradicting any locked decision.
+
+- **D-34:** **`pattern_confidence: 'weak' | 'strong'` slot on `WeeklyReviewResult.pattern`.** D-13's N_scored ≥ 14 floor stays as-is; when 14 ≤ N_scored < 20, the weekly result carries `pattern_confidence: 'weak'` so the formatter can render a "small sample — effect estimates imprecise" warning. When N_scored ≥ 20, `pattern_confidence: 'strong'`. Schema-additive; the existing `Pattern | { kind: 'no_pattern_detected', reason }` discriminated union (ADR-0004) gains a non-discriminator annotation field on the `Pattern` arm. **Resolves Research Open Question 1.** Rationale: preserves the spec floor while signaling small-sample uncertainty (Mann-Whitney normal approximation degrades at n_1=3 vs n_2=11).
+
+- **D-35:** **REV-07 load-bearing fixture is `[0.05, 0.20, 0.30, 0.45, 0.60]`; original D-15 numbers `[0.01, 0.04, 0.05, 0.20, 0.50]` move to a separate test case.** Under BH step-up at q=0.10/m=5, the original fixture rejects positions 1–3 (since 3·0.10/5 = 0.06 ≥ 0.05) — incompatible with the REV-07 success criterion "p=0.05 false positive that FDR correctly downgrades." The corrected fixture has zero rejections (smallest p=0.05 vs critical 0.02), making the "downgrade" assertion exercisable. **Two test cases:**
+  1. **`bh_downgrades_marginal.fixture.json`** (REV-07 load-bearing, corrected) — p-values `[0.05, 0.20, 0.30, 0.45, 0.60]` → 0 rejections → weekly result = `{ kind: 'no_pattern_detected', reason: 'fdr_threshold_not_crossed' }`.
+  2. **`bh_partial_rejection.fixture.json`** (D-15 original numbers preserved as a separate path) — p-values `[0.01, 0.04, 0.05, 0.20, 0.50]` → 3 rejections at kStar=3 → weekly result returns the strongest-effect Pattern with `pattern_confidence` per D-34. Exercises the "BH rejects some but not all" path.
+
+  **Resolves Research Open Question 2.** Both fixtures live in `tests/fixtures/weekly-fdr/`.
+
+- **D-36:** **MCP resource + prompt sanitizer wrappers ship in Phase 4 scope.** Extend the Phase 1 `register.ts` wrapper discipline to two new files:
+  - `src/mcp/register-resource.ts` — wraps `server.registerResource(...)` calls in the same try-catch + `sanitize.ts` error pipeline tools already use.
+  - `src/mcp/register-prompt.ts` — same for `server.registerPrompt(...)`.
+
+  All 6 resources (`whoop://summary/today`, `whoop://summary/week`, `whoop://baseline/30d`, `whoop://data-quality`, `whoop://api-gaps`, `whoop://decisions/open`) and all 4 prompts (`whoop_daily_decision_brief`, `whoop_weekly_recovery_investigation`, `whoop_experiment_designer`, `whoop_deload_or_train`) flow through these wrappers. Adds 2 source files (~120 LOC combined) and 2 new grep gates to `scripts/ci-grep-gates.sh`:
+  - **Gate I (resource):** outside `src/mcp/register-resource.ts`, no direct `server.registerResource(`.
+  - **Gate J (prompt):** outside `src/mcp/register-prompt.ts`, no direct `server.registerPrompt(`.
+
+  D-33's `tools.length === 1` attestation (Phase 3 carry-forward) breaks intentionally in Phase 4 anyway (D-29) — the analog attestations become `resources.length === 6` + `prompts.length === 4` + `tools.length === 8`, all enforced via the wrapper layer. **Resolves Research Open Question 3.**
+
+These three decisions are now locked alongside D-01..D-33.
+
+</decisions_addendum>
+
 ---
 
 *Phase: 04-domain-math-reviews-decision-ledger-mcp-surface*
