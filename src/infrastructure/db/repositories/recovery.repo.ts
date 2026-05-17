@@ -24,11 +24,16 @@ import { cycles as cyclesTable, recoveries as recoveriesTable } from '../schema.
 
 export type { ByRangeOpts };
 
+/** Upsert input — Recovery entity carries no `rawJson` (D-29: hidden from
+ *  domain); the orchestrator pairs each entity with its WHOOP wire payload
+ *  before calling `upsertBatch` (Issue #12 — real declared field, no cast). */
+export type RecoveryUpsertRow = Recovery & { rawJson: string };
+
 export interface RecoveryRepo {
   /** `COALESCE(MAX(updated_at), EPOCH_ZERO_ISO)` over the recoveries table. */
   cursor(): string;
   /** Idempotent upsert with compound-PK target (cycle_id, sleep_id). */
-  upsertBatch(rows: Recovery[]): { changed: number };
+  upsertBatch(rows: RecoveryUpsertRow[]): { changed: number };
   /** Compound-key point lookup; null when the row is absent. */
   byCycleAndSleep(cycleId: number, sleepId: string): Recovery | null;
   /** Range query over `recoveries.created_at` ∈ [start, end]. Default filter:
@@ -52,7 +57,7 @@ export function createRecoveryRepo(db: ReturnType<typeof drizzle>): RecoveryRepo
       return row?.cursor ?? EPOCH_ZERO_ISO;
     },
 
-    upsertBatch(rows: Recovery[]): { changed: number } {
+    upsertBatch(rows: RecoveryUpsertRow[]): { changed: number } {
       if (rows.length === 0) return { changed: 0 };
       return db.transaction(
         (tx) => {
@@ -189,7 +194,7 @@ export function rowToRecovery(row: RecoveryRow): Recovery {
   }
 }
 
-function recoveryEntityToRow(r: Recovery): typeof recoveriesTable.$inferInsert {
+function recoveryEntityToRow(r: RecoveryUpsertRow): typeof recoveriesTable.$inferInsert {
   const base = {
     cycle_id: r.cycleId,
     sleep_id: r.sleepId,
@@ -197,7 +202,7 @@ function recoveryEntityToRow(r: Recovery): typeof recoveriesTable.$inferInsert {
     created_at: r.createdAt,
     updated_at: r.updatedAt,
     score_state: r.scoreState,
-    raw_json: (r as Recovery & { rawJson?: string }).rawJson ?? '{}',
+    raw_json: r.rawJson,
   };
   if (r.scoreState === 'SCORED') {
     return {

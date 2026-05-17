@@ -31,7 +31,17 @@ export interface ListRecoveryOpts {
   until: string;
 }
 
-export async function listRecovery(opts: ListRecoveryOpts): Promise<Recovery[]> {
+/**
+ * Parallel-array result so the orchestrator can attach the corresponding
+ * raw WHOOP JSON to each upsert (D-29 diagnostic seam — Issue #12). `raw`
+ * and `entities` are index-aligned.
+ */
+export interface ListRecoveryResult {
+  raw: z.infer<typeof WhoopRawRecovery>[];
+  entities: Recovery[];
+}
+
+export async function listRecovery(opts: ListRecoveryOpts): Promise<ListRecoveryResult> {
   const rawRecords = await paginateAll<z.infer<typeof WhoopRawRecovery>>(
     async (nextToken) =>
       httpGet(
@@ -48,5 +58,5 @@ export async function listRecovery(opts: ListRecoveryOpts): Promise<Recovery[]> 
     (row) => row.cycle_id + ':' + row.sleep_id,
   );
 
-  return rawRecords.map(normalizeRecovery);
+  return { raw: rawRecords, entities: rawRecords.map(normalizeRecovery) };
 }

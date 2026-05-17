@@ -341,13 +341,17 @@ async function syncOneResource(
       const priorCycle = deps.repos.cycles.priorBefore(window.since);
       const priorTimezoneOffset = priorCycle?.timezoneOffset ?? null;
 
-      const entities = await deps.whoop.resources.cycles({
+      const { raw, entities } = await deps.whoop.resources.cycles({
         since: window.since,
         until: window.until,
         ianaZone,
         priorTimezoneOffset,
       });
-      const upsert = deps.repos.cycles.upsertBatch(entities);
+      // D-29 / Issue #12: pair each entity with the index-aligned raw
+      // payload so `raw_json` persists the actual wire JSON, not '{}'.
+      const upsert = deps.repos.cycles.upsertBatch(
+        entities.map((entity, i) => ({ ...entity, rawJson: JSON.stringify(raw[i]) })),
+      );
       return {
         status: 'success',
         fetched: entities.length,
@@ -362,11 +366,13 @@ async function syncOneResource(
         flagSinceISO: input.since ?? null,
         flagDaysN: input.days ?? null,
       });
-      const entities = await deps.whoop.resources.recoveries({
+      const { raw, entities } = await deps.whoop.resources.recoveries({
         since: window.since,
         until: window.until,
       });
-      const upsert = deps.repos.recoveries.upsertBatch(entities);
+      const upsert = deps.repos.recoveries.upsertBatch(
+        entities.map((entity, i) => ({ ...entity, rawJson: JSON.stringify(raw[i]) })),
+      );
       return {
         status: 'success',
         fetched: entities.length,
@@ -381,11 +387,13 @@ async function syncOneResource(
         flagSinceISO: input.since ?? null,
         flagDaysN: input.days ?? null,
       });
-      const entities = await deps.whoop.resources.sleeps({
+      const { raw, entities } = await deps.whoop.resources.sleeps({
         since: window.since,
         until: window.until,
       });
-      const upsert = deps.repos.sleeps.upsertBatch(entities);
+      const upsert = deps.repos.sleeps.upsertBatch(
+        entities.map((entity, i) => ({ ...entity, rawJson: JSON.stringify(raw[i]) })),
+      );
       return {
         status: 'success',
         fetched: entities.length,
@@ -400,11 +408,13 @@ async function syncOneResource(
         flagSinceISO: input.since ?? null,
         flagDaysN: input.days ?? null,
       });
-      const entities = await deps.whoop.resources.workouts({
+      const { raw, entities } = await deps.whoop.resources.workouts({
         since: window.since,
         until: window.until,
       });
-      const upsert = deps.repos.workouts.upsertBatch(entities);
+      const upsert = deps.repos.workouts.upsertBatch(
+        entities.map((entity, i) => ({ ...entity, rawJson: JSON.stringify(raw[i]) })),
+      );
       return {
         status: 'success',
         fetched: entities.length,

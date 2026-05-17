@@ -9,7 +9,7 @@
 // refresh-orchestrator bypasses the keychain.
 
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, test, vi } from 'vitest';
-import type { Sleep } from '../../src/domain/types/entities.js';
+import type { SleepUpsertRow } from '../../src/infrastructure/db/repositories/sleep.repo.js';
 import { createInMemoryDb, type InMemoryDbResult } from '../helpers/in-memory-db.js';
 import { createWhoopSleepHelper, type WhoopSleepHelper } from '../helpers/msw-whoop-sleep.js';
 
@@ -30,7 +30,7 @@ const UNTIL = '2026-12-31T23:59:59.999Z';
 const BASE_USER_ID = 100001;
 const FIXTURE_SLEEP_ID = '7dee4993-8fa2-43a7-8e54-94a5c0d3227a';
 
-function makeScoredSleep(id: string): Sleep {
+function makeScoredSleep(id: string): SleepUpsertRow {
   return {
     id,
     userId: BASE_USER_ID,
@@ -46,10 +46,11 @@ function makeScoredSleep(id: string): Sleep {
     sleepConsistencyPercentage: 76.0,
     sleepEfficiencyPercentage: 93.7,
     respiratoryRate: 14.8,
+    rawJson: '{}',
   };
 }
 
-function makePendingSleep(id: string): Sleep {
+function makePendingSleep(id: string): SleepUpsertRow {
   return {
     id,
     userId: BASE_USER_ID,
@@ -59,6 +60,7 @@ function makePendingSleep(id: string): Sleep {
     end: '2026-05-11T13:00:00.000Z',
     timezoneOffset: '-08:00',
     scoreState: 'PENDING_SCORE',
+    rawJson: '{}',
   };
 }
 
@@ -88,13 +90,13 @@ afterEach(() => {
 
 describe('sleep contract — happy path + idempotency', () => {
   test('Test 1: happy path — listSleep + upsertBatch + byRange returns the fixture sleep (UUID id)', async () => {
-    const sleeps = await listSleep({ since: SINCE, until: UNTIL });
+    const { entities: sleeps } = await listSleep({ since: SINCE, until: UNTIL });
     expect(sleeps).toHaveLength(1);
     expect(sleeps[0]?.scoreState).toBe('SCORED');
     expect(sleeps[0]?.id).toBe(FIXTURE_SLEEP_ID);
 
     const repo = createSleepsRepo(mem.db);
-    const upsertResult = repo.upsertBatch(sleeps);
+    const upsertResult = repo.upsertBatch(sleeps.map((s) => ({ ...s, rawJson: '{}' })));
     expect(upsertResult.changed).toBe(1);
 
     const stored = repo.byRange(SINCE, UNTIL);
@@ -104,10 +106,10 @@ describe('sleep contract — happy path + idempotency', () => {
 
   test('Test 2: idempotency — second listSleep + upsertBatch leaves row count at 1', async () => {
     const repo = createSleepsRepo(mem.db);
-    const first = await listSleep({ since: SINCE, until: UNTIL });
-    repo.upsertBatch(first);
-    const second = await listSleep({ since: SINCE, until: UNTIL });
-    repo.upsertBatch(second);
+    const { entities: first } = await listSleep({ since: SINCE, until: UNTIL });
+    repo.upsertBatch(first.map((s) => ({ ...s, rawJson: '{}' })));
+    const { entities: second } = await listSleep({ since: SINCE, until: UNTIL });
+    repo.upsertBatch(second.map((s) => ({ ...s, rawJson: '{}' })));
 
     const count = (mem.sqlite.prepare('SELECT COUNT(*) AS c FROM sleeps').get() as { c: number }).c;
     expect(count).toBe(1);
@@ -133,9 +135,9 @@ describe('sleep contract — D-04 SCORED-only default filter', () => {
 
 describe('sleep contract — A6 UUID-string id shape', () => {
   test('Test 4: stored sleep id is a 36-char UUID string', async () => {
-    const sleeps = await listSleep({ since: SINCE, until: UNTIL });
+    const { entities: sleeps } = await listSleep({ since: SINCE, until: UNTIL });
     const repo = createSleepsRepo(mem.db);
-    repo.upsertBatch(sleeps);
+    repo.upsertBatch(sleeps.map((s) => ({ ...s, rawJson: '{}' })));
     const stored = repo.byRange(SINCE, UNTIL);
     expect(typeof stored[0]?.id).toBe('string');
     expect(stored[0]?.id.length).toBe(36);
@@ -144,16 +146,10 @@ describe('sleep contract — A6 UUID-string id shape', () => {
 
 describe('sleep contract — getRawJson diagnostic seam (D-29)', () => {
   test('Test 5: getRawJson(id) returns the stored raw_json payload', async () => {
-    const sleeps = await listSleep({ since: SINCE, until: UNTIL });
+    const { entities: sleeps } = await listSleep({ since: SINCE, until: UNTIL });
     const repo = createSleepsRepo(mem.db);
     const fixturePayload = '{"id":"7dee4993-8fa2-43a7-8e54-94a5c0d3227a","mock":true}';
-    const withRaw = sleeps.map(
-      (s) =>
-        ({ ...s, rawJson: fixturePayload }) as Sleep & {
-          rawJson: string;
-        },
-    );
-    repo.upsertBatch(withRaw);
+    repo.upsertBatch(sleeps.map((s) => ({ ...s, rawJson: fixturePayload })));
     expect(repo.getRawJson(FIXTURE_SLEEP_ID)).toBe(fixturePayload);
   });
 });

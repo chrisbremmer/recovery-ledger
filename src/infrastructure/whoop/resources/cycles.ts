@@ -38,7 +38,17 @@ export interface ListCyclesOpts {
   priorTimezoneOffset: string | null;
 }
 
-export async function listCycles(opts: ListCyclesOpts): Promise<Cycle[]> {
+/**
+ * Parallel-array result so the orchestrator can attach the corresponding
+ * raw WHOOP JSON to each upsert (D-29 diagnostic seam — Issue #12). `raw`
+ * and `entities` are index-aligned and post-sort (start ascending).
+ */
+export interface ListCyclesResult {
+  raw: z.infer<typeof WhoopRawCycle>[];
+  entities: Cycle[];
+}
+
+export async function listCycles(opts: ListCyclesOpts): Promise<ListCyclesResult> {
   const rawRecords = await paginateAll<z.infer<typeof WhoopRawCycle>>(async (nextToken) =>
     httpGet(
       '/v2/cycle',
@@ -53,7 +63,8 @@ export async function listCycles(opts: ListCyclesOpts): Promise<Cycle[]> {
   );
 
   // Sort start-ascending so the rolling priorOffset walk below sees the
-  // chronologically-prior cycle on each iteration.
+  // chronologically-prior cycle on each iteration. Raw and entities share
+  // this ordering so the orchestrator can pair them by index.
   const sorted = [...rawRecords].sort((a, b) => a.start.localeCompare(b.start));
 
   const entities: Cycle[] = [];
@@ -64,5 +75,5 @@ export async function listCycles(opts: ListCyclesOpts): Promise<Cycle[]> {
     );
     priorOffset = raw.timezone_offset;
   }
-  return entities;
+  return { raw: sorted, entities };
 }

@@ -80,7 +80,7 @@ afterEach(() => {
 describe('cycles contract — happy path + idempotency (D-11 / SYNC-04)', () => {
   test('Test 1: happy path — listCycles + upsertBatch + byRange round-trip returns the fixture cycle', async () => {
     // Default fixture (200-ok.json) returns one SCORED cycle.
-    const cycles = await listCycles({
+    const { entities: cycles } = await listCycles({
       since: SINCE,
       until: UNTIL,
       ianaZone: IANA_ZONE,
@@ -90,7 +90,7 @@ describe('cycles contract — happy path + idempotency (D-11 / SYNC-04)', () => 
     expect(cycles[0]?.scoreState).toBe('SCORED');
 
     const repo = createCyclesRepo(mem.db);
-    const upsertResult = repo.upsertBatch(cycles);
+    const upsertResult = repo.upsertBatch(cycles.map((c) => ({ ...c, rawJson: '{}' })));
     expect(upsertResult.changed).toBe(1);
 
     const stored = repo.byRange(SINCE, UNTIL);
@@ -101,20 +101,20 @@ describe('cycles contract — happy path + idempotency (D-11 / SYNC-04)', () => 
 
   test('Test 2: idempotency — a second listCycles + upsertBatch with the same fixture does not duplicate rows', async () => {
     const repo = createCyclesRepo(mem.db);
-    const first = await listCycles({
+    const { entities: first } = await listCycles({
       since: SINCE,
       until: UNTIL,
       ianaZone: IANA_ZONE,
       priorTimezoneOffset: null,
     });
-    repo.upsertBatch(first);
-    const second = await listCycles({
+    repo.upsertBatch(first.map((c) => ({ ...c, rawJson: '{}' })));
+    const { entities: second } = await listCycles({
       since: SINCE,
       until: UNTIL,
       ianaZone: IANA_ZONE,
       priorTimezoneOffset: null,
     });
-    repo.upsertBatch(second);
+    repo.upsertBatch(second.map((c) => ({ ...c, rawJson: '{}' })));
 
     const stored = repo.byRange(SINCE, UNTIL);
     expect(stored).toHaveLength(1);
@@ -126,7 +126,7 @@ describe('cycles contract — happy path + idempotency (D-11 / SYNC-04)', () => 
 describe('cycles contract — Pitfall H (DST/tz exclusion fixtures)', () => {
   test('Test 3: 200-dst-spring-forward fixture → baselineExcluded=true + exclusionReason="dst_straddle"', async () => {
     helper.setNextResponse(loadFixture('200-dst-spring-forward'));
-    const cycles = await listCycles({
+    const { entities: cycles } = await listCycles({
       since: SINCE,
       until: UNTIL,
       ianaZone: IANA_ZONE,
@@ -138,7 +138,7 @@ describe('cycles contract — Pitfall H (DST/tz exclusion fixtures)', () => {
 
     // Persisted flag must round-trip through upsert + byRange (D-16).
     const repo = createCyclesRepo(mem.db);
-    repo.upsertBatch(cycles);
+    repo.upsertBatch(cycles.map((c) => ({ ...c, rawJson: '{}' })));
     const withExcluded = repo.byRange(SINCE, UNTIL, { includeExcluded: true });
     expect(withExcluded).toHaveLength(1);
     expect(withExcluded[0]?.baselineExcluded).toBe(true);
@@ -150,7 +150,7 @@ describe('cycles contract — Pitfall H (DST/tz exclusion fixtures)', () => {
 
   test('Test 4: 200-dst-fall-back fixture → same exclusion behavior on the November boundary', async () => {
     helper.setNextResponse(loadFixture('200-dst-fall-back'));
-    const cycles = await listCycles({
+    const { entities: cycles } = await listCycles({
       since: SINCE,
       until: UNTIL,
       ianaZone: IANA_ZONE,
@@ -163,7 +163,7 @@ describe('cycles contract — Pitfall H (DST/tz exclusion fixtures)', () => {
 
   test('Test 5: 200-tz-trip-sfo-jfk fixture → tz_drift fires on the offset transition', async () => {
     helper.setNextResponse(loadFixture('200-tz-trip-sfo-jfk'));
-    const cycles = await listCycles({
+    const { entities: cycles } = await listCycles({
       since: SINCE,
       until: UNTIL,
       ianaZone: IANA_ZONE,
@@ -213,7 +213,7 @@ describe('cycles contract — pagination + dup-key detection (D-19 / Pitfall 10)
       }),
     );
 
-    const cycles = await listCycles({
+    const { entities: cycles } = await listCycles({
       since: SINCE,
       until: UNTIL,
       ianaZone: IANA_ZONE,
@@ -270,7 +270,7 @@ describe('cycles contract — pagination + dup-key detection (D-19 / Pitfall 10)
 describe('cycles contract — Pitfall H mixed-score-states + D-04 SCORED-only filter', () => {
   test('Test 8: 200-mixed-score-states fixture — 3 score states survive the pipeline; default byRange returns SCORED only', async () => {
     helper.setNextResponse(loadFixture('200-mixed-score-states'));
-    const cycles = await listCycles({
+    const { entities: cycles } = await listCycles({
       since: SINCE,
       until: UNTIL,
       ianaZone: IANA_ZONE,
@@ -281,7 +281,7 @@ describe('cycles contract — Pitfall H mixed-score-states + D-04 SCORED-only fi
     expect(states).toEqual(['PENDING_SCORE', 'SCORED', 'UNSCORABLE']);
 
     const repo = createCyclesRepo(mem.db);
-    const upsertResult = repo.upsertBatch(cycles);
+    const upsertResult = repo.upsertBatch(cycles.map((c) => ({ ...c, rawJson: '{}' })));
     expect(upsertResult.changed).toBe(3);
 
     // D-04 default filter: SCORED only.
@@ -300,7 +300,7 @@ describe('cycles contract — Pitfall H mixed-score-states + D-04 SCORED-only fi
     // repo's entityToRow defaults raw_json to '{}' when absent, so we
     // attach the wire payload via the optional rawJson side-channel
     // (matches the cycles.repo.test.ts pattern).
-    const cycles = await listCycles({
+    const { entities: cycles } = await listCycles({
       since: SINCE,
       until: UNTIL,
       ianaZone: IANA_ZONE,

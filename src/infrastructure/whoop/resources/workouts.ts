@@ -21,7 +21,17 @@ export interface ListWorkoutsOpts {
   until: string;
 }
 
-export async function listWorkouts(opts: ListWorkoutsOpts): Promise<Workout[]> {
+/**
+ * Parallel-array result so the orchestrator can attach the corresponding
+ * raw WHOOP JSON to each upsert (D-29 diagnostic seam — Issue #12). `raw`
+ * and `entities` are index-aligned.
+ */
+export interface ListWorkoutsResult {
+  raw: z.infer<typeof WhoopRawWorkout>[];
+  entities: Workout[];
+}
+
+export async function listWorkouts(opts: ListWorkoutsOpts): Promise<ListWorkoutsResult> {
   const rawRecords = await paginateAll<z.infer<typeof WhoopRawWorkout>>(async (nextToken) =>
     httpGet(
       '/v2/activity/workout',
@@ -35,5 +45,5 @@ export async function listWorkouts(opts: ListWorkoutsOpts): Promise<Workout[]> {
     ),
   );
 
-  return rawRecords.map(normalizeWorkout);
+  return { raw: rawRecords, entities: rawRecords.map(normalizeWorkout) };
 }
