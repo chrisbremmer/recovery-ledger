@@ -27,7 +27,7 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, test, vi } from 'vitest';
-import type { Cycle, Recovery } from '../../src/domain/types/entities.js';
+import type { CycleUpsertRow } from '../../src/infrastructure/db/repositories/cycles.repo.js';
 import { createInMemoryDb, type InMemoryDbResult } from '../helpers/in-memory-db.js';
 import {
   createWhoopRecoveryHelper,
@@ -62,7 +62,7 @@ const SINCE = '2026-01-01T00:00:00.000Z';
 const UNTIL = '2026-12-31T23:59:59.999Z';
 const BASE_USER_ID = 100001;
 
-function makeParentCycle(id: number): Cycle {
+function makeParentCycle(id: number): CycleUpsertRow {
   return {
     id,
     userId: BASE_USER_ID,
@@ -78,6 +78,7 @@ function makeParentCycle(id: number): Cycle {
     maxHeartRate: 176,
     baselineExcluded: false,
     exclusionReason: null,
+    rawJson: '{}',
   };
 }
 
@@ -114,12 +115,12 @@ describe('recovery contract — happy path + idempotency (D-11 / SYNC-04)', () =
   test('Test 1: happy path — listRecovery + upsertBatch + byCycleAndSleep round-trip returns the SCORED entity', async () => {
     // Default fixture: cycle_id 12345678 + sleep_id a98fe018-...
     seedParentCycles(mem, [12345678]);
-    const recoveries = await listRecovery({ since: SINCE, until: UNTIL });
+    const { entities: recoveries } = await listRecovery({ since: SINCE, until: UNTIL });
     expect(recoveries).toHaveLength(1);
     expect(recoveries[0]?.scoreState).toBe('SCORED');
 
     const repo = createRecoveryRepo(mem.db);
-    const upsertResult = repo.upsertBatch(recoveries);
+    const upsertResult = repo.upsertBatch(recoveries.map((r) => ({ ...r, rawJson: '{}' })));
     expect(upsertResult.changed).toBe(1);
 
     const stored = repo.byCycleAndSleep(12345678, 'a98fe018-e629-4be3-97a6-529077ea7f24');
@@ -133,10 +134,10 @@ describe('recovery contract — happy path + idempotency (D-11 / SYNC-04)', () =
   test('Test 2: idempotency — compound ON CONFLICT(cycle_id, sleep_id) keeps the row count at 1', async () => {
     seedParentCycles(mem, [12345678]);
     const repo = createRecoveryRepo(mem.db);
-    const first = await listRecovery({ since: SINCE, until: UNTIL });
-    repo.upsertBatch(first);
-    const second = await listRecovery({ since: SINCE, until: UNTIL });
-    repo.upsertBatch(second);
+    const { entities: first } = await listRecovery({ since: SINCE, until: UNTIL });
+    repo.upsertBatch(first.map((r) => ({ ...r, rawJson: '{}' })));
+    const { entities: second } = await listRecovery({ since: SINCE, until: UNTIL });
+    repo.upsertBatch(second.map((r) => ({ ...r, rawJson: '{}' })));
 
     const count = (
       mem.sqlite.prepare('SELECT COUNT(*) AS c FROM recoveries').get() as { c: number }
@@ -152,13 +153,13 @@ describe('recovery contract — Pitfall G score-state discipline (200-mixed-scor
     seedParentCycles(mem, [40001, 40002, 40003]);
     helper.setNextResponse(loadFixture('200-mixed-score-states'));
 
-    const recoveries = await listRecovery({ since: SINCE, until: UNTIL });
+    const { entities: recoveries } = await listRecovery({ since: SINCE, until: UNTIL });
     expect(recoveries).toHaveLength(3);
     const states = recoveries.map((r) => r.scoreState).sort();
     expect(states).toEqual(['PENDING_SCORE', 'SCORED', 'UNSCORABLE']);
 
     const repo = createRecoveryRepo(mem.db);
-    const upsertResult = repo.upsertBatch(recoveries);
+    const upsertResult = repo.upsertBatch(recoveries.map((r) => ({ ...r, rawJson: '{}' })));
     expect(upsertResult.changed).toBe(3);
 
     // D-04 default filter: SCORED only.
@@ -263,18 +264,12 @@ describe('recovery contract — pagination dup-key detection for compound keys (
 describe('recovery contract — getRawJson diagnostic seam (D-29)', () => {
   test('Test 5: getRawJson(cycleId, sleepId) returns the stored wire payload for the SCORED row', async () => {
     seedParentCycles(mem, [12345678]);
-    const recoveries = await listRecovery({ since: SINCE, until: UNTIL });
+    const { entities: recoveries } = await listRecovery({ since: SINCE, until: UNTIL });
     const repo = createRecoveryRepo(mem.db);
     const fixturePayload = JSON.stringify(
       (loadFixture('200-ok') as { records: unknown[] }).records[0],
     );
-    const withRaw: Recovery[] = recoveries.map(
-      (r) =>
-        ({ ...r, rawJson: fixturePayload }) as Recovery & {
-          rawJson: string;
-        },
-    );
-    repo.upsertBatch(withRaw);
+    repo.upsertBatch(recoveries.map((r) => ({ ...r, rawJson: fixturePayload })));
     const raw = repo.getRawJson(12345678, 'a98fe018-e629-4be3-97a6-529077ea7f24');
     expect(raw).toBe(fixturePayload);
   });

@@ -18,7 +18,17 @@ export interface ListSleepOpts {
   until: string;
 }
 
-export async function listSleep(opts: ListSleepOpts): Promise<Sleep[]> {
+/**
+ * Parallel-array result so the orchestrator can attach the corresponding
+ * raw WHOOP JSON to each upsert (D-29 diagnostic seam — Issue #12). `raw`
+ * and `entities` are index-aligned.
+ */
+export interface ListSleepResult {
+  raw: z.infer<typeof WhoopRawSleep>[];
+  entities: Sleep[];
+}
+
+export async function listSleep(opts: ListSleepOpts): Promise<ListSleepResult> {
   const rawRecords = await paginateAll<z.infer<typeof WhoopRawSleep>>(async (nextToken) =>
     httpGet(
       '/v2/activity/sleep',
@@ -32,5 +42,5 @@ export async function listSleep(opts: ListSleepOpts): Promise<Sleep[]> {
     ),
   );
 
-  return rawRecords.map(normalizeSleep);
+  return { raw: rawRecords, entities: rawRecords.map(normalizeSleep) };
 }

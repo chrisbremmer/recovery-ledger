@@ -5,9 +5,8 @@
 
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { createInMemoryDb, type InMemoryDbResult } from '../../../../tests/helpers/in-memory-db.js';
-import type { Cycle, Recovery } from '../../../domain/types/entities.js';
-import { createCyclesRepo } from './cycles.repo.js';
-import { createRecoveryRepo } from './recovery.repo.js';
+import { createCyclesRepo, type CycleUpsertRow } from './cycles.repo.js';
+import { createRecoveryRepo, type RecoveryUpsertRow } from './recovery.repo.js';
 
 // Helpers ---------------------------------------------------------------------
 
@@ -17,7 +16,10 @@ const SLEEP_3 = 'eba87580-89d8-41b4-bd5c-386d2e1a3df1';
 
 const BASE_USER_ID = 100001;
 
-function makeScoredCycle(id: number, baselineExcluded = false): Cycle {
+// Factories return upsert-shaped rows (entity + rawJson default '{}') so
+// test sites can pass them straight to upsertBatch without per-call wrappers.
+
+function makeScoredCycle(id: number, baselineExcluded = false): CycleUpsertRow {
   return {
     id,
     userId: BASE_USER_ID,
@@ -33,14 +35,15 @@ function makeScoredCycle(id: number, baselineExcluded = false): Cycle {
     maxHeartRate: 176,
     baselineExcluded,
     exclusionReason: baselineExcluded ? 'dst_straddle' : null,
+    rawJson: '{}',
   };
 }
 
 function makeScoredRecovery(
   cycleId: number,
   sleepId: string,
-  overrides: Partial<Recovery> = {},
-): Recovery {
+  overrides: Partial<RecoveryUpsertRow> = {},
+): RecoveryUpsertRow {
   return {
     cycleId,
     sleepId,
@@ -54,11 +57,12 @@ function makeScoredRecovery(
     spo2Percentage: 96.5,
     skinTempCelsius: 33.0,
     userCalibrating: false,
+    rawJson: '{}',
     ...overrides,
-  } as Recovery;
+  } as RecoveryUpsertRow;
 }
 
-function makePendingRecovery(cycleId: number, sleepId: string): Recovery {
+function makePendingRecovery(cycleId: number, sleepId: string): RecoveryUpsertRow {
   return {
     cycleId,
     sleepId,
@@ -66,10 +70,11 @@ function makePendingRecovery(cycleId: number, sleepId: string): Recovery {
     createdAt: '2026-05-14T08:30:00.000Z',
     updatedAt: '2026-05-14T08:30:00.000Z',
     scoreState: 'PENDING_SCORE',
+    rawJson: '{}',
   };
 }
 
-function makeUnscorableRecovery(cycleId: number, sleepId: string): Recovery {
+function makeUnscorableRecovery(cycleId: number, sleepId: string): RecoveryUpsertRow {
   return {
     cycleId,
     sleepId,
@@ -77,6 +82,7 @@ function makeUnscorableRecovery(cycleId: number, sleepId: string): Recovery {
     createdAt: '2026-05-15T08:30:00.000Z',
     updatedAt: '2026-05-15T20:30:00.000Z',
     scoreState: 'UNSCORABLE',
+    rawJson: '{}',
   };
 }
 
@@ -258,9 +264,9 @@ describe('recovery repo — getRawJson() compound-key seam (D-29)', () => {
   it('Test 12: returns stored raw_json on compound key; null on miss', () => {
     seedCycles(mem, [40001]);
     const repo = createRecoveryRepo(mem.db);
-    const entityWithRaw = makeScoredRecovery(40001, SLEEP_1) as Recovery & { rawJson: string };
-    entityWithRaw.rawJson = '{"cycle_id":40001}';
-    repo.upsertBatch([entityWithRaw]);
+    repo.upsertBatch([
+      makeScoredRecovery(40001, SLEEP_1, { rawJson: '{"cycle_id":40001}' }),
+    ]);
     expect(repo.getRawJson(40001, SLEEP_1)).toBe('{"cycle_id":40001}');
     expect(repo.getRawJson(99999, SLEEP_1)).toBeNull();
     expect(repo.getRawJson(40001, 'no-such-sleep-uuid')).toBeNull();

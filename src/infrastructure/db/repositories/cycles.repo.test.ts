@@ -22,8 +22,7 @@
 import { readFileSync } from 'node:fs';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { createInMemoryDb, type InMemoryDbResult } from '../../../../tests/helpers/in-memory-db.js';
-import type { Cycle } from '../../../domain/types/entities.js';
-import { createCyclesRepo, rowToCycle } from './cycles.repo.js';
+import { createCyclesRepo, type CycleUpsertRow, rowToCycle } from './cycles.repo.js';
 
 const REPO_FILE = new URL('./cycles.repo.ts', import.meta.url).pathname;
 
@@ -32,7 +31,10 @@ const REPO_FILE = new URL('./cycles.repo.ts', import.meta.url).pathname;
 const BASE_DATE = '2026-05-13T07:00:00.000Z';
 const BASE_USER_ID = 100001;
 
-function makeScoredCycle(overrides: Partial<Cycle> = {}): Cycle {
+// Factories return `CycleUpsertRow` (Cycle & { rawJson }) so test sites can
+// pass them straight to upsertBatch without a per-call wrapper. `rawJson`
+// defaults to '{}' — getRawJson tests override it explicitly.
+function makeScoredCycle(overrides: Partial<CycleUpsertRow> = {}): CycleUpsertRow {
   return {
     id: 40001,
     userId: BASE_USER_ID,
@@ -48,11 +50,12 @@ function makeScoredCycle(overrides: Partial<Cycle> = {}): Cycle {
     maxHeartRate: 176,
     baselineExcluded: false,
     exclusionReason: null,
+    rawJson: '{}',
     ...overrides,
-  } as Cycle;
+  } as CycleUpsertRow;
 }
 
-function makePendingCycle(overrides: Partial<Cycle> = {}): Cycle {
+function makePendingCycle(overrides: Partial<CycleUpsertRow> = {}): CycleUpsertRow {
   return {
     id: 40002,
     userId: BASE_USER_ID,
@@ -64,11 +67,12 @@ function makePendingCycle(overrides: Partial<Cycle> = {}): Cycle {
     scoreState: 'PENDING_SCORE',
     baselineExcluded: false,
     exclusionReason: null,
+    rawJson: '{}',
     ...overrides,
-  } as Cycle;
+  } as CycleUpsertRow;
 }
 
-function makeUnscorableCycle(overrides: Partial<Cycle> = {}): Cycle {
+function makeUnscorableCycle(overrides: Partial<CycleUpsertRow> = {}): CycleUpsertRow {
   return {
     id: 40003,
     userId: BASE_USER_ID,
@@ -80,8 +84,9 @@ function makeUnscorableCycle(overrides: Partial<Cycle> = {}): Cycle {
     scoreState: 'UNSCORABLE',
     baselineExcluded: false,
     exclusionReason: null,
+    rawJson: '{}',
     ...overrides,
-  } as Cycle;
+  } as CycleUpsertRow;
 }
 
 // Test suite ------------------------------------------------------------------
@@ -252,11 +257,9 @@ describe('cycles repo — getRawJson() diagnostic seam (D-29)', () => {
 
   it('Test 9a: returns the stored raw_json string', () => {
     const repo = createCyclesRepo(mem.db);
-    // The cycle entity has no rawJson on its type; carry through the
-    // optional-field path the entity-to-row mapper supports.
-    const entityWithRaw = makeScoredCycle({ id: 40001 }) as Cycle & { rawJson: string };
-    entityWithRaw.rawJson = '{"id":40001,"score_state":"SCORED"}';
-    repo.upsertBatch([entityWithRaw]);
+    repo.upsertBatch([
+      makeScoredCycle({ id: 40001, rawJson: '{"id":40001,"score_state":"SCORED"}' }),
+    ]);
     expect(repo.getRawJson(40001)).toBe('{"id":40001,"score_state":"SCORED"}');
   });
 

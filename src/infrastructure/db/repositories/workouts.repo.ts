@@ -17,9 +17,14 @@ import { workouts as workoutsTable } from '../schema.js';
 
 export type { ByRangeOpts };
 
+/** Upsert input — Workout entity carries no `rawJson` (D-29: hidden from
+ *  domain); the orchestrator pairs each entity with its WHOOP wire payload
+ *  before calling `upsertBatch` (Issue #12 — real declared field, no cast). */
+export type WorkoutUpsertRow = Workout & { rawJson: string };
+
 export interface WorkoutsRepo {
   cursor(): string;
-  upsertBatch(rows: Workout[]): { changed: number };
+  upsertBatch(rows: WorkoutUpsertRow[]): { changed: number };
   byRange(start: string, end: string, opts?: ByRangeOpts): Workout[];
   getRawJson(id: string): string | null;
 }
@@ -38,7 +43,7 @@ export function createWorkoutsRepo(db: ReturnType<typeof drizzle>): WorkoutsRepo
       return row?.cursor ?? EPOCH_ZERO_ISO;
     },
 
-    upsertBatch(rows: Workout[]): { changed: number } {
+    upsertBatch(rows: WorkoutUpsertRow[]): { changed: number } {
       if (rows.length === 0) return { changed: 0 };
       return db.transaction(
         (tx) => {
@@ -152,7 +157,7 @@ export function rowToWorkout(row: WorkoutRow): Workout {
   }
 }
 
-function workoutEntityToRow(w: Workout): typeof workoutsTable.$inferInsert {
+function workoutEntityToRow(w: WorkoutUpsertRow): typeof workoutsTable.$inferInsert {
   const base = {
     id: w.id,
     user_id: w.userId,
@@ -163,7 +168,7 @@ function workoutEntityToRow(w: Workout): typeof workoutsTable.$inferInsert {
     timezone_offset: w.timezoneOffset,
     sport_id: w.sportId,
     score_state: w.scoreState,
-    raw_json: (w as Workout & { rawJson?: string }).rawJson ?? '{}',
+    raw_json: w.rawJson,
   };
   if (w.scoreState === 'SCORED') {
     return {

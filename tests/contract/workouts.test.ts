@@ -8,7 +8,7 @@
 // ADR-0006: onUnhandledRequest:'error' on MSW.
 
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, test, vi } from 'vitest';
-import type { Workout } from '../../src/domain/types/entities.js';
+import type { WorkoutUpsertRow } from '../../src/infrastructure/db/repositories/workouts.repo.js';
 import { createInMemoryDb, type InMemoryDbResult } from '../helpers/in-memory-db.js';
 import {
   createWhoopWorkoutsHelper,
@@ -34,7 +34,7 @@ const UNTIL = '2026-12-31T23:59:59.999Z';
 const BASE_USER_ID = 100001;
 const FIXTURE_WORKOUT_ID = 'fb8ce391-62b3-4fb3-8113-3eb522ede16c';
 
-function makeScoredWorkout(id: string): Workout {
+function makeScoredWorkout(id: string): WorkoutUpsertRow {
   return {
     id,
     userId: BASE_USER_ID,
@@ -52,10 +52,11 @@ function makeScoredWorkout(id: string): Workout {
     distanceMeter: 8400.0,
     altitudeGainMeter: 42.0,
     altitudeChangeMeter: 12.0,
+    rawJson: '{}',
   };
 }
 
-function makePendingWorkout(id: string): Workout {
+function makePendingWorkout(id: string): WorkoutUpsertRow {
   return {
     id,
     userId: BASE_USER_ID,
@@ -66,6 +67,7 @@ function makePendingWorkout(id: string): Workout {
     timezoneOffset: '-08:00',
     sportId: 0,
     scoreState: 'PENDING_SCORE',
+    rawJson: '{}',
   };
 }
 
@@ -94,13 +96,13 @@ afterEach(() => {
 
 describe('workouts contract — happy path + idempotency', () => {
   test('Test 1: happy path — listWorkouts + upsertBatch + byRange returns the fixture workout', async () => {
-    const workouts = await listWorkouts({ since: SINCE, until: UNTIL });
+    const { entities: workouts } = await listWorkouts({ since: SINCE, until: UNTIL });
     expect(workouts).toHaveLength(1);
     expect(workouts[0]?.scoreState).toBe('SCORED');
     expect(workouts[0]?.id).toBe(FIXTURE_WORKOUT_ID);
 
     const repo = createWorkoutsRepo(mem.db);
-    const upsertResult = repo.upsertBatch(workouts);
+    const upsertResult = repo.upsertBatch(workouts.map((w) => ({ ...w, rawJson: '{}' })));
     expect(upsertResult.changed).toBe(1);
 
     const stored = repo.byRange(SINCE, UNTIL);
@@ -110,10 +112,10 @@ describe('workouts contract — happy path + idempotency', () => {
 
   test('Test 2: idempotency — second pass leaves row count at 1', async () => {
     const repo = createWorkoutsRepo(mem.db);
-    const first = await listWorkouts({ since: SINCE, until: UNTIL });
-    repo.upsertBatch(first);
-    const second = await listWorkouts({ since: SINCE, until: UNTIL });
-    repo.upsertBatch(second);
+    const { entities: first } = await listWorkouts({ since: SINCE, until: UNTIL });
+    repo.upsertBatch(first.map((w) => ({ ...w, rawJson: '{}' })));
+    const { entities: second } = await listWorkouts({ since: SINCE, until: UNTIL });
+    repo.upsertBatch(second.map((w) => ({ ...w, rawJson: '{}' })));
 
     const count = (mem.sqlite.prepare('SELECT COUNT(*) AS c FROM workouts').get() as { c: number })
       .c;
@@ -140,9 +142,9 @@ describe('workouts contract — D-04 SCORED-only default filter', () => {
 
 describe('workouts contract — A6 UUID id shape', () => {
   test('Test 4: stored workout id is a 36-char UUID string', async () => {
-    const workouts = await listWorkouts({ since: SINCE, until: UNTIL });
+    const { entities: workouts } = await listWorkouts({ since: SINCE, until: UNTIL });
     const repo = createWorkoutsRepo(mem.db);
-    repo.upsertBatch(workouts);
+    repo.upsertBatch(workouts.map((w) => ({ ...w, rawJson: '{}' })));
     const stored = repo.byRange(SINCE, UNTIL);
     expect(typeof stored[0]?.id).toBe('string');
     expect(stored[0]?.id.length).toBe(36);
@@ -151,25 +153,19 @@ describe('workouts contract — A6 UUID id shape', () => {
 
 describe('workouts contract — getRawJson diagnostic seam (D-29)', () => {
   test('Test 5: getRawJson(id) returns the stored raw_json payload', async () => {
-    const workouts = await listWorkouts({ since: SINCE, until: UNTIL });
+    const { entities: workouts } = await listWorkouts({ since: SINCE, until: UNTIL });
     const repo = createWorkoutsRepo(mem.db);
     const fixturePayload = '{"id":"fb8ce391-62b3-4fb3-8113-3eb522ede16c","mock":true}';
-    const withRaw = workouts.map(
-      (w) =>
-        ({ ...w, rawJson: fixturePayload }) as Workout & {
-          rawJson: string;
-        },
-    );
-    repo.upsertBatch(withRaw);
+    repo.upsertBatch(workouts.map((w) => ({ ...w, rawJson: fixturePayload })));
     expect(repo.getRawJson(FIXTURE_WORKOUT_ID)).toBe(fixturePayload);
   });
 });
 
 describe('workouts contract — DU discriminator narrowing (D-03 + ADR-0003)', () => {
   test('Test 6: SCORED workout has strain; PENDING_SCORE workout does not — ts-expect-error locks the type', async () => {
-    const workouts = await listWorkouts({ since: SINCE, until: UNTIL });
+    const { entities: workouts } = await listWorkouts({ since: SINCE, until: UNTIL });
     const repo = createWorkoutsRepo(mem.db);
-    repo.upsertBatch(workouts);
+    repo.upsertBatch(workouts.map((w) => ({ ...w, rawJson: '{}' })));
     // Seed a PENDING_SCORE row alongside the SCORED one.
     repo.upsertBatch([makePendingWorkout('33333333-3333-3333-3333-333333333333')]);
 

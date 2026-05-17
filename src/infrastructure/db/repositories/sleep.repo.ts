@@ -29,9 +29,14 @@ import { sleeps as sleepsTable } from '../schema.js';
 
 export type { ByRangeOpts };
 
+/** Upsert input — Sleep entity carries no `rawJson` (D-29: hidden from
+ *  domain); the orchestrator pairs each entity with its WHOOP wire payload
+ *  before calling `upsertBatch` (Issue #12 — real declared field, no cast). */
+export type SleepUpsertRow = Sleep & { rawJson: string };
+
 export interface SleepsRepo {
   cursor(): string;
-  upsertBatch(rows: Sleep[]): { changed: number };
+  upsertBatch(rows: SleepUpsertRow[]): { changed: number };
   byRange(start: string, end: string, opts?: ByRangeOpts): Sleep[];
   getRawJson(id: string): string | null;
 }
@@ -50,7 +55,7 @@ export function createSleepsRepo(db: ReturnType<typeof drizzle>): SleepsRepo {
       return row?.cursor ?? EPOCH_ZERO_ISO;
     },
 
-    upsertBatch(rows: Sleep[]): { changed: number } {
+    upsertBatch(rows: SleepUpsertRow[]): { changed: number } {
       if (rows.length === 0) return { changed: 0 };
       return db.transaction(
         (tx) => {
@@ -162,7 +167,7 @@ export function rowToSleep(row: SleepRow): Sleep {
   }
 }
 
-function sleepEntityToRow(s: Sleep): typeof sleepsTable.$inferInsert {
+function sleepEntityToRow(s: SleepUpsertRow): typeof sleepsTable.$inferInsert {
   const base = {
     id: s.id,
     user_id: s.userId,
@@ -172,7 +177,7 @@ function sleepEntityToRow(s: Sleep): typeof sleepsTable.$inferInsert {
     end: s.end,
     timezone_offset: s.timezoneOffset,
     score_state: s.scoreState,
-    raw_json: (s as Sleep & { rawJson?: string }).rawJson ?? '{}',
+    raw_json: s.rawJson,
   };
   if (s.scoreState === 'SCORED') {
     return {
