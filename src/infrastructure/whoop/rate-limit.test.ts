@@ -117,6 +117,77 @@ describe('rate-limit semaphore', () => {
     await expect(next).resolves.toBeUndefined();
   });
 
+  test('R-06b: simultaneous below-threshold releases share one throttle window via nextAllowedAcquireAt', async () => {
+    vi.useFakeTimers();
+    // Saturate the semaphore, then queue two pending acquirers.
+    await Promise.all([acquire(), acquire(), acquire(), acquire()]);
+    let aResolved = false;
+    let bResolved = false;
+    const a = acquire().then(() => {
+      aResolved = true;
+    });
+    const b = acquire().then(() => {
+      bResolved = true;
+    });
+    await Promise.resolve();
+
+    // Two below-threshold releases at t=0. Both bump nextAllowedAcquireAt
+    // (the second is a no-op since the first already set it to ≥ now+250)
+    // and both defer their handoffs via setTimeout. Prior to the fix the
+    // jitter values diverged and one timer fired well before the other,
+    // collapsing the second waiter's effective throttle.
+    release(String(REMAINING_THROTTLE_THRESHOLD - 1));
+    release(String(REMAINING_THROTTLE_THRESHOLD - 1));
+    await Promise.resolve();
+    expect(aResolved).toBe(false);
+    expect(bResolved).toBe(false);
+
+    // Below the minimum jitter — neither acquirer can have resolved yet.
+    await vi.advanceTimersByTimeAsync(THROTTLE_DELAY_MIN_MS - 1);
+    expect(aResolved).toBe(false);
+    expect(bResolved).toBe(false);
+
+    // Past the max jitter — both can resolve.
+    await vi.advanceTimersByTimeAsync(THROTTLE_DELAY_MIN_MS + 500);
+    await a;
+    await b;
+    expect(aResolved).toBe(true);
+    expect(bResolved).toBe(true);
+  });
+
+  test('R-08: acquire(signal) abort path — pending waiter is removed from FIFO and rejects with AbortError', async () => {
+    // Saturate, then queue a waiter that we will cancel via AbortSignal.
+    await Promise.all([acquire(), acquire(), acquire(), acquire()]);
+    const ctrl = new AbortController();
+    const cancelled = acquire(ctrl.signal);
+    // The signal aborts BEFORE any release; the pending resolver is spliced
+    // from the FIFO queue and the promise rejects.
+    ctrl.abort();
+    await expect(cancelled).rejects.toMatchObject({ name: 'AbortError' });
+
+    // After cancellation a subsequent release does NOT crash + does NOT
+    // resolve a phantom waiter — the queue is empty.
+    release('95');
+    // Confirm the slot freed cleanly: a fresh acquire resolves immediately.
+    const fresh = await acquire();
+    expect(fresh).toBeUndefined();
+  });
+
+  test('R-09: acquire(signal) — abort after release-handoff is a no-op (idempotent race)', async () => {
+    await Promise.all([acquire(), acquire(), acquire(), acquire()]);
+    const ctrl = new AbortController();
+    const next = acquire(ctrl.signal);
+    // Release first — handoff occurs and the pending resolver is consumed.
+    release('95');
+    await next; // confirms the slot was granted
+    // Late abort: must NOT throw at the caller and must NOT unbalance state.
+    ctrl.abort();
+    // Sanity: state is still consistent.
+    release('95');
+    const fresh = await acquire();
+    expect(fresh).toBeUndefined();
+  });
+
   test('R-07: _resetForTest returns a clean state even when pending waiters and in-flight slots exist', async () => {
     // Build up a stuck-looking state: 4 in-flight + 1 pending.
     await Promise.all([acquire(), acquire(), acquire(), acquire()]);

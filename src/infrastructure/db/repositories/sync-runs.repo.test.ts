@@ -151,4 +151,22 @@ describe('sync-runs repo — listRecent() ordering + entity mapping', () => {
     });
     expect(run.perResource.sleeps).toEqual({ status: 'skipped' });
   });
+
+  it('Test 8: corrupted per_resource JSON falls back to {} without crashing', () => {
+    const repo = createSyncRunsRepo(mem.db);
+    const id = repo.insertRunning({ startedAt: STARTED_AT_BASE, flags: null });
+    // Hand-corrupt the per_resource column to simulate a restored backup or
+    // a future-version downgrade. The validator in rowToSyncRun should
+    // recover gracefully (empty perResource map, run shell still returned).
+    mem.sqlite
+      .prepare('UPDATE sync_runs SET per_resource = ? WHERE id = ?')
+      .run('{"unknown_resource":{"status":"success"}}', id);
+    repo.finalize(id, 'ok', 0, FINISHED_AT_BASE);
+    const [run] = repo.listRecent(1);
+    expect(run).toBeDefined();
+    if (!run) throw new Error('expected at least one run');
+    expect(run.id).toBe(id);
+    expect(run.status).toBe('ok');
+    expect(run.perResource).toEqual({});
+  });
 });

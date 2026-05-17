@@ -37,6 +37,15 @@ import { withRetry } from './retry.js';
 export const WHOOP_API_BASE = 'https://api.prod.whoop.com';
 
 /**
+ * Per-request timeout. A stalled TCP connection (TLS handshake hang, dead
+ * proxy, paused server) without a timeout holds the rate-limit semaphore
+ * slot forever and ultimately stalls the entire sync run. 30 seconds is
+ * generous for the largest WHOOP page (25 records) and short enough that
+ * the user notices the stall during a sync.
+ */
+export const HTTP_REQUEST_TIMEOUT_MS = 30_000;
+
+/**
  * Query-param values accepted by `httpGet`. `undefined` and `null` are
  * filtered out (not serialized) so callers can pass an object whose
  * shape mirrors a Zod-derived options type without manually pruning
@@ -68,15 +77,26 @@ export async function httpGet<T>(
   let lastRemainingHeader: string | null = null;
   try {
     const result = await withRetry<Response>(async () => {
-      const response = await callWithAuth(async (accessToken) =>
-        fetch(url, {
-          method: 'GET',
-          headers: {
-            Authorization: `Bearer ${accessToken}`,
-            Accept: 'application/json',
-          },
-        }),
-      );
+      // Fresh AbortController per attempt — a 30s timeout that fires fires
+      // a synthesized AbortError so retry.ts can distinguish timeout from
+      // a network error and refuse to retry timeouts.
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), HTTP_REQUEST_TIMEOUT_MS);
+      let response: Response;
+      try {
+        response = await callWithAuth(async (accessToken) =>
+          fetch(url, {
+            method: 'GET',
+            headers: {
+              Authorization: `Bearer ${accessToken}`,
+              Accept: 'application/json',
+            },
+            signal: controller.signal,
+          }),
+        );
+      } finally {
+        clearTimeout(timeoutId);
+      }
       return {
         status: response.status,
         headers: response.headers,

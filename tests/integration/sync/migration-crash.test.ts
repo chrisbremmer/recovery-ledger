@@ -354,6 +354,14 @@ describe('migration crash recovery (DATA-04 — Pitfall 7)', () => {
     writeSql(migrationsDir, '0002_c', 'CREATE TABLE c (id INTEGER PRIMARY KEY);');
     writeSql(migrationsDir, '0003_d', 'CREATE TABLE d (id INTEGER PRIMARY KEY);');
 
+    // Seed an existing dbFile so 0000_a also triggers a backup (otherwise
+    // the first-ever migration on a non-existent dbFile skips backup
+    // entirely). With the seed in place, all 4 migrations take a backup,
+    // and pruneBackups retains exactly 3.
+    const seed = new (await import('better-sqlite3')).default(dbFile);
+    seed.exec('CREATE TABLE seed_marker (id INTEGER PRIMARY KEY)');
+    seed.close();
+
     // Use the pragma-only child scenario which simply runs migrate to
     // completion against the fixture; no SIGKILL race here.
     const result = await runChildPragmaOnly({
@@ -363,16 +371,10 @@ describe('migration crash recovery (DATA-04 — Pitfall 7)', () => {
     });
     expect(result.exitCode, `child stderr: ${result.stderr}`).toBe(0);
 
-    // Note: 0000_a is the first migration applied against a non-existent
-    // dbFile (mkdtemp created the directory but no db.sqlite yet), so
-    // takeBackup returns '' for that one — no backup file. Backups land
-    // for 0001_b, 0002_c, 0003_d (3 backups). pruneBackups keeps the 3
-    // most recent regardless of the input count.
     expect(existsSync(backupsDir)).toBe(true);
     const remaining = readdirSync(backupsDir).filter((n) => n.endsWith('.sqlite'));
-    // 3 backups expected (one each for 0001_b, 0002_c, 0003_d). The
-    // load-bearing assertion is: never more than 3.
-    expect(remaining.length).toBeLessThanOrEqual(3);
-    expect(remaining.length).toBeGreaterThanOrEqual(1);
+    // Exact equality: 4 migrations × 1 backup each − 1 pruned by
+    // retention=3 = 3 remaining.
+    expect(remaining.length).toBe(3);
   });
 });

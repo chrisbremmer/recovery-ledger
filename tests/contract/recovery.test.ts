@@ -255,7 +255,7 @@ describe('recovery contract — pagination dup-key detection for compound keys (
     expect((captured as InstanceType<typeof WhoopApiError>).kind).toBe('validation');
     // The dup-key detail spells the compound key.
     expect((captured as InstanceType<typeof WhoopApiError>).message).toMatch(
-      /duplicate key 40001:/,
+      /duplicate record key 40001:/,
     );
   });
 });

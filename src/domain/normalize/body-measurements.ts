@@ -6,10 +6,9 @@
 // repository synthesizes the `id` at insert time (autoincrement per D-35)
 // so the normalizer does not produce one.
 //
-// `raw.user_id` is `.optional()` in the Zod schema for forward-compat but
-// the repository requires it; the normalizer throws when missing rather
-// than producing an entity with a `null` user_id that would silently drop
-// the row at insert time.
+// `raw.user_id` is required in the Zod schema — Zod's `.parse` at the HTTP
+// boundary rejects payloads that lack it, so the normalizer can use the
+// field unconditionally.
 
 import type { z } from 'zod';
 import type { WhoopRawBodyMeasurement } from '../schemas/whoop-api.js';
@@ -31,9 +30,6 @@ export function normalizeBodyMeasurement(
   raw: z.infer<typeof WhoopRawBodyMeasurement>,
   opts: NormalizeBodyMeasurementOpts,
 ): NormalizedBodyMeasurement {
-  if (raw.user_id === undefined) {
-    throw new Error('normalizeBodyMeasurement: raw.user_id is required but missing');
-  }
   return {
     userId: raw.user_id,
     heightMeter: raw.height_meter,

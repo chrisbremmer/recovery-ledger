@@ -189,6 +189,38 @@ describe('runSyncCommand input validation', () => {
     expect(writtenBody.toLowerCase()).toContain('iso');
     expect(exitCode).toBe(SYNC_EXIT_CODES.invalid_input);
   });
+
+  test('Test 6b: {resources: "cycles,,recoveries"} → exit invalid_input (empty token rejected)', async () => {
+    const { runSyncSpy } = mockBootstrap();
+    vi.resetModules();
+    const { runSyncCommand, SYNC_EXIT_CODES } = await import('./sync.js');
+    await runSyncCommand({ resources: 'cycles,,recoveries' });
+    expect(runSyncSpy).not.toHaveBeenCalled();
+    expect(writtenBody.toLowerCase()).toContain('empty token');
+    expect(exitCode).toBe(SYNC_EXIT_CODES.invalid_input);
+  });
+
+  test('Test 6c: {resources: "cycles,"} → exit invalid_input (trailing comma rejected)', async () => {
+    const { runSyncSpy } = mockBootstrap();
+    vi.resetModules();
+    const { runSyncCommand, SYNC_EXIT_CODES } = await import('./sync.js');
+    await runSyncCommand({ resources: 'cycles,' });
+    expect(runSyncSpy).not.toHaveBeenCalled();
+    expect(writtenBody.toLowerCase()).toContain('empty token');
+    expect(exitCode).toBe(SYNC_EXIT_CODES.invalid_input);
+  });
+
+  test('Test 6d: {since: future ISO} → exit invalid_input (future --since rejected)', async () => {
+    const { runSyncSpy } = mockBootstrap();
+    vi.resetModules();
+    const { runSyncCommand, SYNC_EXIT_CODES } = await import('./sync.js');
+    // 24h in the future relative to wall clock.
+    const future = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
+    await runSyncCommand({ since: future });
+    expect(runSyncSpy).not.toHaveBeenCalled();
+    expect(writtenBody.toLowerCase()).toContain('future');
+    expect(exitCode).toBe(SYNC_EXIT_CODES.invalid_input);
+  });
 });
 
 // ---------------------------------------------------------------------------

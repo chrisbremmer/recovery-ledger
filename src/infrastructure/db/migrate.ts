@@ -39,7 +39,6 @@ import {
   mkdirSync,
   readdirSync,
   readFileSync,
-  statSync,
   unlinkSync,
 } from 'node:fs';
 import { join } from 'node:path';
@@ -274,7 +273,10 @@ export function migrate(sqlite: Database.Database, opts: MigrateOptions): void {
       throw new MigrationError({
         kind: 'apply_failed',
         backupPath: backupPathForError,
-        latestSafeMigration: entry.tag,
+        // Reference the outer `latestSafeMigration` (updated only AFTER
+        // successful COMMIT below) rather than `entry.tag` — the failing
+        // entry has NOT completed, so naming it as "safe" is wrong.
+        latestSafeMigration,
         cause: err,
       });
     }
@@ -361,20 +363,25 @@ function takeBackup(dbFile: string, backupsDir: string, tag: string): string {
 }
 
 /**
- * Keep the `keep` most-recent `.sqlite` backup files (by mtime). Unlinks
- * older entries along with their `.sqlite-wal` + `.sqlite-shm` companions.
- * Missing companion files are fine — the WAL / shm may not exist on a
+ * Keep the `keep` most-recent `.sqlite` backup files. Unlinks older entries
+ * along with their `.sqlite-wal` + `.sqlite-shm` companions. Missing
+ * companion files are fine — the WAL / shm may not exist on a
  * checkpointed-clean DB.
+ *
+ * Sort key: filename lexicographic order (descending). Each backup name
+ * embeds an ISO-8601 timestamp (`db.<ts>-pre-<tag>.sqlite`), and ISO-8601
+ * strings sort identically to chronological order when compared
+ * lexicographically. This avoids a `statSync` per file and is robust to
+ * mtime drift caused by `cp`-style copies that preserve the source mtime.
  */
 export function pruneBackups(backupsDir: string, keep: number): void {
   if (!existsSync(backupsDir)) return;
 
   const files = readdirSync(backupsDir)
     .filter((name) => name.endsWith('.sqlite'))
-    .map((name) => ({ name, mtime: statSync(join(backupsDir, name)).mtimeMs }))
-    .sort((a, b) => b.mtime - a.mtime);
+    .sort((a, b) => b.localeCompare(a));
 
-  for (const { name } of files.slice(keep)) {
+  for (const name of files.slice(keep)) {
     const baseName = name.slice(0, -'.sqlite'.length);
     for (const suffix of BACKUP_SUFFIXES) {
       const targetPath = join(backupsDir, baseName + suffix);

@@ -1,22 +1,10 @@
-// CLI `sync` command shim (D-26 / D-33 / D-34 — SYNC-01 / SYNC-05).
+// CLI `sync` command shim (D-26).
 //
-// Per ARCHITECTURE.md "lite hexagonal" + Plan 02-05 auth.ts precedent: this
-// file is a ≤5-line orchestration shim over
+// Per ARCHITECTURE.md "lite hexagonal" + the auth.ts precedent: this file
+// is a ≤5-line orchestration shim over
 //   bootstrap() → services.runSync() → formatSyncResult() → stdout → exit(code).
-// Validation + sanitization arms add file weight (the auth.ts analog ships
-// ~150 LOC) but the core composition stays ≤5 lines per CLI policy.
-//
-// D-33 attestation: ZERO new MCP tools land in Phase 3. The sync surface is
-// reachable via CLI ONLY in this phase; Phase 4 will add a 5-line MCP shim
-// against the same services.runSync(). This file MUST NOT register or
-// reference any MCP tool — server.registerTool is Gate-D-fenced to
-// src/mcp/register.ts.
-//
-// D-34 attestation: src/mcp/sanitize.ts is IMPORTED from but NEVER MODIFIED in
-// Phase 3. The CI gate confirms; this file's `import { sanitize }` is the
-// allowed consumer-side dependency. The cross-layer import mirrors Plan
-// 02-05 auth.ts (relocating sanitize.ts to src/infrastructure/observability/
-// is tracked as deferred work — PLAN-03-CROSS-LAYER).
+// Validation + sanitization arms add file weight but the core composition
+// stays ≤5 lines per CLI policy.
 //
 // ADR-0001: this file lives under src/cli/commands/, so Gate B exempts
 // it from the console.* prohibition and Gate C exempts it from the
@@ -39,7 +27,7 @@
 import { RESOURCE_NAMES_SET, type ResourceName } from '../../domain/types/sync.js';
 import { formatBootstrapError, formatSyncResult } from '../../formatters/sync.txt.js';
 import { paths } from '../../infrastructure/config/paths.js';
-import { isMigrationError, type MigrationError } from '../../infrastructure/db/migrate.js';
+import { isMigrationError } from '../../infrastructure/db/migrate.js';
 import {
   formatAuthError,
   formatWhoopApiError,
@@ -47,9 +35,7 @@ import {
   isWhoopApiError,
 } from '../../infrastructure/whoop/errors.js';
 // Cross-layer import: src/mcp/sanitize.ts is the single source of truth for
-// secret-bearing pattern redaction (D-07 / Pitfall 17 / D-34). Importing here
-// does NOT modify sanitize.ts — Gate-protected attestation extends through
-// Phase 3. Mirror of Plan 02-05 auth.ts.
+// secret-bearing pattern redaction. Mirrors the auth.ts cross-layer import.
 import { sanitize } from '../../mcp/sanitize.js';
 import { type Bootstrapped, bootstrap } from '../../services/index.js';
 
@@ -93,14 +79,32 @@ function parseResourcesFlag(
 ): { ok: true; value: readonly ResourceName[] | undefined } | { ok: false; message: string } {
   if (raw === undefined || raw.trim() === '') return { ok: true, value: undefined };
   const tokens = raw.split(',').map((s) => s.trim());
-  const unknown = tokens.filter((t) => !RESOURCE_NAMES_SET.has(t));
+  // Reject empty tokens (e.g., `--resources cycles,,recoveries` or a trailing
+  // comma `cycles,`) — silently dropping them masks a typo, and surfacing the
+  // empty-token form keeps the error message specific instead of complaining
+  // about an unknown blank.
+  if (tokens.some((t) => t.length === 0)) {
+    return {
+      ok: false,
+      message: `Invalid --resources value: empty token between commas (check for ',,' or a trailing comma).`,
+    };
+  }
+  const unknown = tokens.filter((t) => !isResourceName(t));
   if (unknown.length > 0) {
     return {
       ok: false,
       message: `Invalid --resources tokens: ${unknown.join(', ')}. Allowed: cycles,recoveries,sleeps,workouts,profile,body_measurements.`,
     };
   }
-  return { ok: true, value: tokens as readonly ResourceName[] };
+  // Type-predicate filter narrows tokens to ResourceName[] — no cast.
+  const valid: ResourceName[] = tokens.filter(isResourceName);
+  return { ok: true, value: valid };
+}
+
+/** Type-predicate membership check against RESOURCE_NAMES_SET. Replaces the
+ *  prior `tokens as readonly ResourceName[]` cast with a narrowing helper. */
+function isResourceName(token: string): token is ResourceName {
+  return RESOURCE_NAMES_SET.has(token);
 }
 
 /**
@@ -114,6 +118,15 @@ function parseSinceFlag(raw: string | undefined): { ok: true } | { ok: false; me
   const parsed = new Date(raw);
   if (Number.isNaN(parsed.getTime())) {
     return { ok: false, message: `Invalid --since value: not parseable as ISO 8601.` };
+  }
+  // A --since in the future produces a window where since > until — the
+  // resource pages return zero rows and the run silently looks like a no-op.
+  // Reject at the CLI boundary so the user sees what is actually wrong.
+  if (parsed.getTime() > Date.now()) {
+    return {
+      ok: false,
+      message: `Invalid --since value: ${raw} is in the future (since must be ≤ now).`,
+    };
   }
   return { ok: true };
 }
@@ -157,7 +170,7 @@ export async function runSyncCommand(opts: RunSyncCommandOpts): Promise<void> {
     app = bootstrap();
   } catch (err) {
     const body = isMigrationError(err)
-      ? formatBootstrapError(err as MigrationError, paths.dbFile)
+      ? formatBootstrapError(err, paths.dbFile)
       : `Bootstrap failed: ${sanitize(String(err))}`;
     process.stdout.write(`${body}\n`, () => {
       process.exit(SYNC_EXIT_CODES.bootstrap_failed);

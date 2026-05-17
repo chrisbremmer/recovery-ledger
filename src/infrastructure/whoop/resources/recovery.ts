@@ -24,9 +24,7 @@ import {
 } from '../../../domain/schemas/whoop-api.js';
 import type { Recovery } from '../../../domain/types/entities.js';
 import { httpGet } from '../client.js';
-import { paginateAll } from '../pagination.js';
-
-const PAGE_SIZE = 25;
+import { PAGE_SIZE, paginateAll } from '../pagination.js';
 
 export interface ListRecoveryOpts {
   since: string;

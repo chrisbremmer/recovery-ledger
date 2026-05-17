@@ -28,6 +28,7 @@
 // ADR-0001: no console.*, no process.stdout.write. Pure functions; the
 // orchestrator (sync/index.ts) owns logging via Pino → stderr.
 
+import { ZodError } from 'zod';
 import type { ResourceName, ResourceSyncOutcome, RunSyncStatus } from '../../domain/types/sync.js';
 import { isAuthError, isWhoopApiError } from '../../infrastructure/whoop/errors.js';
 
@@ -65,10 +66,26 @@ export function classifyOutcome(err: unknown): ResourceSyncOutcome {
     }
   }
   // Catch-all for any throwable that is neither AuthError nor
-  // WhoopApiError (e.g., a bug in a normalizer that throws TypeError, a
-  // DB constraint violation that surfaces as Error). Surface as
-  // failed_network so the run rolls up correctly.
-  return { status: 'failed_network', errors: 1 };
+  // WhoopApiError. Inspect the error shape before defaulting:
+  //   - better-sqlite3 SqliteError (.code starts with 'SQLITE_') → failed_db
+  //   - ZodError or TypeError from a normalizer            → failed_parse
+  //   - anything else                                      → failed_unknown
+  if (isSqliteError(err)) {
+    return { status: 'failed_db', errors: 1 };
+  }
+  if (err instanceof ZodError || err instanceof TypeError) {
+    return { status: 'failed_parse', errors: 1 };
+  }
+  return { status: 'failed_unknown', errors: 1 };
+}
+
+/** Duck-type check for better-sqlite3's SqliteError — a vanilla `Error`
+ *  subclass with `.code` set to a `SQLITE_*` constant. Avoids importing
+ *  better-sqlite3 into the domain layer just for `instanceof` semantics. */
+function isSqliteError(err: unknown): boolean {
+  if (typeof err !== 'object' || err === null) return false;
+  const code = (err as { code?: unknown }).code;
+  return typeof code === 'string' && code.startsWith('SQLITE_');
 }
 
 /**

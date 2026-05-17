@@ -4,9 +4,11 @@
 // can compare exact sleep values without flakiness.
 
 import { describe, expect, test, vi } from 'vitest';
+import { WhoopApiError } from './errors.js';
 import {
   EXP_BACKOFF_BASE_MS,
   EXP_BACKOFF_MAX_MS,
+  parseRetryAfter,
   RATE_LIMIT_RESET_SLEEP_CAP_MS,
   type RetryResult,
   withRetry,
@@ -138,6 +140,74 @@ describe('withRetry', () => {
     expect(result.status).toBe(404);
     expect(fn).toHaveBeenCalledTimes(1);
     expect(spies.sleep).not.toHaveBeenCalled();
+  });
+
+  test('Y-10: thrown network error is retried once on the same backoff schedule, then re-thrown as WhoopApiError({kind:network})', async () => {
+    const spies = makeSpies(0.5);
+    const fn = vi
+      .fn<() => Promise<RetryResult<unknown>>>()
+      .mockRejectedValueOnce(new TypeError('socket dropped'))
+      .mockRejectedValueOnce(new TypeError('socket dropped again'));
+
+    await expect(withRetry(fn, spies)).rejects.toBeInstanceOf(WhoopApiError);
+    expect(fn).toHaveBeenCalledTimes(2);
+    // 5xx-style backoff used for the network retry arm.
+    expect(spies.sleep).toHaveBeenCalledWith(750);
+  });
+
+  test('Y-11: thrown network error followed by 200 response succeeds after one retry', async () => {
+    const spies = makeSpies(0.5);
+    const fn = vi
+      .fn<() => Promise<RetryResult<unknown>>>()
+      .mockRejectedValueOnce(new TypeError('socket dropped'))
+      .mockResolvedValueOnce(makeResult(200, { ok: true }));
+
+    const result = await withRetry(fn, spies);
+    expect(result.status).toBe(200);
+    expect(fn).toHaveBeenCalledTimes(2);
+  });
+
+  test('Y-12: AbortError is NOT retried — surfaced as WhoopApiError({kind:network, detail:request aborted})', async () => {
+    const spies = makeSpies(0.5);
+    const abortErr = new Error('aborted');
+    abortErr.name = 'AbortError';
+    const fn = vi.fn<() => Promise<RetryResult<unknown>>>().mockRejectedValueOnce(abortErr);
+
+    let thrown: unknown;
+    try {
+      await withRetry(fn, spies);
+    } catch (e) {
+      thrown = e;
+    }
+    expect(thrown).toBeInstanceOf(WhoopApiError);
+    expect((thrown as WhoopApiError).kind).toBe('network');
+    // Single attempt — no retry on timeouts.
+    expect(fn).toHaveBeenCalledTimes(1);
+    expect(spies.sleep).not.toHaveBeenCalled();
+  });
+
+  test('Y-13: parseRetryAfter handles HTTP-date strings (RFC 7231 alt format) without falling to 1s', () => {
+    // 30s in the future — should resolve to ≈30000ms, well above the 1s
+    // fallback that the prior implementation produced for HTTP-dates.
+    const future = new Date(Date.now() + 30_000).toUTCString();
+    const ms = parseRetryAfter(future);
+    expect(ms).toBeGreaterThan(20_000);
+    expect(ms).toBeLessThanOrEqual(31_000);
+  });
+
+  test('Y-14: parseRetryAfter handles delta-seconds (the documented WHOOP format)', () => {
+    expect(parseRetryAfter('45')).toBe(45_000);
+  });
+
+  test('Y-15: parseRetryAfter falls back to 1s on null/empty/garbage', () => {
+    expect(parseRetryAfter(null)).toBe(1_000);
+    expect(parseRetryAfter('')).toBe(1_000);
+    expect(parseRetryAfter('not-a-date-or-number')).toBe(1_000);
+  });
+
+  test('Y-16: parseRetryAfter clamps non-positive delta-seconds to 1s', () => {
+    expect(parseRetryAfter('-5')).toBe(1_000);
+    expect(parseRetryAfter('0')).toBe(1_000);
   });
 
   test('Y-09: jitter=() => 0.5 produces deterministic sleep values for both retry arms', async () => {

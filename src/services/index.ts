@@ -10,8 +10,8 @@
 // policy across every WHOOP API call. Phase 3's WHOOP sync service
 // consumes it via the resource modules without further wiring.
 //
-// Phase 3 Plan 03-11 (THIS plan) extends the barrel with `runSync` and
-// re-exports `bootstrap` per PATTERNS §D3. Design choice (b) in the plan:
+// Phase 3 Plan 03-11 extends the barrel with `runSync` and re-exports
+// `bootstrap` per PATTERNS §D3. Design choice (b) in the plan:
 // keep `createServices()` lightweight (no DB) so existing consumers
 // (`src/cli/commands/doctor.ts`) do NOT pay the DB-open cost. CLI shims
 // that need `runSync` import `bootstrap` directly — the bootstrap layer

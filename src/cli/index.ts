@@ -40,6 +40,29 @@ export function parseIntStrict(value: string, _prev: unknown): number {
   return n;
 }
 
+/**
+ * Strict positive-day parser for `recovery-ledger sync --days <n>`. Rejects
+ * non-integers, non-positive values, and absurd futures (>365 days). Surfaces
+ * a clear error via Commander's standard invalid-argument path (exit 2)
+ * instead of silently falling back to the default 7-day re-window deep
+ * inside `computeWindow()` — the prior implementation parsed `-1` as
+ * `Number.parseInt('-1') = -1`, then `computeWindow` treated `flagDaysN <= 0`
+ * as fall-through, silently dropping the user's flag.
+ */
+export function parseDaysFlag(value: string, _prev: unknown): number {
+  const n = Number.parseInt(value, 10);
+  if (Number.isNaN(n) || !Number.isFinite(n)) {
+    throw new InvalidArgumentError('expected an integer');
+  }
+  if (n <= 0) {
+    throw new InvalidArgumentError('expected a positive integer (e.g., --days 7)');
+  }
+  if (n > 365) {
+    throw new InvalidArgumentError('value too large (max 365)');
+  }
+  return n;
+}
+
 export function buildProgram(): Command {
   const program = new Command();
   program
@@ -104,15 +127,14 @@ export function buildProgram(): Command {
     )
     .action(runAuthCommand);
 
-  // Plan 03-12 — `sync` subcommand (D-26). Three flags only per the SYNC-01
+  // `sync` subcommand (D-26). Three flags only per the SYNC-01
   // configuration-knobs surface: --days (default 30), --since (ISO 8601),
   // --resources (comma-separated subset). Action is the ≤5-line shim in
-  // src/cli/commands/sync.ts. D-33 attestation: NO MCP tool counterpart in
-  // Phase 3; Phase 4's whoop_sync tool will wrap the same services.runSync.
+  // src/cli/commands/sync.ts.
   program
     .command('sync')
     .description('Sync WHOOP data into the local cache')
-    .option('--days <n>', 'window in days (default 30)', parseIntStrict, 30)
+    .option('--days <n>', 'window in days (default 30, max 365)', parseDaysFlag, 30)
     .option('--since <iso>', 'backfill from this ISO 8601 date (overrides --days)')
     .option(
       '--resources <list>',

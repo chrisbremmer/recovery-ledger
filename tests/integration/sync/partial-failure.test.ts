@@ -154,6 +154,13 @@ describe('sync partial-failure — SYNC-05 + SYNC-06 + Pitfall E', () => {
     );
 
     const deps = buildDeps(mem);
+
+    // SYNC-06: spy on the pragma method BEFORE the first runSync. The
+    // migrator runs at deps construct time (above) and may also call
+    // pragma — but we assert specifically on TRUNCATE-arg calls, which
+    // only the orchestrator emits on ok|partial.
+    const pragmaSpy = vi.spyOn(mem.sqlite, 'pragma');
+
     const result = await runSync({ days: 30 }, deps);
 
     expect(result.status).toBe('partial');
@@ -170,18 +177,8 @@ describe('sync partial-failure — SYNC-05 + SYNC-06 + Pitfall E', () => {
     expect(runs[0]?.status).toBe('partial');
     expect(runs[0]?.perResource.workouts?.status).toBe('partial_429');
 
-    // SYNC-06: wal_checkpoint(TRUNCATE) fires on 'partial' (D-32). The
-    // sqlite.pragma call records frames-checkpointed in the WAL — but
-    // for an in-memory DB without WAL we cannot inspect the WAL file
-    // size. We CAN verify the orchestrator made the call by spying on
-    // the pragma method. Re-construct a deps set whose sqlite handle
-    // wraps a pragma spy.
-    const pragmaSpy = vi.spyOn(mem.sqlite, 'pragma');
-    pragmaSpy.mockClear();
-    // Issue a second run to capture the pragma call cleanly (the first
-    // run above hit pragma at construct time via the migrator).
-    mswHelper.resetHitCounts();
-    await runSync({ days: 30 }, deps);
+    // The orchestrator emits wal_checkpoint(TRUNCATE) on ok|partial (D-32);
+    // assert at least one such call happened during the first runSync.
     expect(pragmaSpy).toHaveBeenCalledWith('wal_checkpoint(TRUNCATE)');
     pragmaSpy.mockRestore();
   });
@@ -364,9 +361,10 @@ describe('sync partial-failure — SYNC-05 + SYNC-06 + Pitfall E', () => {
     // recoveries also fails because its FK to cycles cannot resolve —
     // but the cycles upsert never ran (validation failure happens
     // before upsert), so recoveries' default-fixture cycle_id=12345678
-    // has no parent. The repo upsert throws a FK constraint error;
-    // catch-all classifier maps unknown throw → failed_network.
-    expect(result.perResource.recoveries?.status).toBe('failed_network');
+    // has no parent. The repo upsert throws a better-sqlite3 SqliteError
+    // with code starting 'SQLITE_'; the classifier now maps these to
+    // 'failed_db' instead of the prior catch-all 'failed_network'.
+    expect(result.perResource.recoveries?.status).toBe('failed_db');
   });
 
   // For the linter — keeps the helper alive without polluting

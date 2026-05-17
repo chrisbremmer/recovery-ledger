@@ -12,8 +12,7 @@
 //
 // ADR-0001 (MCP stdout purity): no console.*, no process.stdout.write — the
 // orchestrator logs structured events through Pino to stderr only. Phase 4's
-// MCP tool wraps this in `src/mcp/register.ts`'s sanitizer (D-34 attestation:
-// register.ts + sanitize.ts byte-identical to origin/main).
+// MCP tool wraps this in `src/mcp/register.ts`'s sanitizer.
 //
 // ADR-0002: this module is the FIRST runtime consumer of `callWithAuth`
 // (the 401-reactive chokepoint) — via `httpGet` inside each resource
@@ -23,7 +22,7 @@
 // Pitfall E (token leakage via WhoopApiError.cause): the catch block logs
 // the resource + status fields only; the raw error never lands in the log
 // payload. The error itself flows through `src/mcp/sanitize.ts` at the
-// MCP boundary when surfaced through Phase 4's tool (D-34 attestation).
+// MCP boundary when surfaced through Phase 4's tool.
 // `tests/integration/sync/partial-failure.test.ts` Test 2 asserts on
 // captured stderr that `grep -E '(Bearer|access_token=)'` returns 0
 // matches after a 401-flow run — runtime confirmation.
@@ -50,7 +49,6 @@ import {
   type RunSyncInput,
   type RunSyncResult,
 } from '../../domain/types/sync.js';
-import { logger as defaultLogger } from '../../infrastructure/config/logger.js';
 import type { BodyMeasurementsRepo } from '../../infrastructure/db/repositories/body-measurements.repo.js';
 import type { CyclesRepo } from '../../infrastructure/db/repositories/cycles.repo.js';
 import type { ProfileRepo } from '../../infrastructure/db/repositories/profile.repo.js';
@@ -162,29 +160,22 @@ export async function runSync(input: RunSyncInput, deps: RunSyncDeps): Promise<R
     since: input.since ?? null,
   });
 
-  // Per-resource outcome map. Initialize every resource — those not in
-  // requestedSet land as 'skipped' so the computeStatus rollup and the
-  // returned RunSyncResult.perResource have every key present.
-  const perResource: Partial<Record<ResourceName, ResourceSyncOutcome>> = {};
-  for (const resource of RESOURCES) {
-    if (!requestedSet.has(resource)) {
-      perResource[resource] = { status: 'skipped' };
-    }
-  }
+  // Per-resource outcome map. Pre-populate every resource with a sentinel
+  // 'skipped' so the type is Record<ResourceName, ResourceSyncOutcome> (no
+  // Partial). The loop below overwrites entries for requested resources with
+  // their real outcomes; non-requested ones keep the seeded 'skipped' value.
+  const perResource: Record<ResourceName, ResourceSyncOutcome> = Object.fromEntries(
+    RESOURCES.map((resource) => [resource, { status: 'skipped' } as ResourceSyncOutcome]),
+  ) as Record<ResourceName, ResourceSyncOutcome>;
 
   // Iterate in canonical D-23 order, not in the user's --resources order.
   // The user can omit resources but not reorder them — the FK from
   // recoveries.cycle_id → cycles.id requires cycles before recoveries.
-  // Sentinel for the seeded 'skipped' outcome — defense against a future
-  // refactor that drops the seeding above. The non-null assertion on
-  // perResource[resource] would have been a silent bug if seeding moved.
-  const SKIPPED: ResourceSyncOutcome = { status: 'skipped' };
   for (const resource of RESOURCES) {
     if (!requestedSet.has(resource)) {
       // Already marked 'skipped' above; record on sync_runs so the
       // per_resource JSON blob reflects the skip.
-      const skipOutcome = perResource[resource] ?? SKIPPED;
-      deps.repos.syncRuns.updatePerResource(syncRunId, resource, skipOutcome);
+      deps.repos.syncRuns.updatePerResource(syncRunId, resource, perResource[resource]);
       continue;
     }
     const resourceStarted = Date.now();
@@ -223,12 +214,10 @@ export async function runSync(input: RunSyncInput, deps: RunSyncDeps): Promise<R
     }
   }
 
-  // Every resource in RESOURCES now has an outcome (either from the loop
-  // above or the initial skip seeding). Cast is structural — TypeScript
-  // cannot prove the loop populated every key, but the seed + loop together
-  // do.
-  const finalPerResource = perResource as Record<ResourceName, ResourceSyncOutcome>;
-  const status = computeStatus(finalPerResource, requestedResources);
+  // Every resource in RESOURCES now has an outcome (seeded as 'skipped' at
+  // the top, overwritten by the loop for requested resources). The type
+  // narrows naturally — no cast needed.
+  const status = computeStatus(perResource, requestedResources);
 
   // gapsDetected starts at 0 in Phase 3; Phase 4's baseline service runs
   // the gap-detection pass when computing daily summaries and updates the
@@ -241,8 +230,29 @@ export async function runSync(input: RunSyncInput, deps: RunSyncDeps): Promise<R
   // D-32: wal_checkpoint(TRUNCATE) on ok|partial only. A 'failed' run
   // leaves the WAL intact for diagnostics — the user (or the doctor) can
   // inspect it before the next sync rolls it forward.
+  //
+  // The pragma returns `[{ busy, log, checkpointed }]` — busy=1 means a
+  // concurrent reader/writer is holding the WAL and the checkpoint could
+  // not truncate fully; log > checkpointed means the truncation only
+  // partially folded. Capture both as a structured warn-level event so
+  // Phase 5's doctor can surface the condition without re-running the
+  // pragma.
   if (status === 'ok' || status === 'partial') {
-    deps.sqlite.pragma('wal_checkpoint(TRUNCATE)');
+    const ckptResult = deps.sqlite.pragma('wal_checkpoint(TRUNCATE)') as Array<{
+      busy: number;
+      log: number;
+      checkpointed: number;
+    }>;
+    const ckpt = ckptResult[0];
+    if (ckpt !== undefined && (ckpt.busy === 1 || ckpt.checkpointed < ckpt.log)) {
+      deps.logger.warn({
+        event: 'wal_checkpoint_incomplete',
+        syncRunId,
+        busy: ckpt.busy,
+        log: ckpt.log,
+        checkpointed: ckpt.checkpointed,
+      });
+    }
   }
 
   deps.logger.warn({
@@ -252,14 +262,9 @@ export async function runSync(input: RunSyncInput, deps: RunSyncDeps): Promise<R
     gapsDetected,
   });
 
-  // Default to the production logger if the caller did not provide one
-  // (preserves the ADR-0001 contract — every code path uses Pino → stderr).
-  // The check is defensive; bootstrap.ts always provides the singleton.
-  void defaultLogger;
-
   return {
     status,
-    perResource: finalPerResource,
+    perResource,
     syncRunId,
     gapsDetected,
   };
@@ -282,20 +287,17 @@ async function syncOneResource(
 ): Promise<ResourceSyncOutcome> {
   switch (resource) {
     case 'profile': {
-      const profile = await deps.whoop.resources.profile();
-      // The profile entity is the normalized camelCase shape (no raw_json
-      // on the entity per D-29). We stringify the entity itself for the
-      // raw_json column — the resource module doesn't expose the raw
-      // wire payload, so this is the closest preservation we have at
-      // this layer. Phase 4's `whoop_query_cache` will read from the
-      // table; Phase 5's doctor may flag a stale stringified entity.
+      const { raw, entity } = await deps.whoop.resources.profile();
+      // Persist the raw snake_case wire payload as the raw_json column so
+      // the D-29 diagnostic seam can replay `WhoopRawProfile.parse(...)`
+      // against `JSON.parse(profileRepo.getRawJson(userId))` and succeed.
       deps.repos.profile.upsert(
         {
-          userId: profile.userId,
-          email: profile.email,
-          firstName: profile.firstName,
-          lastName: profile.lastName,
-          rawJson: JSON.stringify(profile),
+          userId: entity.userId,
+          email: entity.email,
+          firstName: entity.firstName,
+          lastName: entity.lastName,
+          rawJson: JSON.stringify(raw),
         },
         { clock: clockNow },
       );
@@ -330,24 +332,14 @@ async function syncOneResource(
         flagDaysN: input.days ?? null,
       });
       // Seed the rolling-prior-offset chain for tz_drift detection (D-13
-      // Rule 2). The detect function needs the prior cycle's timezone
-      // offset to compare against the current cycle. Within a single
-      // sync's page set the resource module walks chronologically; across
-      // syncs we seed from the latest existing cycle in the DB. Use a
-      // 7-day lookback window (wide enough to find the most recent cycle
-      // regardless of cursor advance) and pick the chronologically-last
-      // entry's timezoneOffset. `includeUnscored: true` + `includeExcluded:
-      // true` so a PENDING_SCORE or DST-excluded prior cycle still seeds
-      // the chain.
-      const sevenDaysAgo = new Date(clockNow.getTime() - 7 * 24 * 60 * 60 * 1000).toISOString();
-      const recentExisting = deps.repos.cycles.byRange(sevenDaysAgo, window.until, {
-        includeUnscored: true,
-        includeExcluded: true,
-      });
-      const priorTimezoneOffset =
-        recentExisting.length > 0
-          ? (recentExisting[recentExisting.length - 1]?.timezoneOffset ?? null)
-          : null;
+      // Rule 2). `priorBefore(window.since)` returns the most recent cycle
+      // STRICTLY BEFORE the current re-window — using a byRange that
+      // overlaps the window would pick a cycle from inside the re-window
+      // itself, defeating the rolling-chain semantics. Includes
+      // PENDING_SCORE / UNSCORABLE / excluded cycles so the seed reads the
+      // true chronologically-prior offset.
+      const priorCycle = deps.repos.cycles.priorBefore(window.since);
+      const priorTimezoneOffset = priorCycle?.timezoneOffset ?? null;
 
       const entities = await deps.whoop.resources.cycles({
         since: window.since,

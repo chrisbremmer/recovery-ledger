@@ -53,7 +53,7 @@ afterEach(() => {
 
 describe('profile contract — happy path', () => {
   test('Test 1: getProfile() returns the Profile entity with fixture-shaped fields', async () => {
-    const profile = await getProfile();
+    const { entity: profile } = await getProfile();
     expect(profile.userId).toBe(FIXTURE_USER_ID);
     expect(profile.email).toBe('chris@example.com');
     expect(profile.firstName).toBe('Chris');
@@ -62,7 +62,7 @@ describe('profile contract — happy path', () => {
   });
 
   test('Test 2: profileRepo.upsert + getCurrent round-trips the entity', async () => {
-    const profile = await getProfile();
+    const { entity: profile } = await getProfile();
     const repo = createProfileRepo(mem.db);
     repo.upsert(
       {
@@ -81,12 +81,20 @@ describe('profile contract — happy path', () => {
     expect(current?.email).toBe('chris@example.com');
     expect(current?.fetchedAt).toBe(CLOCK.toISOString());
   });
+
+  test('Test 2b: getProfile() raw payload is the snake_case wire format (D-29 diagnostic seam)', async () => {
+    const { raw } = await getProfile();
+    // Raw payload exposes WHOOP wire-shape fields (snake_case) — replaying
+    // it through WhoopRawProfile.parse() must succeed.
+    expect(raw.user_id).toBe(FIXTURE_USER_ID);
+    expect(typeof raw.email).toBe('string');
+  });
 });
 
 describe('profile contract — idempotency (D-11 / SYNC-04)', () => {
   test('Test 3: getProfile + upsert twice leaves row count at 1 (ON CONFLICT(user_id) DO UPDATE)', async () => {
     const repo = createProfileRepo(mem.db);
-    const first = await getProfile();
+    const { entity: first } = await getProfile();
     repo.upsert(
       {
         userId: first.userId,
@@ -97,7 +105,7 @@ describe('profile contract — idempotency (D-11 / SYNC-04)', () => {
       },
       { clock: CLOCK },
     );
-    const second = await getProfile();
+    const { entity: second } = await getProfile();
     repo.upsert(
       {
         userId: second.userId,
@@ -118,7 +126,7 @@ describe('profile contract — idempotency (D-11 / SYNC-04)', () => {
 
 describe('profile contract — getRawJson diagnostic seam (D-29)', () => {
   test('Test 4: getRawJson(userId) returns the stored raw_json payload', async () => {
-    const profile = await getProfile();
+    const { entity: profile } = await getProfile();
     const repo = createProfileRepo(mem.db);
     const fixturePayload = '{"user_id":100001,"email":"chris@example.com"}';
     repo.upsert(

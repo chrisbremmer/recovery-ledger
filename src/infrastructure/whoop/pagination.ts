@@ -35,6 +35,13 @@
 import { WhoopApiError } from './errors.js';
 
 /**
+ * WHOOP v2 documented max page size (A3 + D-19). Pinned here so every
+ * per-resource module (cycles, recoveries, sleeps, workouts) imports the
+ * same constant instead of duplicating the literal.
+ */
+export const PAGE_SIZE = 25;
+
+/**
  * Wire-shape page returned by every paginated WHOOP v2 list endpoint.
  * `next_token` is snake_case verbatim — the request-side
  * `nextToken` camel translation lives in the resource module that
@@ -73,6 +80,7 @@ export async function paginateAll<T>(
   const resolveKey = keyFn ?? ((row: T) => String((row as { id?: unknown }).id));
   const all: T[] = [];
   const seenKeys = new Set<string>();
+  const seenTokens = new Set<string>();
   let nextToken: string | null = null;
   do {
     const page = await fetchPage(nextToken);
@@ -81,13 +89,25 @@ export async function paginateAll<T>(
       if (seenKeys.has(key)) {
         throw new WhoopApiError({
           kind: 'validation',
-          detail: `duplicate key ${key} across consecutive pages (signals mid-pagination reordering)`,
+          detail: `duplicate record key ${key} (signals mid-pagination reordering or within-page dup)`,
         });
       }
       seenKeys.add(key);
       all.push(row);
     }
     nextToken = page.next_token;
+    // Defense-in-depth: detect a next_token cycle (WHOOP returning the same
+    // token twice would otherwise loop forever). Throw loudly so the failure
+    // is visible rather than an infinite-pagination hang.
+    if (nextToken !== null) {
+      if (seenTokens.has(nextToken)) {
+        throw new WhoopApiError({
+          kind: 'validation',
+          detail: `next_token cycle detected (token "${nextToken}" repeated)`,
+        });
+      }
+      seenTokens.add(nextToken);
+    }
   } while (nextToken !== null);
   return all;
 }

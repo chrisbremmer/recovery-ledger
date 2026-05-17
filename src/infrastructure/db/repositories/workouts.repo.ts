@@ -11,7 +11,11 @@
 import { and, asc, eq, gte, lte, sql } from 'drizzle-orm';
 import type { drizzle } from 'drizzle-orm/better-sqlite3';
 import type { Workout } from '../../../domain/types/entities.js';
+import type { ByRangeOpts } from '../../../domain/types/repos.js';
+import { EPOCH_ZERO_ISO } from '../../../domain/types/sync.js';
 import { workouts as workoutsTable } from '../schema.js';
+
+export type { ByRangeOpts };
 
 export interface WorkoutsRepo {
   cursor(): string;
@@ -19,15 +23,6 @@ export interface WorkoutsRepo {
   byRange(start: string, end: string, opts?: ByRangeOpts): Workout[];
   getRawJson(id: string): string | null;
 }
-
-export interface ByRangeOpts {
-  includeUnscored?: boolean;
-  /** Honored for API symmetry; workouts carry no baseline_excluded column
-   *  of their own per Plan 03-02 schema. */
-  includeExcluded?: boolean;
-}
-
-const EPOCH_ZERO_ISO = '1970-01-01T00:00:00.000Z';
 
 type WorkoutRow = typeof workoutsTable.$inferSelect;
 

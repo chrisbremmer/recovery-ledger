@@ -21,9 +21,7 @@ import { normalizeCycle } from '../../../domain/normalize/cycles.js';
 import { WhoopCyclesPageSchema, type WhoopRawCycle } from '../../../domain/schemas/whoop-api.js';
 import type { Cycle } from '../../../domain/types/entities.js';
 import { httpGet } from '../client.js';
-import { paginateAll } from '../pagination.js';
-
-const PAGE_SIZE = 25; // A3 + D-19 verified max
+import { PAGE_SIZE, paginateAll } from '../pagination.js';
 
 export interface ListCyclesOpts {
   /** ISO-8601 inclusive lower bound (cycle.start ≥ since). */

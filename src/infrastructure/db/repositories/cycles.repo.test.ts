@@ -201,6 +201,46 @@ describe('cycles repo — byRange() default filters (D-04 + D-16)', () => {
   });
 });
 
+describe('cycles repo — priorBefore() tz_drift seed (D-13 Rule 2)', () => {
+  let mem: InMemoryDbResult;
+
+  beforeEach(() => {
+    mem = createInMemoryDb();
+  });
+
+  afterEach(() => mem.close());
+
+  it('returns the most recent cycle strictly before the window — does NOT pick a cycle inside the window', () => {
+    const repo = createCyclesRepo(mem.db);
+    repo.upsertBatch([
+      makeScoredCycle({ id: 40001, start: '2026-05-01T07:00:00.000Z', timezoneOffset: '-08:00' }),
+      makeScoredCycle({ id: 40002, start: '2026-05-13T07:00:00.000Z', timezoneOffset: '-07:00' }),
+    ]);
+    // Window since = 2026-05-10. The 05-13 cycle is INSIDE the window; the
+    // seed must read the 05-01 cycle's offset (-08:00), not the 05-13's.
+    const prior = repo.priorBefore('2026-05-10T00:00:00.000Z');
+    expect(prior).not.toBeNull();
+    expect(prior?.id).toBe(40001);
+    expect(prior?.timezoneOffset).toBe('-08:00');
+  });
+
+  it('returns null when no cycle exists before the boundary', () => {
+    const repo = createCyclesRepo(mem.db);
+    expect(repo.priorBefore('2026-05-10T00:00:00.000Z')).toBeNull();
+  });
+
+  it('includes PENDING_SCORE + UNSCORABLE rows so the rolling chain continues', () => {
+    const repo = createCyclesRepo(mem.db);
+    repo.upsertBatch([
+      makePendingCycle({ id: 40001, start: '2026-05-01T07:00:00.000Z', timezoneOffset: '-09:00' }),
+    ]);
+    const prior = repo.priorBefore('2026-05-10T00:00:00.000Z');
+    expect(prior).not.toBeNull();
+    expect(prior?.id).toBe(40001);
+    expect(prior?.scoreState).toBe('PENDING_SCORE');
+  });
+});
+
 describe('cycles repo — getRawJson() diagnostic seam (D-29)', () => {
   let mem: InMemoryDbResult;
 

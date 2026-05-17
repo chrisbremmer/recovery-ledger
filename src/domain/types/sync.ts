@@ -32,6 +32,15 @@
 // Plan 03-04 acceptance grep keys on the verbatim tuple literal.
 export const RESOURCES = ['profile', 'body_measurements', 'cycles', 'recoveries', 'sleeps', 'workouts'] as const;
 
+/**
+ * Canonical empty-cursor sentinel (D-09). Used as the COALESCE fallback in
+ * every per-resource `cursor()` query and as the documented input to
+ * `computeWindow()` when a resource table is empty. Single source of truth
+ * — `cursor.ts` re-exports this for back-compat; the 4 scored repos import
+ * it directly.
+ */
+export const EPOCH_ZERO_ISO = '1970-01-01T00:00:00.000Z';
+
 export type ResourceName = (typeof RESOURCES)[number];
 
 /**
@@ -52,6 +61,9 @@ export const RESOURCE_NAMES_SET: ReadonlySet<string> = new Set(RESOURCES);
  * - `partial_5xx`    — server error mid-pagination; some pages landed.
  * - `failed_auth`    — refresh chain bottomed out; nothing landed.
  * - `failed_network` — network unreachable / DNS failure; nothing landed.
+ * - `failed_db`      — SQLite write rejected (FK, CHECK, schema drift); nothing landed.
+ * - `failed_parse`   — normalizer / Zod boundary rejected the wire payload.
+ * - `failed_unknown` — bug or unanticipated throwable; nothing landed.
  * - `skipped`        — user passed `--resources` excluding this resource.
  */
 export type ResourceSyncStatus =
@@ -60,6 +72,9 @@ export type ResourceSyncStatus =
   | 'partial_5xx'
   | 'failed_auth'
   | 'failed_network'
+  | 'failed_db'
+  | 'failed_parse'
+  | 'failed_unknown'
   | 'skipped';
 
 /**

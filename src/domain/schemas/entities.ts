@@ -18,6 +18,7 @@
 // Pure schema declarations. No I/O, no logger, no infrastructure imports.
 
 import { z } from 'zod';
+import { RESOURCES } from '../types/sync.js';
 
 // ============================================================================
 // CYCLE — discriminated union on `scoreState` (camelCase).
@@ -212,13 +213,16 @@ export const BodyMeasurementEntitySchema = z.object({
 // SYNC RUN — D-24 row shape.
 // ============================================================================
 
-const ResourceSyncOutcomeSchema = z.object({
+export const ResourceSyncOutcomeSchema = z.object({
   status: z.enum([
     'success',
     'partial_429',
     'partial_5xx',
     'failed_auth',
     'failed_network',
+    'failed_db',
+    'failed_parse',
+    'failed_unknown',
     'skipped',
   ]),
   fetched: z.number().int().optional(),
@@ -232,7 +236,15 @@ export const SyncRunEntitySchema = z.object({
   startedAt: z.string(),
   finishedAt: z.string().nullable(),
   status: z.enum(['running', 'ok', 'partial', 'failed']),
-  perResource: z.record(z.string(), ResourceSyncOutcomeSchema),
+  // Zod 4's `z.record(KeySchema, ValueSchema)` validates that every enum key
+  // is present — but the sync_runs row stores partial maps mid-run. Use a
+  // string-keyed record with a runtime guard (refine) that every key is one
+  // of RESOURCES, without forcing every key to be present.
+  perResource: z
+    .record(z.string(), ResourceSyncOutcomeSchema)
+    .refine((map) => Object.keys(map).every((k) => (RESOURCES as readonly string[]).includes(k)), {
+      message: 'perResource contains an unknown resource key',
+    }),
   gapsDetected: z.number().int(),
   flags: z.string().nullable(),
 });

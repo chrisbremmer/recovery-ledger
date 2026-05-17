@@ -168,6 +168,12 @@ const ScoredRawSleep = z
             total_awake_time_milli: z.number().int(),
           })
           .passthrough(),
+        // TODO: replace z.unknown() with the documented WHOOP shape once
+        // the API contract is verified. WHOOP v2 lists this as an optional
+        // nested object with baseline + need_from_sleep_debt + need_from
+        // _recent_strain + need_from_recent_nap (all numbers) but the
+        // exact field set has not been pinned against fixture wire data.
+        // See https://developer.whoop.com/api for the live shape.
         sleep_needed: z.unknown().optional(),
         respiratory_rate: z.number(),
         sleep_performance_percentage: z.number(),
@@ -280,7 +286,10 @@ export const WhoopRawProfile = z
 
 export const WhoopRawBodyMeasurement = z
   .object({
-    user_id: z.number().int().optional(),
+    // Required: the normalizer + repo both treat user_id as load-bearing.
+    // The prior `.optional()` was speculative forward-compat; the WHOOP
+    // v2 measurement-body shape includes user_id on every response.
+    user_id: z.number().int(),
     height_meter: z.number(),
     weight_kilogram: z.number(),
     max_heart_rate: z.number().int(),

@@ -43,15 +43,39 @@ import { logger } from '../infrastructure/config/logger.js';
 import { paths } from '../infrastructure/config/paths.js';
 import { type drizzle, openDb } from '../infrastructure/db/connection.js';
 import { migrate } from '../infrastructure/db/migrate.js';
-import { createBodyMeasurementsRepo } from '../infrastructure/db/repositories/body-measurements.repo.js';
-import { createCyclesRepo } from '../infrastructure/db/repositories/cycles.repo.js';
-import { createDailySummariesRepo } from '../infrastructure/db/repositories/daily-summaries.repo.js';
-import { createDecisionsRepo } from '../infrastructure/db/repositories/decisions.repo.js';
-import { createProfileRepo } from '../infrastructure/db/repositories/profile.repo.js';
-import { createRecoveryRepo } from '../infrastructure/db/repositories/recovery.repo.js';
-import { createSleepsRepo } from '../infrastructure/db/repositories/sleep.repo.js';
-import { createSyncRunsRepo } from '../infrastructure/db/repositories/sync-runs.repo.js';
-import { createWorkoutsRepo } from '../infrastructure/db/repositories/workouts.repo.js';
+import {
+  type BodyMeasurementsRepo,
+  createBodyMeasurementsRepo,
+} from '../infrastructure/db/repositories/body-measurements.repo.js';
+import {
+  type CyclesRepo,
+  createCyclesRepo,
+} from '../infrastructure/db/repositories/cycles.repo.js';
+import {
+  createDailySummariesRepo,
+  type DailySummariesRepo,
+} from '../infrastructure/db/repositories/daily-summaries.repo.js';
+import {
+  createDecisionsRepo,
+  type DecisionsRepo,
+} from '../infrastructure/db/repositories/decisions.repo.js';
+import {
+  createProfileRepo,
+  type ProfileRepo,
+} from '../infrastructure/db/repositories/profile.repo.js';
+import {
+  createRecoveryRepo,
+  type RecoveryRepo,
+} from '../infrastructure/db/repositories/recovery.repo.js';
+import { createSleepsRepo, type SleepsRepo } from '../infrastructure/db/repositories/sleep.repo.js';
+import {
+  createSyncRunsRepo,
+  type SyncRunsRepo,
+} from '../infrastructure/db/repositories/sync-runs.repo.js';
+import {
+  createWorkoutsRepo,
+  type WorkoutsRepo,
+} from '../infrastructure/db/repositories/workouts.repo.js';
 import { getBodyMeasurement } from '../infrastructure/whoop/resources/body-measurements.js';
 import { listCycles } from '../infrastructure/whoop/resources/cycles.js';
 import { getProfile } from '../infrastructure/whoop/resources/profile.js';
@@ -63,6 +87,21 @@ import { type RunSyncDeps, runSync } from './sync/index.js';
 export interface Bootstrapped {
   db: ReturnType<typeof drizzle>;
   sqlite: Database.Database;
+  /** All wired repositories. Exposed on the bootstrap surface so Phase 4
+   *  review/decision commands (which consume decisions + dailySummaries)
+   *  do not need to re-construct factories or open a second handle. The
+   *  sync orchestrator consumes the relevant subset through `services`. */
+  repos: {
+    cycles: CyclesRepo;
+    recoveries: RecoveryRepo;
+    sleeps: SleepsRepo;
+    workouts: WorkoutsRepo;
+    profile: ProfileRepo;
+    bodyMeasurements: BodyMeasurementsRepo;
+    syncRuns: SyncRunsRepo;
+    decisions: DecisionsRepo;
+    dailySummaries: DailySummariesRepo;
+  };
   services: {
     runSync(input: RunSyncInput): Promise<RunSyncResult>;
   };
@@ -161,6 +200,7 @@ export function bootstrap(opts: BootstrapOptions = {}): Bootstrapped {
   return {
     db,
     sqlite,
+    repos,
     services: {
       runSync: (input) => runSync(input, syncDeps),
     },

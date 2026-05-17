@@ -11,9 +11,7 @@ import { normalizeSleep } from '../../../domain/normalize/sleep.js';
 import { type WhoopRawSleep, WhoopSleepPageSchema } from '../../../domain/schemas/whoop-api.js';
 import type { Sleep } from '../../../domain/types/entities.js';
 import { httpGet } from '../client.js';
-import { paginateAll } from '../pagination.js';
-
-const PAGE_SIZE = 25;
+import { PAGE_SIZE, paginateAll } from '../pagination.js';
 
 export interface ListSleepOpts {
   since: string;

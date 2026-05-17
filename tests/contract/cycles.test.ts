@@ -261,7 +261,9 @@ describe('cycles contract — pagination + dup-key detection (D-19 / Pitfall 10)
     }
     expect(captured).toBeInstanceOf(WhoopApiError);
     expect((captured as InstanceType<typeof WhoopApiError>).kind).toBe('validation');
-    expect((captured as InstanceType<typeof WhoopApiError>).message).toMatch(/duplicate key/);
+    expect((captured as InstanceType<typeof WhoopApiError>).message).toMatch(
+      /duplicate record key/,
+    );
   });
 });
 

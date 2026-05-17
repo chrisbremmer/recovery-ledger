@@ -77,7 +77,7 @@ describe('paginateAll (default keyFn — String(row.id))', () => {
       captured = err;
     }
     expect(captured).toBeInstanceOf(WhoopApiError);
-    expect((captured as WhoopApiError).detail).toContain('duplicate key');
+    expect((captured as WhoopApiError).detail).toContain('duplicate record key');
     expect((captured as WhoopApiError).detail).toContain('2');
   });
 
@@ -101,6 +101,23 @@ describe('paginateAll (default keyFn — String(row.id))', () => {
     const fetcher = fetcherFor<{ id: number }>([{ records: [], next_token: null }]);
     const result = await paginateAll(fetcher);
     expect(result).toEqual([]);
+  });
+
+  test('P-07b: next_token cycle detected (token repeats) throws a validation error instead of infinite-looping', async () => {
+    // Page 1 returns token "t1"; page 2 returns the same "t1". Without the
+    // cycle detection guard, paginateAll would request page 2 again forever.
+    const fetcher = fetcherFor<{ id: number }>([
+      { records: [{ id: 1 }], next_token: 't1' },
+      { records: [{ id: 2 }], next_token: 't1' },
+    ]);
+    let captured: unknown;
+    try {
+      await paginateAll(fetcher);
+    } catch (err) {
+      captured = err;
+    }
+    expect(captured).toBeInstanceOf(WhoopApiError);
+    expect((captured as WhoopApiError).detail).toContain('next_token cycle');
   });
 });
 

@@ -20,6 +20,7 @@
 // only via the existing logger singleton.
 
 import { logger } from '../config/logger.js';
+import { WhoopApiError } from './errors.js';
 
 /**
  * Defense-in-depth ceiling on the 429 sleep duration (Answer A5). WHOOP
@@ -84,7 +85,47 @@ export async function withRetry<T>(
   const sleep = deps?.sleep ?? defaultSleep;
   const jitter = deps?.jitter ?? defaultJitter;
 
-  const first = await fn();
+  let first: RetryResult<T>;
+  try {
+    first = await fn();
+  } catch (err) {
+    // Distinguish AbortError (request timeout) from a genuine network
+    // failure: timeouts must NOT retry — the caller already burned the
+    // configured budget by design. Other thrown errors (DNS failures,
+    // dropped sockets, TLS errors) get exactly one retry on the same
+    // jitter schedule used for 5xx, then re-throw as
+    // WhoopApiError({kind:'network'}).
+    if (isAbortError(err)) {
+      throw new WhoopApiError({
+        kind: 'network',
+        detail: 'request aborted (timeout)',
+        cause: err,
+      });
+    }
+    const sleepMs = Math.min(
+      EXP_BACKOFF_BASE_MS + EXP_BACKOFF_BASE_MS * jitter(),
+      EXP_BACKOFF_MAX_MS,
+    );
+    logger.warn({ event: 'network_error_retry', sleepMs });
+    await sleep(sleepMs);
+    try {
+      return await fn();
+    } catch (err2) {
+      if (isAbortError(err2)) {
+        throw new WhoopApiError({
+          kind: 'network',
+          detail: 'request aborted (timeout)',
+          cause: err2,
+        });
+      }
+      throw new WhoopApiError({
+        kind: 'network',
+        detail: err2 instanceof Error ? err2.message : 'network error',
+        cause: err2,
+      });
+    }
+  }
+
   if (first.status < 400) {
     return first;
   }
@@ -114,10 +155,54 @@ export async function withRetry<T>(
   return first;
 }
 
+/** AbortError can surface as either a DOMException with name='AbortError'
+ *  or a plain Error with name='AbortError' depending on platform. The
+ *  duck-type guard accepts both. */
+function isAbortError(err: unknown): boolean {
+  return (
+    typeof err === 'object' && err !== null && (err as { name?: unknown }).name === 'AbortError'
+  );
+}
+
 function computeRateLimitResetSleepMs(headers: Headers, jitter: () => number): number {
   const raw = headers.get('X-RateLimit-Reset');
-  const parsed = raw === null ? Number.NaN : Number(raw);
-  const resetSec = Number.isNaN(parsed) || parsed <= 0 ? RATE_LIMIT_RESET_FALLBACK_SEC : parsed;
-  const sleepMs = resetSec * 1000 + jitter() * 250;
+  const sleepMs = parseRetryAfter(raw) + jitter() * 250;
   return Math.min(sleepMs, RATE_LIMIT_RESET_SLEEP_CAP_MS);
+}
+
+/**
+ * Parse a Retry-After / X-RateLimit-Reset header value into milliseconds.
+ * WHOOP documents delta-seconds (A5), but headers spec also allows an
+ * HTTP-date string ("Wed, 21 Oct 2026 07:28:00 GMT"). The bare
+ * `Number(raw)` path returns NaN on HTTP-date strings, falling through to
+ * a 1s fallback — a hot loop the moment WHOOP returns a date.
+ *
+ * Order of attempts:
+ *   1. Number(raw) — delta seconds. Falsy/null/empty → fallback.
+ *   2. Date.parse(raw) — HTTP-date. Compute delta from Date.now().
+ *   3. Both failed → fallback 1s.
+ * Negative results are clamped to the fallback; absurd futures are clamped
+ * to the upstream cap (handled by the caller via the existing Math.min).
+ */
+export function parseRetryAfter(raw: string | null): number {
+  if (raw === null || raw === '') {
+    return RATE_LIMIT_RESET_FALLBACK_SEC * 1000;
+  }
+  const asNumber = Number(raw);
+  if (!Number.isNaN(asNumber)) {
+    if (asNumber <= 0) {
+      return RATE_LIMIT_RESET_FALLBACK_SEC * 1000;
+    }
+    return asNumber * 1000;
+  }
+  // Try HTTP-date parsing.
+  const asDate = Date.parse(raw);
+  if (!Number.isNaN(asDate)) {
+    const deltaMs = asDate - Date.now();
+    if (deltaMs <= 0) {
+      return RATE_LIMIT_RESET_FALLBACK_SEC * 1000;
+    }
+    return deltaMs;
+  }
+  return RATE_LIMIT_RESET_FALLBACK_SEC * 1000;
 }

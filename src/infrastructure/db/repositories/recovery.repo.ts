@@ -18,7 +18,11 @@
 import { and, asc, eq, gte, lte, sql } from 'drizzle-orm';
 import type { drizzle } from 'drizzle-orm/better-sqlite3';
 import type { Recovery } from '../../../domain/types/entities.js';
+import type { ByRangeOpts } from '../../../domain/types/repos.js';
+import { EPOCH_ZERO_ISO } from '../../../domain/types/sync.js';
 import { cycles as cyclesTable, recoveries as recoveriesTable } from '../schema.js';
+
+export type { ByRangeOpts };
 
 export interface RecoveryRepo {
   /** `COALESCE(MAX(updated_at), EPOCH_ZERO_ISO)` over the recoveries table. */
@@ -33,13 +37,6 @@ export interface RecoveryRepo {
   /** D-29 diagnostic seam — compound-key lookup. */
   getRawJson(cycleId: number, sleepId: string): string | null;
 }
-
-export interface ByRangeOpts {
-  includeUnscored?: boolean;
-  includeExcluded?: boolean;
-}
-
-const EPOCH_ZERO_ISO = '1970-01-01T00:00:00.000Z';
 
 type RecoveryRow = typeof recoveriesTable.$inferSelect;
 

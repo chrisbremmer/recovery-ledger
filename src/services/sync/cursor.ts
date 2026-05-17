@@ -45,8 +45,12 @@ export const MS_PER_DAY = 86_400_000;
  * lands here and the default branch returns `since = EPOCH_ZERO_ISO` (the
  * older of the two — the 7-day re-window never wins against epoch zero).
  * Effective semantics: fetch everything.
+ *
+ * Re-exported from `src/domain/types/sync.ts` where the constant is owned —
+ * cursor.ts keeps the named re-export so the existing test imports
+ * (`import { EPOCH_ZERO_ISO } from './cursor.js'`) continue to resolve.
  */
-export const EPOCH_ZERO_ISO = '1970-01-01T00:00:00.000Z';
+export { EPOCH_ZERO_ISO } from '../../domain/types/sync.js';
 
 export interface ComputeWindowOptions {
   /**

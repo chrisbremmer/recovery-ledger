@@ -31,11 +31,12 @@
 // Gate G compliance: this file imports zero drizzle-orm symbols. It
 // consumes domain types (RunSyncResult, ResourceSyncOutcome) only.
 
-import type {
-  ResourceName,
-  ResourceSyncOutcome,
-  ResourceSyncStatus,
-  RunSyncResult,
+import {
+  RESOURCES,
+  type ResourceName,
+  type ResourceSyncOutcome,
+  type ResourceSyncStatus,
+  type RunSyncResult,
 } from '../domain/types/sync.js';
 import type { MigrationError } from '../infrastructure/db/migrate.js';
 import { formatAuthError, isAuthError } from '../infrastructure/whoop/errors.js';
@@ -67,6 +68,12 @@ function statusSuffix(status: ResourceSyncStatus): string {
       return ' (run `recovery-ledger auth`)';
     case 'failed_network':
       return ' (check network and re-run)';
+    case 'failed_db':
+      return ' (database write rejected; see logs)';
+    case 'failed_parse':
+      return ' (WHOOP response did not match the expected shape)';
+    case 'failed_unknown':
+      return ' (unknown error; see logs)';
   }
 }
 
@@ -93,7 +100,9 @@ function formatOutcomeLine(resource: ResourceName, outcome: ResourceSyncOutcome)
  */
 export function formatSyncResult(result: RunSyncResult): string {
   const lines: string[] = [`Status: ${result.status}`];
-  for (const resource of Object.keys(result.perResource) as ResourceName[]) {
+  // Iterate the canonical RESOURCES tuple so the output order is fixed at
+  // compile time (no reliance on the runtime key order of perResource).
+  for (const resource of RESOURCES) {
     const outcome = result.perResource[resource];
     lines.push(formatOutcomeLine(resource, outcome));
   }

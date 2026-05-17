@@ -20,13 +20,29 @@
 
 import { desc, eq } from 'drizzle-orm';
 import type { drizzle } from 'drizzle-orm/better-sqlite3';
+import { z } from 'zod';
+import { ResourceSyncOutcomeSchema } from '../../../domain/schemas/entities.js';
 import type { SyncRun } from '../../../domain/types/entities.js';
-import type {
-  ResourceName,
-  ResourceSyncOutcome,
-  RunSyncStatus,
+import {
+  RESOURCES,
+  type ResourceName,
+  type ResourceSyncOutcome,
+  type RunSyncStatus,
 } from '../../../domain/types/sync.js';
+import { logger } from '../../config/logger.js';
 import { sync_runs as syncRunsTable } from '../schema.js';
+
+/** Runtime validator for the `per_resource` JSON-as-text column. Guards
+ *  against hand-corrupted rows (restored backups, manual SQL edits) returning
+ *  unexpected shapes through `listRecent`. Mid-run rows can have partial
+ *  maps (a subset of RESOURCES), so `z.record(z.string(), …)` is used with a
+ *  refine that every key is a known resource — `z.record(z.enum(RESOURCES))`
+ *  would reject partial maps in Zod 4. */
+const PerResourceSchema = z
+  .record(z.string(), ResourceSyncOutcomeSchema)
+  .refine((map) => Object.keys(map).every((k) => (RESOURCES as readonly string[]).includes(k)), {
+    message: 'per_resource contains an unknown resource key',
+  });
 
 export interface SyncRunsRepo {
   /** Insert a row with status='running', per_resource='{}',
@@ -125,12 +141,25 @@ export function createSyncRunsRepo(db: ReturnType<typeof drizzle>): SyncRunsRepo
 
 function rowToSyncRun(row: SyncRunRow): SyncRun {
   // The schema's status column enum is ['running', 'ok', 'partial', 'failed'].
-  // SyncRun's `status` field accepts the same four literals (entities.ts line
-  // 228) so the cast is structural.
-  const perResource = (row.per_resource ? JSON.parse(row.per_resource) : {}) as Record<
-    ResourceName,
-    ResourceSyncOutcome
-  >;
+  // SyncRun's `status` field accepts the same four literals (entities.ts).
+  //
+  // The per_resource column is JSON-as-text. Validate the parse against the
+  // domain schema before returning — a hand-corrupted row (restored backup,
+  // schema drift, future-version downgrade) should not crash the listRecent
+  // surface; emit a warn-level event and fall back to an empty map so the
+  // doctor + MCP probe can still report the run shell.
+  let perResource: Record<ResourceName, ResourceSyncOutcome>;
+  try {
+    const raw = row.per_resource ? JSON.parse(row.per_resource) : {};
+    perResource = PerResourceSchema.parse(raw) as Record<ResourceName, ResourceSyncOutcome>;
+  } catch (err) {
+    logger.warn({
+      event: 'sync_runs_per_resource_parse_failed',
+      syncRunId: row.id,
+      detail: err instanceof Error ? err.message : String(err),
+    });
+    perResource = {} as Record<ResourceName, ResourceSyncOutcome>;
+  }
   return {
     id: row.id,
     startedAt: row.started_at,

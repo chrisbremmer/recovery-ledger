@@ -33,10 +33,14 @@
 // unknown `score_state` value — a defensive impossibility check; the column
 // is enum-typed at the schema level).
 
-import { and, asc, eq, gte, lte, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, gte, lt, lte, sql } from 'drizzle-orm';
 import type { drizzle } from 'drizzle-orm/better-sqlite3';
 import type { Cycle } from '../../../domain/types/entities.js';
+import type { ByRangeOpts } from '../../../domain/types/repos.js';
+import { EPOCH_ZERO_ISO } from '../../../domain/types/sync.js';
 import { cycles as cyclesTable } from '../schema.js';
+
+export type { ByRangeOpts };
 
 export interface CyclesRepo {
   /** `COALESCE(MAX(updated_at), EPOCH_ZERO_ISO)` over the cycles table (D-09). */
@@ -47,20 +51,16 @@ export interface CyclesRepo {
   /** Range query over `cycles.start` ∈ [start, end]. Default filter:
    *  `score_state = 'SCORED' AND baseline_excluded = 0` (D-04 + D-16). */
   byRange(start: string, end: string, opts?: ByRangeOpts): Cycle[];
+  /** Returns the most recent cycle with `start < startISO` (strict-less-than
+   *  upper bound). Used by the sync orchestrator to seed the tz_drift
+   *  rolling-prior-offset chain WITHOUT including any cycle inside the
+   *  current re-window. Includes PENDING_SCORE / UNSCORABLE / excluded
+   *  cycles so the seed reads the true chronologically-prior offset. */
+  priorBefore(startISO: string): Cycle | null;
   /** D-29 diagnostic seam. Returns the raw WHOOP JSON payload (the
    *  Phase 3 schema column `raw_json`) or `null` for a missing id. */
   getRawJson(id: number): string | null;
 }
-
-export interface ByRangeOpts {
-  /** Include `PENDING_SCORE` + `UNSCORABLE` rows. Default: false. */
-  includeUnscored?: boolean;
-  /** Include rows with `baseline_excluded = 1` (D-14 DST/tz exclusion).
-   *  Default: false. */
-  includeExcluded?: boolean;
-}
-
-const EPOCH_ZERO_ISO = '1970-01-01T00:00:00.000Z';
 
 type CycleRow = typeof cyclesTable.$inferSelect;
 
@@ -135,6 +135,17 @@ export function createCyclesRepo(db: ReturnType<typeof drizzle>): CyclesRepo {
         .orderBy(asc(cyclesTable.start))
         .all();
       return rows.map(rowToCycle);
+    },
+
+    priorBefore(startISO: string): Cycle | null {
+      const row = db
+        .select()
+        .from(cyclesTable)
+        .where(lt(cyclesTable.start, startISO))
+        .orderBy(desc(cyclesTable.start))
+        .limit(1)
+        .get();
+      return row ? rowToCycle(row) : null;
     },
 
     getRawJson(id: number): string | null {

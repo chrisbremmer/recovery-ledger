@@ -156,11 +156,34 @@ describe('migrate — sad paths + MigrationError shape', () => {
     expect(isMigrationError(thrown)).toBe(true);
     const err = thrown as MigrationError;
     expect(err.kind).toBe('apply_failed');
-    expect(err.latestSafeMigration).toBe('0000_bad');
+    // The failing migration is NOT a "safe" tag — nothing has committed,
+    // so latestSafeMigration is null (no prior migration applied cleanly).
+    expect(err.latestSafeMigration).toBeNull();
     // ROLLBACK fired — __drizzle_migrations table exists (created in step 1)
     // but holds zero rows.
     const rows = sqlite.prepare('SELECT hash FROM __drizzle_migrations').all();
     expect(rows).toHaveLength(0);
+  });
+
+  it('Test 3b: when a later migration fails, latestSafeMigration is the last COMMITTED tag (not the failing one)', () => {
+    // First migration is well-formed and will COMMIT; second migration has
+    // bad SQL and will ROLLBACK. latestSafeMigration must point at the
+    // first (committed) tag, not the failing second tag.
+    writeJournal(migrationsDir, [{ tag: '0000_good' }, { tag: '0001_bad' }]);
+    writeMigrationSql(migrationsDir, '0000_good', 'CREATE TABLE foo (id INTEGER PRIMARY KEY);');
+    writeMigrationSql(migrationsDir, '0001_bad', 'XYZGARBAGE this is not valid sql;');
+
+    let thrown: unknown;
+    try {
+      migrate(sqlite, { migrationsDir, backupsDir, dbFile: ':memory:' });
+    } catch (err) {
+      thrown = err;
+    }
+
+    expect(isMigrationError(thrown)).toBe(true);
+    const err = thrown as MigrationError;
+    expect(err.kind).toBe('apply_failed');
+    expect(err.latestSafeMigration).toBe('0000_good');
   });
 
   it('Test 4: MigrationError shape matches the AuthError mirror contract', () => {
