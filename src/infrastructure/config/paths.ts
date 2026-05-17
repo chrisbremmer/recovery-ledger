@@ -1,19 +1,31 @@
-// Path resolver for the on-disk Recovery Ledger home (D-03 / D-06 / D-07).
+// Path resolver for the on-disk Recovery Ledger home (D-03 / D-06 / D-07
+// in Phase 2; Phase 3 D-14 / D-30 / D-32 extend with DB-layer paths).
 //
 // Layout (default): `~/.recovery-ledger/`
 //   ├── config.json        # InitConfig (Plan 02-05) — mode 0600
 //   ├── tokens.json        # encrypted tokens — mode 0600 — file-fallback path
 //   ├── tokens.json.lock   # proper-lockfile target (D-07, ADR-0002)
-//   └── storage-mode       # one-line marker: "keychain" | "file"
+//   ├── storage-mode       # one-line marker: "keychain" | "file"
+//   ├── db.sqlite          # local cache, WAL mode (Plan 03-?? bootstrap)
+//   ├── db.sqlite-wal      # SQLite write-ahead log (companion of db.sqlite)
+//   ├── db.sqlite-shm      # SQLite shared memory file (companion of db.sqlite)
+//   └── backups/           # pre-migration backups, mode 0600 (Phase 3 D-07)
 //
 // `RECOVERY_LEDGER_HOME` env var fully overrides the home directory (D-06).
 // Used by the test suite to point at a tmpdir and by power users who want
 // the data tree somewhere other than `$HOME` (T-02.01-01 — the override is
 // intentional; a local attacker with shell access already owns the process).
 //
-// MR-21 voice: this module is the ONLY source of the five derived paths.
-// token-store.ts, init.ts, auth.ts (Plans 02-02, 02-05) all import from
-// here. Mirrors the factory+singleton shape of logger.ts so the test seam
+// Phase 3 NOTE: `migrationsDir` is NOT resolved here. The hand-rolled
+// migrator (Wave 2 Plan 03-05) computes it from `import.meta.url` so
+// migrations travel inside the package (read from `dist/` at runtime),
+// not from the user's writable home — different lifetime, different
+// trust boundary. See 03-PATTERNS.md F1 for the resolution shape.
+//
+// MR-21 voice: this module is the ONLY source of the derived paths.
+// token-store.ts, init.ts, auth.ts (Plans 02-02, 02-05) and the future
+// db/connection.ts + db/migrate.ts (Phase 3) all import from here.
+// Mirrors the factory+singleton shape of logger.ts so the test seam
 // stays consistent across the infrastructure layer.
 
 import { join } from 'node:path';
@@ -29,6 +41,15 @@ export interface ResolvedPaths {
   tokensFile: string;
   tokensLockFile: string;
   storageModeFile: string;
+  // Phase 3 DB-layer additions (D-14 / D-30 / D-32). `dbFile` is the
+  // canonical SQLite path; `-wal` and `-shm` are the two on-disk
+  // companions that the migrator's pre-migration backup (D-07) must
+  // capture alongside the main file. `backupsDir` houses the three
+  // most-recent pre-migration backups at mode 0600.
+  dbFile: string;
+  dbWalFile: string;
+  dbShmFile: string;
+  backupsDir: string;
 }
 
 /**
@@ -54,6 +75,10 @@ export function resolvePaths(env: PathsEnv): ResolvedPaths {
     tokensFile: join(configDir, 'tokens.json'),
     tokensLockFile: join(configDir, 'tokens.json.lock'),
     storageModeFile: join(configDir, 'storage-mode'),
+    dbFile: join(configDir, 'db.sqlite'),
+    dbWalFile: join(configDir, 'db.sqlite-wal'),
+    dbShmFile: join(configDir, 'db.sqlite-shm'),
+    backupsDir: join(configDir, 'backups'),
   };
 }
 

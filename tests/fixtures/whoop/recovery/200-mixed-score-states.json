@@ -1,0 +1,37 @@
+{
+  "records": [
+    {
+      "cycle_id": 40001,
+      "sleep_id": "a712fd26-deab-4bec-9503-2cc6a8fbab3f",
+      "user_id": 100001,
+      "created_at": "2026-05-13T08:30:00.000Z",
+      "updated_at": "2026-05-13T20:30:00.000Z",
+      "score_state": "SCORED",
+      "score": {
+        "user_calibrating": false,
+        "recovery_score": 68,
+        "resting_heart_rate": 58,
+        "hrv_rmssd_milli": 40.1,
+        "spo2_percentage": 96.5,
+        "skin_temp_celsius": 33.0
+      }
+    },
+    {
+      "cycle_id": 40002,
+      "sleep_id": "bb8c0f52-773e-4875-820b-df64d972ff13",
+      "user_id": 100001,
+      "created_at": "2026-05-14T08:30:00.000Z",
+      "updated_at": "2026-05-14T08:30:00.000Z",
+      "score_state": "PENDING_SCORE"
+    },
+    {
+      "cycle_id": 40003,
+      "sleep_id": "eba87580-89d8-41b4-bd5c-386d2e1a3df1",
+      "user_id": 100001,
+      "created_at": "2026-05-15T08:30:00.000Z",
+      "updated_at": "2026-05-15T20:30:00.000Z",
+      "score_state": "UNSCORABLE"
+    }
+  ],
+  "next_token": null
+}

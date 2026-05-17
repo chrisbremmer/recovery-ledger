@@ -1,0 +1,26 @@
+{
+  "records": [
+    {
+      "id": "7dee4993-8fa2-43a7-8e54-94a5c0d3227a",
+      "user_id": 100001,
+      "created_at": "2026-05-10T05:00:00.000Z",
+      "updated_at": "2026-05-10T15:00:00.000Z",
+      "start": "2026-05-10T05:00:00.000Z",
+      "end": "2026-05-10T13:00:00.000Z",
+      "timezone_offset": "-08:00",
+      "nap": false,
+      "score_state": "SCORED",
+      "score": {
+        "stage_summary": {
+          "total_in_bed_time_milli": 28800000,
+          "total_awake_time_milli": 1800000
+        },
+        "respiratory_rate": 14.8,
+        "sleep_performance_percentage": 88.5,
+        "sleep_consistency_percentage": 76.0,
+        "sleep_efficiency_percentage": 93.7
+      }
+    }
+  ],
+  "next_token": null
+}

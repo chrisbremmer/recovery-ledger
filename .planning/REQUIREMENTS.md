@@ -28,22 +28,22 @@ Requirements for the initial release. Each maps to roadmap phases.
 
 ### Data Model & DB
 
-- [ ] **DATA-01**: SQLite database opens in WAL mode with `busy_timeout=5000`, `journal_size_limit=64MB`, `wal_autocheckpoint=1000` pragmas at default `~/.recovery-ledger/recovery-ledger.sqlite`
-- [ ] **DATA-02**: Drizzle schema for `oauth_tokens`, `sync_runs`, `cycles`, `recoveries`, `sleeps`, `workouts`, `daily_summaries`, `decisions` with hybrid normalized columns + `raw_json` per entity
-- [ ] **DATA-03**: Index on `(score_state, start)` on each scored entity to support the SCORED-only baseline queries
-- [ ] **DATA-04**: Drizzle migrator runs at every connection inside `BEGIN IMMEDIATE`, takes a pre-migration backup of `.sqlite`/`-wal`/`-shm`, and fails closed on partial migration
-- [ ] **DATA-05**: Three-layer types — raw WHOOP responses (Zod), normalized entities (Drizzle), and view types for review outputs — with `Score = discriminatedUnion('score_state', …)` enforcing `SCORED` discipline in domain code
-- [ ] **DATA-06**: DST / time-zone-shift detection during sync flags affected cycles for baseline exclusion while keeping them visible in raw views
+- [x] **DATA-01**: SQLite database opens in WAL mode with `busy_timeout=5000`, `journal_size_limit=64MB`, `wal_autocheckpoint=1000` pragmas at default `~/.recovery-ledger/recovery-ledger.sqlite`
+- [x] **DATA-02**: Drizzle schema for `oauth_tokens`, `sync_runs`, `cycles`, `recoveries`, `sleeps`, `workouts`, `daily_summaries`, `decisions` with hybrid normalized columns + `raw_json` per entity
+- [x] **DATA-03**: Index on `(score_state, start)` on each scored entity to support the SCORED-only baseline queries
+- [x] **DATA-04**: Drizzle migrator runs at every connection inside `BEGIN IMMEDIATE`, takes a pre-migration backup of `.sqlite`/`-wal`/`-shm`, and fails closed on partial migration
+- [x] **DATA-05**: Three-layer types — raw WHOOP responses (Zod), normalized entities (Drizzle), and view types for review outputs — with `Score = discriminatedUnion('score_state', …)` enforcing `SCORED` discipline in domain code
+- [x] **DATA-06**: DST / time-zone-shift detection during sync flags affected cycles for baseline exclusion while keeping them visible in raw views
 
 ### Sync
 
-- [ ] **SYNC-01**: `recovery-ledger sync --days N` (default 30) fetches profile, body measurements, cycles, recovery, sleep, and workouts for the requested window
-- [ ] **SYNC-02**: WHOOP HTTP client honors pagination, normalizes snake_case → camelCase, and enforces a semaphore-of-4 concurrent-request limit
-- [ ] **SYNC-03**: 429 responses back off honoring `Retry-After` / `X-RateLimit-Reset`; rate-limit state is reported on the CLI
-- [ ] **SYNC-04**: Sync is idempotent via `ON CONFLICT DO UPDATE`; deltas use `updated_at` with a 7-day re-window to catch late-scored cycles
-- [ ] **SYNC-05**: Partial-failure reporting — sync exit reports which resources succeeded, failed, or were skipped, recorded in a `sync_runs` row
-- [ ] **SYNC-06**: Sync issues a `wal_checkpoint(TRUNCATE)` at the end of a successful run
-- [ ] **SYNC-07**: Fixture-based contract tests cover every WHOOP resource (cycles, recovery, sleep, workouts, profile, body measurements); no live API calls in the default test run
+- [x] **SYNC-01**: `recovery-ledger sync --days N` (default 30) fetches profile, body measurements, cycles, recovery, sleep, and workouts for the requested window
+- [x] **SYNC-02**: WHOOP HTTP client honors pagination, normalizes snake_case → camelCase, and enforces a semaphore-of-4 concurrent-request limit
+- [x] **SYNC-03**: 429 responses back off honoring `Retry-After` / `X-RateLimit-Reset`; rate-limit state is reported on the CLI
+- [x] **SYNC-04**: Sync is idempotent via `ON CONFLICT DO UPDATE`; deltas use `updated_at` with a 7-day re-window to catch late-scored cycles
+- [x] **SYNC-05**: Partial-failure reporting — sync exit reports which resources succeeded, failed, or were skipped, recorded in a `sync_runs` row
+- [x] **SYNC-06**: Sync issues a `wal_checkpoint(TRUNCATE)` at the end of a successful run
+- [x] **SYNC-07**: Fixture-based contract tests cover every WHOOP resource (cycles, recovery, sleep, workouts, profile, body measurements); no live API calls in the default test run
 
 ### Review
 
@@ -138,19 +138,19 @@ Explicitly excluded. Gated behind the hard scope guardrail in PROJECT.md (≥ 12
 | AUTH-04 | Phase 2 | Complete |
 | AUTH-05 | Phase 2 | Complete |
 | AUTH-06 | Phase 2 | Complete |
-| DATA-01 | Phase 3 | Pending |
-| DATA-02 | Phase 3 | Pending |
-| DATA-03 | Phase 3 | Pending |
-| DATA-04 | Phase 3 | Pending |
-| DATA-05 | Phase 3 | Pending |
-| DATA-06 | Phase 3 | Pending |
-| SYNC-01 | Phase 3 | Pending |
-| SYNC-02 | Phase 3 | Pending |
-| SYNC-03 | Phase 3 | Pending |
-| SYNC-04 | Phase 3 | Pending |
-| SYNC-05 | Phase 3 | Pending |
-| SYNC-06 | Phase 3 | Pending |
-| SYNC-07 | Phase 3 | Pending |
+| DATA-01 | Phase 3 | Complete (Plan 03-05, 2026-05-16) |
+| DATA-02 | Phase 3 | Complete (Plan 03-02, 2026-05-16) |
+| DATA-03 | Phase 3 | Complete (Plan 03-02, 2026-05-16) |
+| DATA-04 | Phase 3 | Complete (Plan 03-05, 2026-05-16) |
+| DATA-05 | Phase 3 | Complete (Plan 03-03, 2026-05-16) |
+| DATA-06 | Phase 3 | Complete (Plan 03-09, 2026-05-16) |
+| SYNC-01 | Phase 3 | Complete (Plan 03-11, 2026-05-16) |
+| SYNC-02 | Phase 3 | Complete (Plan 03-06, 2026-05-16) |
+| SYNC-03 | Phase 3 | Complete (Plan 03-06, 2026-05-16) |
+| SYNC-04 | Phase 3 | Complete (Plan 03-04, 2026-05-16) |
+| SYNC-05 | Phase 3 | Complete (Plan 03-08, 2026-05-16) |
+| SYNC-06 | Phase 3 | Complete (Plan 03-05, 2026-05-16) |
+| SYNC-07 | Phase 3 | Complete (Plan 03-07, 2026-05-16) |
 | REV-01 | Phase 4 | Pending |
 | REV-02 | Phase 4 | Pending |
 | REV-03 | Phase 4 | Pending |
@@ -180,8 +180,8 @@ Explicitly excluded. Gated behind the hard scope guardrail in PROJECT.md (≥ 12
 - v1 requirements: 49 total
 - Mapped to phases: 49
 - Unmapped: 0 ✓
-- Complete: 2 / 49 (FND-01, FND-04)
+- Complete: 26 / 49 (7 FND + 6 AUTH + 13 DATA/SYNC; Phases 1 + 2 + 3 closed)
 
 ---
 *Requirements defined: 2026-05-11*
-*Last updated: 2026-05-12 — FND-04 complete via Plan 01-02 (unit half); 2 / 49 requirements done*
+*Last updated: 2026-05-16 — Phase 3 closed (13 REQ-IDs flipped to Complete: DATA-01..06 + SYNC-01..07); 26 / 49 requirements done*

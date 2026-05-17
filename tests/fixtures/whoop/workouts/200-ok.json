@@ -1,0 +1,25 @@
+{
+  "records": [
+    {
+      "id": "fb8ce391-62b3-4fb3-8113-3eb522ede16c",
+      "user_id": 100001,
+      "created_at": "2026-05-10T18:00:00.000Z",
+      "updated_at": "2026-05-10T19:30:00.000Z",
+      "start": "2026-05-10T17:30:00.000Z",
+      "end": "2026-05-10T18:30:00.000Z",
+      "timezone_offset": "-08:00",
+      "sport_id": 0,
+      "score_state": "SCORED",
+      "score": {
+        "strain": 12.8,
+        "average_heart_rate": 142,
+        "max_heart_rate": 178,
+        "kilojoule": 1450.2,
+        "distance_meter": 8400.0,
+        "altitude_gain_meter": 42.0,
+        "altitude_change_meter": 12.0
+      }
+    }
+  ],
+  "next_token": null
+}

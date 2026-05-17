@@ -8,8 +8,8 @@
 ## Phases
 
 - [x] **Phase 1: Foundation & Stdout-Pure MCP Bootstrap** - Bootstrapped TypeScript repo, empty CLI + MCP stdio shells, stderr-only logging, MCP error-sanitizer contract, native-module load verification
-- [ ] **Phase 2: OAuth, Token Store & Single-Flight Refresh** - WHOOP OAuth flow, keychain-backed token store with chmod 600 fallback, in-process + cross-process single-flight refresh, MCP error sanitizer wired through
-- [ ] **Phase 3: Data Model, DB Layer & Sync Loop** - Three-layer types with discriminated-union Score, Drizzle schema + atomic migrator with pre-migration backup, WHOOP HTTP client with rate limiting + pagination, idempotent sync with DST/tz flagging and partial-failure reporting
+- [x] **Phase 2: OAuth, Token Store & Single-Flight Refresh** - WHOOP OAuth flow, keychain-backed token store with chmod 600 fallback, in-process + cross-process single-flight refresh, MCP error sanitizer wired through
+- [x] **Phase 3: Data Model, DB Layer & Sync Loop** - Three-layer types with discriminated-union Score, Drizzle schema + atomic migrator with pre-migration backup, WHOOP HTTP client with rate limiting + pagination, idempotent sync with DST/tz flagging and partial-failure reporting
 - [ ] **Phase 4: Domain Math, Reviews, Decision Ledger & MCP Surface** - Median+MAD baselines, confidence-tier gating, FDR-corrected weekly patterns, daily + weekly reviews, decision ledger, 8 MCP tools + 6 resources + 4 prompts, banned-word tone lint
 - [ ] **Phase 5: Doctor Polish, Install Guide & <20-Minute Setup Validation** - Full doctor checks, per-client install guides, API-gap docs, launchd template, CI stopwatch test asserting clean-clone-to-first-review under 20 minutes
 
@@ -64,7 +64,20 @@
   3. Cycles whose `start`/`end` straddle a DST transition or differ in `timezone_offset` from the adjacent cycle are flagged as excluded from baseline aggregation while remaining visible in raw views.
   4. The Drizzle migrator runs inside `BEGIN IMMEDIATE`, takes a pre-migration backup of `.sqlite`/`-wal`/`-shm`, and a crash-mid-migration test (process killed between statements) is recoverable from the auto-backup; the `__drizzle_migrations` table matches the on-disk schema.
   5. A partial-failure sync (e.g., workouts 429s but cycles succeed) records per-resource success/fail/skipped counts in a `sync_runs` row, exits with `status: 'partial'`, and runs `wal_checkpoint(TRUNCATE)` after every successful run; the fixture-based contract test suite covers every WHOOP resource with zero live API calls and finishes in under 60 seconds.
-**Plans**: TBD
+**Plans**: 13 plans
+- [x] 03-01-wave0-infra-PLAN.md — Wave-0 precondition: 5 npm deps + drizzle.config.ts + paths.ts extension + WhoopApiError union + Gate F + Gate G
+- [x] 03-02-schema-PLAN.md — Drizzle schema for 9 tables + drizzle-kit generate + introspection tests (DATA-02 / DATA-03 / DATA-05 / DATA-06)
+- [x] 03-03-domain-types-PLAN.md — ScoreState + entity types + raw Zod schemas + page wrappers + DU forcing-function tests (DATA-05 / DATA-06)
+- [x] 03-04-sync-types-cursor-PLAN.md — RunSyncInput/Result/Outcome + RESOURCES tuple + computeWindow pure function (SYNC-01 / SYNC-04) — completed 2026-05-16 (4m 24s, 3 src files + 11 unit tests)
+- [x] 03-05-db-connection-migrator-PLAN.md — openDb + hand-rolled BEGIN IMMEDIATE migrator + pre-migration backup + migration-crash + pragma-roundtrip integration tests (DATA-01 / DATA-04 / SYNC-06)
+- [x] 03-06-whoop-client-PLAN.md — httpGet chokepoint + paginateAll + rate-limit semaphore-of-4 + 429-Reset-honoring retry (SYNC-02 / SYNC-03)
+- [x] 03-07-msw-fixtures-PLAN.md — 6 MSW helpers + 15+ fixtures including DST/tz set + in-memory-db helper (SYNC-07 / DATA-06)
+- [x] 03-08-repositories-PLAN.md — 9 repositories with SCORED-only default filter + ON CONFLICT idempotency + sync_runs lifecycle + body-measurements append-on-change (DATA-02 / DATA-03 / DATA-05 / DATA-06 / SYNC-04 / SYNC-05)
+- [x] 03-09-resources-normalizers-dst-PLAN.md — 6 per-resource modules + 6 normalizers + DST/tz detector with two OR-ed rules (SYNC-01 / SYNC-02 / SYNC-04 / DATA-05 / DATA-06)
+- [x] 03-10-contract-tests-PLAN.md — 6 fixture-based contract tests anchoring Pitfall G + Pitfall H + idempotency per resource (SYNC-07 / DATA-05 / DATA-06)
+- [x] 03-11-sync-orchestration-PLAN.md — runSync orchestrator + bootstrap composition root + idempotency/partial-failure/DST integration tests (SYNC-01..06 / DATA-01 / DATA-04 / DATA-06)
+- [x] 03-12-cli-sync-formatter-PLAN.md — Commander `recovery-ledger sync` shim + formatter; D-33 + D-34 attestation preserved (SYNC-01 / SYNC-05)
+- [x] 03-13-phase-close-PLAN.md — full-suite green + 7 grep gates + attestation matrix + STATE/REQUIREMENTS/ROADMAP/VALIDATION updates (all 13 REQ-IDs) — completed 2026-05-16
 **UI hint**: no
 
 ### Phase 4: Domain Math, Reviews, Decision Ledger & MCP Surface
@@ -97,8 +110,8 @@
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Foundation & Stdout-Pure MCP Bootstrap | 6/6 | Complete | 2026-05-12 |
-| 2. OAuth, Token Store & Single-Flight Refresh | 6/8 | In Progress|  |
-| 3. Data Model, DB Layer & Sync Loop | 0/? | Not started | - |
+| 2. OAuth, Token Store & Single-Flight Refresh | 8/8 | Complete | 2026-05-12 |
+| 3. Data Model, DB Layer & Sync Loop | 13/13 | Complete | 2026-05-16 |
 | 4. Domain Math, Reviews, Decision Ledger & MCP Surface | 0/? | Not started | - |
 | 5. Doctor Polish, Install Guide & <20-Minute Setup Validation | 0/? | Not started | - |
 
@@ -125,4 +138,4 @@ Concerns originate in the phase where the first vulnerable code is introduced; t
 
 ---
 *Roadmap created: 2026-05-11*
-*Last updated: 2026-05-12 — Plan 02-01 complete (Wave-0 infra: paths.ts + schema.ts + 6-kind AuthError union + MSW helper + OAuth fixtures + 4 npm deps). 7 / 14 plans complete (50%).*
+*Last updated: 2026-05-16 — Phase 3 (data-model-db-layer-sync-loop) complete. 27 / 27 plans complete across Phases 1 + 2 + 3 (formula-based; Phase 4 plan count TBD).*

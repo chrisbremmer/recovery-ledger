@@ -72,7 +72,7 @@ the `SCORED` count, not the row count:
 
 ## Enforcement
 
-- Type definition in `src/domain/score.ts` (lands with Phase 3 when
+- Type definition in `src/domain/types/score.ts` (lands with Phase 3 when
   the first scored entity is modelled).
 - Domain functions accept `Score[]` or `ScoredOnly[]` (branded type);
   the brand can only be produced by passing through the filter
