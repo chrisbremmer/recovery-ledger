@@ -4,7 +4,7 @@ Local-first WHOOP data reviews for recovery-aware training and sleep decisions.
 
 Recovery Ledger syncs your official WHOOP API v2 data into a local SQLite cache and exposes structured daily and weekly review tools through a CLI and an MCP server. It is built for people who want a private, repeatable way to turn WHOOP data into decisions — not another endpoint wrapper.
 
-> **Status:** In development. Planning artifacts under [`.planning/`](.planning/); v1 scope and roadmap are committed. Implementation has not started yet.
+> **Status:** Pre-v1, in active development. Phases 1–3 of the five-phase v1 roadmap are complete (foundation + MCP bootstrap, OAuth + token store, data model + sync loop); Phase 4 (domain math, reviews, decision ledger, full MCP surface) is in planning. The CLI and MCP servers can install and sync, but the daily/weekly review surface is not wired up yet. See [`.planning/STATE.md`](.planning/STATE.md) and [`.planning/ROADMAP.md`](.planning/ROADMAP.md).
 >
 > **Not affiliated with or endorsed by WHOOP.** Bring your own WHOOP developer app.
 
@@ -48,28 +48,35 @@ If a feature does not improve sync reliability, review quality, or repeat usage,
 
 Five phases, layered to lock cross-cutting safety nets before any application code is written. Full detail in [`.planning/ROADMAP.md`](.planning/ROADMAP.md).
 
-| # | Phase | What it delivers |
-|---|---|---|
-| 1 | Foundation & Stdout-Pure MCP Bootstrap | Repo, CLI/MCP shells, stderr-only logging, MCP error sanitizer, native-module checks |
-| 2 | OAuth, Token Store & Single-Flight Refresh | BYO WHOOP auth, keychain-backed tokens, concurrent CLI+MCP refresh without burning the token family |
-| 3 | Data Model, DB Layer & Sync Loop | Drizzle schema with `score_state` discipline, DST/tz exclusion, idempotent sync with partial-failure reporting |
-| 4 | Domain Math, Reviews, Decision Ledger & MCP Surface | Daily + weekly reviews (median + MAD baselines, FDR-corrected patterns), decision ledger, 8 tools + 6 resources + 4 prompts |
-| 5 | Doctor Polish, Install Guide & <20-min Setup | `doctor` covering every prior phase; per-client install guides; CI stopwatch test |
+| # | Phase | Status | What it delivers |
+|---|---|---|---|
+| 1 | Foundation & Stdout-Pure MCP Bootstrap | Complete (2026-05-12) | Repo, CLI/MCP shells, stderr-only logging, MCP error sanitizer, native-module checks |
+| 2 | OAuth, Token Store & Single-Flight Refresh | Complete (2026-05-12) | BYO WHOOP auth, keychain-backed tokens, concurrent CLI+MCP refresh without burning the token family |
+| 3 | Data Model, DB Layer & Sync Loop | Complete (2026-05-16) | Drizzle schema with `score_state` discipline, DST/tz exclusion, idempotent sync with partial-failure reporting |
+| 4 | Domain Math, Reviews, Decision Ledger & MCP Surface | In planning | Daily + weekly reviews (median + MAD baselines, FDR-corrected patterns), decision ledger, 8 tools + 6 resources + 4 prompts |
+| 5 | Doctor Polish, Install Guide & <20-min Setup | Not started | `doctor` covering every prior phase; per-client install guides; CI stopwatch test |
 
-## CLI surface (planned)
+## CLI surface
+
+Implemented today (Phases 1–3):
 
 ```sh
 recovery-ledger init                  # configure BYO WHOOP credentials
 recovery-ledger auth                  # OAuth flow on dynamic loopback port
-recovery-ledger sync --days 30        # sync last N days of WHOOP data
+recovery-ledger sync --days 30        # sync last N days of WHOOP data into local SQLite
+recovery-ledger doctor                # auth, token, DB, sync, MCP, data-quality checks
+```
+
+Landing in Phase 4:
+
+```sh
 recovery-ledger review daily          # today + baseline deltas + top 3 actions
 recovery-ledger review weekly         # worst-recovery days + plausible precursors
 recovery-ledger decision add          # record a training/sleep/recovery decision
 recovery-ledger decision review       # check outcomes of prior decisions
-recovery-ledger doctor                # auth, token, DB, sync, MCP, data-quality checks
 ```
 
-## MCP surface (planned)
+## MCP surface (Phase 4)
 
 **Tools** — `whoop_sync`, `whoop_daily_review`, `whoop_weekly_review`, `whoop_query_cache`, `whoop_add_decision`, `whoop_review_decisions`, `whoop_api_gap`, `whoop_doctor`
 
@@ -98,15 +105,34 @@ Consumer / private WHOOP endpoint scraping, write operations to WHOOP, medical a
 ├── .planning/                # GSD planning artifacts (committed)
 │   ├── PROJECT.md            # What this is, core value, requirements, decisions
 │   ├── REQUIREMENTS.md       # 49 v1 requirements with REQ-IDs and traceability
-│   ├── ROADMAP.md            # 5-phase plan
+│   ├── ROADMAP.md            # 5-phase plan with per-phase status
 │   ├── STATE.md              # Current execution state
+│   ├── phases/               # Per-phase PLAN / VALIDATION / REVIEW artifacts
 │   ├── config.json           # GSD workflow config
 │   └── research/             # STACK / FEATURES / ARCHITECTURE / PITFALLS / SUMMARY
-├── CLAUDE.md                 # Project-level instructions for Claude Code
+├── src/
+│   ├── cli/                  # Commander shims over services (≤ 5 lines each)
+│   ├── mcp/                  # MCP stdio server + tool registration shims
+│   ├── services/             # Orchestration (sync, auth, doctor)
+│   ├── domain/               # Pure functions (score discipline, types)
+│   ├── infrastructure/       # WHOOP HTTP, Drizzle, token store, config, paths
+│   └── formatters/           # Text/JSON renderers
+├── tests/
+│   ├── contract/             # Fixture-based WHOOP contract tests (MSW, offline)
+│   ├── integration/          # DB migrator, auth concurrency, sync orchestration
+│   ├── fixtures/             # WHOOP API response fixtures
+│   ├── helpers/              # MSW handlers + in-memory DB helpers
+│   └── setup/                # Vitest setup
+├── agent_docs/               # Agent-facing conventions, ADRs, workflows
+│   ├── decisions/            # ADR-0001 … ADR-0007
+│   ├── workflows/            # contributing, pr-review, debugging
+│   ├── conventions.md
+│   └── learnings.md
+├── scripts/                  # CI grep gates, worktree hooks
+├── .github/                  # Workflows + PR template
+├── AGENTS.md                 # Canonical agent instructions (CLAUDE.md → symlink)
 └── README.md
 ```
-
-Source code lands during Phase 1.
 
 ## Disclaimers
 
