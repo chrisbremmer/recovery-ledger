@@ -67,9 +67,18 @@ describe('mannWhitney', () => {
       // Run a handful of small-sample inputs that exercise the continuity-
       // correction regime where 2*(1 - Phi(z)) can numerically exceed 1.
       const cases: Array<[number[], number[]]> = [
-        [[3, 3, 3], [3, 3, 3]],
-        [[1, 1], [1, 1]],
-        [[2, 2, 2, 2], [2, 2, 2, 2]],
+        [
+          [3, 3, 3],
+          [3, 3, 3],
+        ],
+        [
+          [1, 1],
+          [1, 1],
+        ],
+        [
+          [2, 2, 2, 2],
+          [2, 2, 2, 2],
+        ],
       ];
       for (const [x, y] of cases) {
         const { p } = mannWhitney(x, y);
