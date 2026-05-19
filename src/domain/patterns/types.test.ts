@@ -55,7 +55,9 @@ describe('WeeklyPattern (D-16 + D-34)', () => {
       direction: 'worst_days_had_lower',
       pattern_confidence: 'strong',
     };
-    expect(describeWeeklyPattern(p)).toBe('detected:sleep_duration_prior_night:worst_days_had_lower:strong');
+    expect(describeWeeklyPattern(p)).toBe(
+      'detected:sleep_duration_prior_night:worst_days_had_lower:strong',
+    );
   });
 
   it('detected arm carries pattern_confidence weak when 14 <= N < 20', () => {
