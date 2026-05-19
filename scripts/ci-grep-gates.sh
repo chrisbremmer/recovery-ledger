@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# CI grep gates — four rules that Biome cannot catch on its own.
+# CI grep gates — ten rules (A-J) that Biome cannot catch on its own.
 #
 # Gate A: banned tone words (CLAUDE.md "Critical Rules" list) — banned in code,
 #         tests, formatters, configs, and docs other than the rule definitions
@@ -41,6 +41,31 @@
 #         + ARCHITECTURE.md Anti-Pattern 3: Drizzle row types never in
 #         src/domain/ or src/services/; repositories map at the boundary.
 #         Test files exempt.
+# Gate H: no `tools.length === 1` assertion outside tests/__legacy__/.
+#         Phase 4 D-33 + D-29: the Phase 3 attestation tools.length === 1
+#         (only whoop_doctor registered) breaks INTENTIONALLY in Phase 4
+#         — the new target is tools.length === 8. This gate is the
+#         anti-regression guard so a future plan cannot accidentally
+#         shrink the tool surface back to 1 (or copy-paste the Phase 3
+#         attestation verbatim into a new test file). Test files are NOT
+#         excluded (the attestation IS in a test file, and Gate H must
+#         catch a regression there). Files explicitly moved to
+#         tests/__legacy__/ are the documented escape hatch when a Phase
+#         3 attestation needs to be preserved verbatim for archaeology.
+# Gate I: no `server.registerResource(` outside src/mcp/register-resource.ts.
+#         Phase 4 D-36: the resource-registration chokepoint where the
+#         try/catch/sanitize wrapper applies. Any direct call from a
+#         resource module would bypass the sanitizer (same defence as
+#         Gate D for tools). Test files exempt (a future contract test
+#         may reference the method name in prose to describe the
+#         attestation under test). The MCP SDK type re-exports
+#         ReadResourceCallback so the wrapper file is identified by
+#         its single literal call to server.registerResource(...).
+# Gate J: no `server.registerPrompt(` outside src/mcp/register-prompt.ts.
+#         Phase 4 D-36: the prompt-registration chokepoint. Mirror of
+#         Gate I for the prompt surface (sanitize-walks
+#         messages[].content.text on success; isError envelope on throw).
+#         Test files exempt for the same reason as Gate I.
 #
 # Exit-code semantics (Pitfall 10): grep returns 0 on match (= violation found).
 # Each gate inverts that: if grep -rEn matches, the gate prints ::error:: and
@@ -292,6 +317,86 @@ if "$GREP" -rEn "$DRIZZLE_IMPORT_RE" --include='*.ts' src/ 2>/dev/null \
   fi
 fi
 rm -f /tmp/gate-g.$$
+
+# ----------------------------------------------------------------------------
+# Gate H — no `tools.length === 1` assertion outside tests/__legacy__/.
+# Phase 4 D-33 + D-29: the Phase 3 attestation `tools.length === 1` (only
+# whoop_doctor registered) breaks INTENTIONALLY in Phase 4 — new target is
+# `tools.length === 8`. This gate is the anti-regression guard so a
+# future plan cannot accidentally shrink the tool surface back to 1 (or
+# copy-paste the Phase 3 attestation verbatim into a new test file).
+#
+# Test files are NOT excluded — the attestation IS in a test file, and
+# Gate H must catch a regression there. The documented escape hatch is
+# to move the Phase 3 attestation into tests/__legacy__/ before this
+# gate fires (Plan 04-12 phase-close).
+#
+# At Wave 0 land time this gate is green-on-empty: Phase 3 attestation
+# lives at tests/integration/mcp-runtime.test.ts as `toHaveLength(1)`
+# (NOT the `===` form), so the gate does not yet fire. The gate's
+# value lands the moment Plan 04-11 / 04-12 flips that attestation
+# from 1 to 8.
+# ----------------------------------------------------------------------------
+TOOLS_LENGTH_ONE_RE='\btools\.length\s*===\s*1\b'
+
+if "$GREP" -rEn "$TOOLS_LENGTH_ONE_RE" --include='*.ts' src/ tests/ 2>/dev/null \
+   | "$GREP" -Ev '^tests/__legacy__/' \
+   > /tmp/gate-h.$$; then
+  if [ -s /tmp/gate-h.$$ ]; then
+    echo "::error::Gate H — tools.length === 1 outside tests/__legacy__/ (D-33; D-29 broke the Phase 3 attestation intentionally to tools.length === 8):"
+    cat /tmp/gate-h.$$
+    rm -f /tmp/gate-h.$$
+    exit 1
+  fi
+fi
+rm -f /tmp/gate-h.$$
+
+# ----------------------------------------------------------------------------
+# Gate I — server.registerResource outside src/mcp/register-resource.ts.
+# Phase 4 D-36: the resource-registration chokepoint where the
+# try/catch/sanitize wrapper applies (mirrors Gate D for tools). A
+# direct call from a resource module would bypass the sanitizer
+# (sanitize walks contents[].text on success; isError envelope on
+# throw). Test files (*.test.ts) exempt — a future contract test may
+# reference the method name in prose to describe the attestation under
+# test, same as Gate D.
+# ----------------------------------------------------------------------------
+REGISTER_RESOURCE_RE='\bserver\.registerResource\s*\('
+
+if "$GREP" -rEn "$REGISTER_RESOURCE_RE" --include='*.ts' src/mcp/ 2>/dev/null \
+   | "$GREP" -Ev '^src/mcp/register-resource\.ts:' \
+   | "$GREP" -Ev '\.test\.ts:' \
+   > /tmp/gate-i.$$; then
+  if [ -s /tmp/gate-i.$$ ]; then
+    echo "::error::Gate I — server.registerResource outside src/mcp/register-resource.ts:"
+    cat /tmp/gate-i.$$
+    rm -f /tmp/gate-i.$$
+    exit 1
+  fi
+fi
+rm -f /tmp/gate-i.$$
+
+# ----------------------------------------------------------------------------
+# Gate J — server.registerPrompt outside src/mcp/register-prompt.ts.
+# Phase 4 D-36: the prompt-registration chokepoint. Mirror of Gate I
+# for the prompt surface (sanitize walks messages[].content.text on
+# success; isError envelope on throw). Test files (*.test.ts) exempt
+# for the same reason as Gate I.
+# ----------------------------------------------------------------------------
+REGISTER_PROMPT_RE='\bserver\.registerPrompt\s*\('
+
+if "$GREP" -rEn "$REGISTER_PROMPT_RE" --include='*.ts' src/mcp/ 2>/dev/null \
+   | "$GREP" -Ev '^src/mcp/register-prompt\.ts:' \
+   | "$GREP" -Ev '\.test\.ts:' \
+   > /tmp/gate-j.$$; then
+  if [ -s /tmp/gate-j.$$ ]; then
+    echo "::error::Gate J — server.registerPrompt outside src/mcp/register-prompt.ts:"
+    cat /tmp/gate-j.$$
+    rm -f /tmp/gate-j.$$
+    exit 1
+  fi
+fi
+rm -f /tmp/gate-j.$$
 
 echo "All grep gates passed."
 exit 0
