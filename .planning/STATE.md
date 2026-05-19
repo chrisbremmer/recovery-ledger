@@ -4,13 +4,13 @@ milestone: v1.0
 milestone_name: milestone
 current_plan: Not started
 status: executing
-last_updated: "2026-05-17T07:17:14.732Z"
+last_updated: "2026-05-19T00:21:20.927Z"
 progress:
   total_phases: 5
   completed_phases: 3
   total_plans: 39
-  completed_plans: 27
-  percent: 69
+  completed_plans: 28
+  percent: 72
 ---
 
 # State: Recovery Ledger
@@ -35,7 +35,7 @@ Plan: 0 of TBD
 - **Phase:** 4
 - **Plan:** Ready to begin Phase 4 planning. Phase 3 closed 2026-05-16 with all 13 plans complete; the recovery-ledger sync CLI command works end-to-end against the MSW fixture suite. Next move: `/gsd-context-phase 4` (or `/gsd-mvp-phase 4` for MVP user-story reframing) to gather Phase 4 context. Phase 4 covers REV-01..08 + DEC-01..04 + MCP-01..06 (18 REQ-IDs): baseline calculator, confidence-tier gating, FDR-corrected weekly patterns, daily + weekly reviews, decision ledger, 8 MCP tools + 6 resources + 4 prompts, banned-word tone lint. Depends on Phase 3 (reviews are pure functions over the cached entities; baseline math hinges on the score_state-disciplined, DST-flagged data Phase 3 produces).
 - **Status:** Ready to execute
-- **Progress:** [░░░░░░░░░░] 0% (Phase 4)
+- **Progress:** [███████░░░] 72%
 
 ```
 [████████████░░░░░░░░] 3 / 5 phases complete (6 / 6 in Phase 1; 8 / 8 in Phase 2; 13 / 13 in Phase 3)
@@ -72,6 +72,8 @@ Plan: 0 of TBD
 | Phase 03 P11 | 13m 21s | 2 tasks | 8 files |
 | Phase 03 P12 | 25min | 2 tasks | 5 files |
 | Phase 03 P13 | verification + 4-doc flip | 2 tasks | 5 files | Phase 3 closed
+| Phase 04 P04-01 | 13min 39s | 5 tasks | 15 files |
+| Phase 04 P04-01 | 13min 39s | 5 tasks | 15 files |
 
 ### Plan Execution History
 
@@ -231,6 +233,12 @@ Plan: 0 of TBD
 - [Phase 03]: Plan 03-11 composition strategy (b) — createServices() stays lightweight (no DB); runSync requires bootstrap(). Services interface still declares runSync so Phase 4 MCP tool depends on same type surface; createServices() returns throwing stub for runSync documenting bootstrap() requirement.
 - [Phase ?]: Plan 03-12: buildProgram() factory + entry-point gate enables testable Commander construction; pure-function formatter is the CLI-MCP reuse seam for future Phase 4 whoop_sync MCP tool.
 - [Phase ?]: Plan 03-12: SYNC_EXIT_CODES.partial === 0 — partial is soft success (per-resource lines flag the issue); cron wrappers do not page on routine WHOOP 429 backoff (T-03.12-04).
+- [Phase ?]: [Phase 04] Plan 04-01: ulid@^3.0.2 + simple-statistics@^7.8.9 installed (zero-dep both); cumulativeStdNormalProbability(z) confirmed present per Assumption A2
+- [Phase ?]: [Phase 04] Plan 04-01: D-36 wrappers ship with as-never cast at the SDK boundary because exactOptionalPropertyTypes refuses argsSchema?: unknown against SDK ZodRawShapeCompat optional
+- [Phase ?]: [Phase 04] Plan 04-01: Gate H matches strict-equality tools.length===1 (NOT toHaveLength(1)); green-on-empty until Plan 04-11/04-12 flips Phase 3 attestation toHaveLength(8)
+- [Phase ?]: [Phase 04] Plan 04-01 deviation Rule-3: banned-words.ts added to Gate A self-exemption (parallels CLAUDE.md + ADR-0005 + ci-grep-gates.sh self-exemptions; banned-words.ts IS the SoT)
+- [Phase ?]: [Phase 04] Plan 04-01 deviation Rule-1: first wrapper draft hid the literal server.registerResource() from Gate I via cast indirection; rewrote to direct call with single-call-site discipline
+- [Phase ?]: [Phase 04] Plan 04-01: EMOJI_RE in src/domain/banned-words.ts adds U+2600-U+27BF dingbat range on top of shell-side 4-byte UTF-8 prefix pattern (strictly stricter than Gate A)
 
 ### Open Todos
 

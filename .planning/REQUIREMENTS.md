@@ -54,7 +54,7 @@ Requirements for the initial release. Each maps to roadmap phases.
 - [ ] **REV-05**: When data is insufficient, the daily review states what is missing and declines to make confident recommendations
 - [ ] **REV-06**: `recovery-ledger review weekly` identifies the lowest-recovery days of the week and runs pattern checks on preceding sleep duration / sleep debt / strain / workout timing / HRV delta / RHR delta / respiratory-rate anomaly
 - [ ] **REV-07**: Weekly review applies Benjamini-Hochberg FDR correction at q = 0.10 across ≤ 5 pre-registered candidate factors and returns "no reliable pattern detected" as a typed positive output when nothing crosses threshold
-- [ ] **REV-08**: Review output tone passes a banned-word CI lint (no coach-y / hype / moralizing language) and renders actions as verb-first single sentences
+- [x] **REV-08**: Review output tone passes a banned-word CI lint (no coach-y / hype / moralizing language) and renders actions as verb-first single sentences
 
 ### Decision Ledger
 
@@ -66,11 +66,11 @@ Requirements for the initial release. Each maps to roadmap phases.
 ### MCP Surface
 
 - [ ] **MCP-01**: MCP server exposes tools `whoop_sync`, `whoop_daily_review`, `whoop_weekly_review`, `whoop_query_cache` (typed per-resource filters, not free-form SQL), `whoop_add_decision`, `whoop_review_decisions`, `whoop_api_gap`, `whoop_doctor`
-- [ ] **MCP-02**: Every tool returns structured JSON (`structuredContent`) plus compact text (`content`) so weaker clients still work
-- [ ] **MCP-03**: All MCP tools are ≤ 5-line shims over services — zero business logic in `src/mcp/`; identical behavior to the CLI equivalents
-- [ ] **MCP-04**: MCP resources `whoop://summary/today`, `whoop://summary/week`, `whoop://baseline/30d`, `whoop://data-quality`, `whoop://api-gaps`, `whoop://decisions/open` are exposed and refresh from the cache
-- [ ] **MCP-05**: MCP prompts `whoop_daily_decision_brief`, `whoop_weekly_recovery_investigation`, `whoop_experiment_designer`, `whoop_deload_or_train` are registered with documented inputs
-- [ ] **MCP-06**: MCP tool error returns are sanitized via the FND-06 contract — no token material, no internal stack traces
+- [x] **MCP-02**: Every tool returns structured JSON (`structuredContent`) plus compact text (`content`) so weaker clients still work
+- [x] **MCP-03**: All MCP tools are ≤ 5-line shims over services — zero business logic in `src/mcp/`; identical behavior to the CLI equivalents
+- [x] **MCP-04**: MCP resources `whoop://summary/today`, `whoop://summary/week`, `whoop://baseline/30d`, `whoop://data-quality`, `whoop://api-gaps`, `whoop://decisions/open` are exposed and refresh from the cache
+- [x] **MCP-05**: MCP prompts `whoop_daily_decision_brief`, `whoop_weekly_recovery_investigation`, `whoop_experiment_designer`, `whoop_deload_or_train` are registered with documented inputs
+- [x] **MCP-06**: MCP tool error returns are sanitized via the FND-06 contract — no token material, no internal stack traces
 
 ### Diagnostics & Setup
 
@@ -158,17 +158,17 @@ Explicitly excluded. Gated behind the hard scope guardrail in PROJECT.md (≥ 12
 | REV-05 | Phase 4 | Pending |
 | REV-06 | Phase 4 | Pending |
 | REV-07 | Phase 4 | Pending |
-| REV-08 | Phase 4 | Pending |
+| REV-08 | Phase 4 | Complete |
 | DEC-01 | Phase 4 | Pending |
 | DEC-02 | Phase 4 | Pending |
 | DEC-03 | Phase 4 | Pending |
 | DEC-04 | Phase 4 | Pending |
 | MCP-01 | Phase 4 | Pending |
-| MCP-02 | Phase 4 | Pending |
-| MCP-03 | Phase 4 | Pending |
-| MCP-04 | Phase 4 | Pending |
-| MCP-05 | Phase 4 | Pending |
-| MCP-06 | Phase 4 | Pending |
+| MCP-02 | Phase 4 | Complete |
+| MCP-03 | Phase 4 | Complete |
+| MCP-04 | Phase 4 | Complete |
+| MCP-05 | Phase 4 | Complete |
+| MCP-06 | Phase 4 | Complete |
 | DOC-01 | Phase 5 | Pending |
 | DOC-02 | Phase 5 | Pending |
 | DOC-03 | Phase 5 | Pending |

@@ -91,7 +91,7 @@
   4. `recovery-ledger decision add` accepts a happy-path one-liner with smart defaults (ULID id, default follow-up window, default expected effect) and persists with `status` (open / followed_up / abandoned) + `outcome_notes`; `decision review` lists open decisions with elapsed time vs. expected effect window; the weekly review prompts for at least one new decision when none has been recorded in the prior week.
   5. The MCP server exposes all 8 tools (`whoop_sync`, `whoop_daily_review`, `whoop_weekly_review`, `whoop_query_cache`, `whoop_add_decision`, `whoop_review_decisions`, `whoop_api_gap`, `whoop_doctor`), all 6 resources (`whoop://summary/today`, `whoop://summary/week`, `whoop://baseline/30d`, `whoop://data-quality`, `whoop://api-gaps`, `whoop://decisions/open`), and all 4 prompts (`whoop_daily_decision_brief`, `whoop_weekly_recovery_investigation`, `whoop_experiment_designer`, `whoop_deload_or_train`); every tool returns both `structuredContent` and a compact `content` text fallback; every MCP tool body is ≤ 5 lines of shim over a service function — zero business logic lives in `src/mcp/`.
 **Plans**: 12 plans
-- [ ] 04-01-PLAN.md — Wave 0 deps install + D-36 wrappers + Gates H/I/J + 6 contract scaffolds (REV-08, MCP-02/03/04/05/06)
+- [x] 04-01-PLAN.md — Wave 0 deps install + D-36 wrappers + Gates H/I/J + 6 contract scaffolds (REV-08, MCP-02/03/04/05/06)
 - [ ] 04-02-PLAN.md — Type contracts (8 type files + 4 narrowing tests) (REV-01/02/03/06/07, DEC-01/02/03)
 - [ ] 04-03-PLAN.md — Stats primitives (median + MAD + Mann-Whitney + BH-FDR + REV-07 fixtures) (REV-01, REV-07)
 - [ ] 04-04-PLAN.md — Baseline + anomaly + confidence pure-domain layer (REV-01, REV-02, REV-05)
