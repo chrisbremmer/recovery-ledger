@@ -92,7 +92,7 @@
   5. The MCP server exposes all 8 tools (`whoop_sync`, `whoop_daily_review`, `whoop_weekly_review`, `whoop_query_cache`, `whoop_add_decision`, `whoop_review_decisions`, `whoop_api_gap`, `whoop_doctor`), all 6 resources (`whoop://summary/today`, `whoop://summary/week`, `whoop://baseline/30d`, `whoop://data-quality`, `whoop://api-gaps`, `whoop://decisions/open`), and all 4 prompts (`whoop_daily_decision_brief`, `whoop_weekly_recovery_investigation`, `whoop_experiment_designer`, `whoop_deload_or_train`); every tool returns both `structuredContent` and a compact `content` text fallback; every MCP tool body is ≤ 5 lines of shim over a service function — zero business logic lives in `src/mcp/`.
 **Plans**: 12 plans
 - [x] 04-01-PLAN.md — Wave 0 deps install + D-36 wrappers + Gates H/I/J + 6 contract scaffolds (REV-08, MCP-02/03/04/05/06)
-- [ ] 04-02-PLAN.md — Type contracts (8 type files + 4 narrowing tests) (REV-01/02/03/06/07, DEC-01/02/03)
+- [x] 04-02-PLAN.md — Type contracts (8 type files + 4 narrowing tests) (REV-01/02/03/06/07, DEC-01/02/03)
 - [ ] 04-03-PLAN.md — Stats primitives (median + MAD + Mann-Whitney + BH-FDR + REV-07 fixtures) (REV-01, REV-07)
 - [ ] 04-04-PLAN.md — Baseline + anomaly + confidence pure-domain layer (REV-01, REV-02, REV-05)
 - [ ] 04-05-PLAN.md — Patterns + action/decision-prompt catalogs + select (REV-06, REV-07, REV-08, DEC-04)
@@ -124,7 +124,7 @@
 | 1. Foundation & Stdout-Pure MCP Bootstrap | 6/6 | Complete | 2026-05-12 |
 | 2. OAuth, Token Store & Single-Flight Refresh | 8/8 | Complete | 2026-05-12 |
 | 3. Data Model, DB Layer & Sync Loop | 13/13 | Complete | 2026-05-16 |
-| 4. Domain Math, Reviews, Decision Ledger & MCP Surface | 0/? | Not started | - |
+| 4. Domain Math, Reviews, Decision Ledger & MCP Surface | 2/12 | In Progress | - |
 | 5. Doctor Polish, Install Guide & <20-Minute Setup Validation | 0/? | Not started | - |
 
 ## Coverage
@@ -150,4 +150,4 @@ Concerns originate in the phase where the first vulnerable code is introduced; t
 
 ---
 *Roadmap created: 2026-05-11*
-*Last updated: 2026-05-16 — Phase 3 (data-model-db-layer-sync-loop) complete. 27 / 27 plans complete across Phases 1 + 2 + 3 (formula-based; Phase 4 plan count TBD).*
+*Last updated: 2026-05-18 — Phase 4 Wave 0 plans 04-01 + 04-02 complete (infra + type contracts). 29 / 39 plans complete across Phases 1 + 2 + 3 + 4-Wave-0 (formula-based; Phase 4 has 12 plans total, 2 complete).*

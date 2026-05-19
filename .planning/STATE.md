@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-current_plan: Not started
+current_plan: 04-02 complete (Wave 0 cross-cutting type contracts shipped)
 status: executing
-last_updated: "2026-05-19T00:21:20.927Z"
+last_updated: "2026-05-19T00:36:06.002Z"
 progress:
   total_phases: 5
   completed_phases: 3
   total_plans: 39
-  completed_plans: 28
-  percent: 72
+  completed_plans: 29
+  percent: 74
 ---
 
 # State: Recovery Ledger
@@ -26,16 +26,16 @@ progress:
 
 ## Current Position
 
-**Current Plan:** Not started
+**Current Plan:** 04-02 complete (Wave 0 cross-cutting type contracts shipped)
 **Total Plans in Phase:** 12
-Phase: 04 (TBD — researcher/discusser to determine slug) — NOT STARTED
-Plan: 0 of TBD
+Phase: 04-domain-math-reviews-decision-ledger-mcp-surface — IN PROGRESS (2 of 12 plans complete)
+Plan: 2 of 12
 
 - **Milestone:** v1
 - **Phase:** 4
 - **Plan:** Ready to begin Phase 4 planning. Phase 3 closed 2026-05-16 with all 13 plans complete; the recovery-ledger sync CLI command works end-to-end against the MSW fixture suite. Next move: `/gsd-context-phase 4` (or `/gsd-mvp-phase 4` for MVP user-story reframing) to gather Phase 4 context. Phase 4 covers REV-01..08 + DEC-01..04 + MCP-01..06 (18 REQ-IDs): baseline calculator, confidence-tier gating, FDR-corrected weekly patterns, daily + weekly reviews, decision ledger, 8 MCP tools + 6 resources + 4 prompts, banned-word tone lint. Depends on Phase 3 (reviews are pure functions over the cached entities; baseline math hinges on the score_state-disciplined, DST-flagged data Phase 3 produces).
 - **Status:** Ready to execute
-- **Progress:** [███████░░░] 72%
+- **Progress:** [███████░░░] 74%
 
 ```
 [████████████░░░░░░░░] 3 / 5 phases complete (6 / 6 in Phase 1; 8 / 8 in Phase 2; 13 / 13 in Phase 3)
@@ -73,7 +73,7 @@ Plan: 0 of TBD
 | Phase 03 P12 | 25min | 2 tasks | 5 files |
 | Phase 03 P13 | verification + 4-doc flip | 2 tasks | 5 files | Phase 3 closed
 | Phase 04 P04-01 | 13min 39s | 5 tasks | 15 files |
-| Phase 04 P04-01 | 13min 39s | 5 tasks | 15 files |
+| Phase 04 P04-02 | 8m 59s | 4 tasks | 12 files |
 
 ### Plan Execution History
 
@@ -106,6 +106,8 @@ Plan: 0 of TBD
 | 03-11-sync-orchestration | 13m 21s | 2 | 8 | Complete (2026-05-16) — Wave 5b |
 | 03-12-cli-sync-formatter | 25m | 2 | 5 | Complete (2026-05-16) — Wave 6 |
 | 03-13-phase-close | verification + 4-doc flip | 2 | 5 | Complete (2026-05-16) — Phase 3 closed |
+| 04-01-wave0-infra | 13m 39s | 5 | 15 | Complete (2026-05-19) — Wave 0 |
+| 04-02-type-contracts | 8m 59s | 4 | 12 | Complete (2026-05-18) — Wave 0 |
 
 ## Accumulated Context
 
@@ -239,6 +241,12 @@ Plan: 0 of TBD
 - [Phase ?]: [Phase 04] Plan 04-01 deviation Rule-3: banned-words.ts added to Gate A self-exemption (parallels CLAUDE.md + ADR-0005 + ci-grep-gates.sh self-exemptions; banned-words.ts IS the SoT)
 - [Phase ?]: [Phase 04] Plan 04-01 deviation Rule-1: first wrapper draft hid the literal server.registerResource() from Gate I via cast indirection; rewrote to direct call with single-call-site discipline
 - [Phase ?]: [Phase 04] Plan 04-01: EMOJI_RE in src/domain/banned-words.ts adds U+2600-U+27BF dingbat range on top of shell-side 4-byte UTF-8 prefix pattern (strictly stricter than Gate A)
+- [Phase ?]: [Phase 04] Plan 04-02: ZAnalysis 3-variant union (computed | refused/insufficient_days | refused/baseline_mad_zero) per D-05 + RESEARCH §1 MAD=0 extension
+- [Phase ?]: [Phase 04] Plan 04-02: CANDIDATE_FACTORS_TYPE_ONLY type-anchor lives in patterns/types.ts (avoids types.ts→candidates.ts circular cycle); load-bearing module-load constant ships in Plan 04-05 candidates.ts (deep-equal-asserted to stay in sync)
+- [Phase ?]: [Phase 04] Plan 04-02: pattern_confidence is on WeeklyPattern.detected arm only (D-34 ADDITIVE non-discriminator); type system rejects reading it on the no_pattern arm
+- [Phase ?]: [Phase 04] Plan 04-02: QueryCacheResult.rows: unknown[] at service boundary; per-resource narrowing at Wave 3 formatter dispatch site via switch on result.resource (rejected generic-discriminator QueryCacheResult<R>)
+- [Phase ?]: [Phase 04] Plan 04-02 deviation Rule-3: exhaustive-switch test bodies must cast through union type (METRIC_NAMES[0] as MetricName); literal-narrowing on const-tuple derived literal refuses other case branches as TS2678 not-comparable
+- [Phase ?]: [Phase 04] Plan 04-02: available_via_v2_api: false is a literal-false type on ApiGapEntry (not boolean); locks the v1 contract — every catalog entry is unavailable by definition
 
 ### Open Todos
 
@@ -285,6 +293,8 @@ Previously executed Plan 02-05 (cli-shims). Single TDD task across RED → GREEN
 Previously executed Plan 02-04 (refresh-orchestrator). Single TDD task across RED → GREEN (REFACTOR skipped — implementation matched planned shape; same precedent as Plan 02-01 Task 2 + Plan 02-07 Task 1). Landed `src/services/refresh-orchestrator.ts` (133 LOC, 7 named exports: callWithAuth + createRefreshOrchestrator + refreshOrchestrator + 4 type interfaces FetchLikeResponse/AuthedOperation/CallWithAuthOptions/RefreshOrchestrator) + `refresh-orchestrator.test.ts` (296 LOC, 9 tests across 4 describe blocks). Extended `src/services/index.ts` (19 → 34 LOC) — Services interface now includes refreshOrchestrator alongside runDoctor; createServices() returns both; type re-exports for orchestrator surface. 401-reactive retry policy chokepoint per D-14/D-15/D-16 + ADR-0002 §Consequences: attempt 1 → tokenStore.getValidAccessToken() + op(at) → if 401, re-read tokens (sibling may have refreshed) → if fresh, retry with current.accessToken (no force-refresh — getValidAccessToken called only once in this path); else force getValidAccessToken() through three-layer gate, retry once with fresh token, return result regardless of status (retry budget = 1). Refresh failure (token-store throws AuthError({kind: 'refresh_failed'})) wraps as AuthError({kind: 'auth_expired', cause: refreshErr}) and does NOT retry the operation (STACK.md §Token refresh point 4 — retry budget 0 on refresh). The orchestrator is the SOLE consumer of tokenStore.getValidAccessToken() outside of token-store internals (grep-verified — `grep -rEn "tokenStore\.getValidAccessToken" src/` outside refresh-orchestrator.ts + token-store.ts + their tests returns 0; Plan 02-06's Gate E will lock at CI time). Consumer scope corrected per checker WARNING PLAN-04-CIRCULAR-NOTE: Phase 3's WHOOP sync service is the FIRST runtime consumer; Plan 02-05's auth.ts does NOT consume (auth-code grant has no 401-reactive boundary — auth.ts imports infrastructure directly). FetchLikeResponse intentionally minimal — just `{status: number}` — orchestrator only inspects `.status` to decide retry; full Response shape is operation callback's concern (decouples from globalThis.Response, lets Phase 3 WHOOP HTTP client pass any wrapper). callWithAuth bound on singleton via `.bind(refreshOrchestrator)` so free-function `import { callWithAuth }` preserves `this`. 9 tests green: H-01/H-02 (happy path; access-token plumbing), R-01/R-02/R-03 (sibling re-read, force refresh path, retry budget exhausted), F-01/F-02 (auth_expired wrap with cause; formatAuthError remediation), S-01/S-02 (services-barrel wiring + end-to-end). Two deviations all auto-fixed: 1 Rule-1 cross-module class identity (top-level static `import { AuthError }` resolves a pre-vi.resetModules() module-graph instance — toBeInstanceOf fails against the orchestrator's caught class; fix: dynamic-import AuthError inside F-01/F-02 matching the orchestrator's lifecycle — planner-template note: any test using vi.resetModules + dynamic import + toBeInstanceOf must dynamic-import the class too); 1 Rule-1 doc-comment phrasing precedent (used `console calls` / `direct stdout writes` rather than literal `console.*` / `process.stdout.write` to dodge plan-acceptance-grep collision — same precedent as Plan 02-01 paths.ts + Plan 02-02 token-store.ts). errors.ts unchanged (FROZEN at 6 kinds — Wave 0 contract preserved); token-store.ts unchanged; sanitize.ts/register.ts unchanged (D-18 attestation preserved across Plans 02-07 + 02-02 + 02-03 + 02-04). REFACTOR skipped — module-leading comment, retry policy, AuthError wrap, services-barrel wiring all matched `<interfaces>` and `<action>` verbatim. Tests: 174 → 183 across 14 → 15 files; lint clean; CI grep gates clean. Commits: `ea6735a` (RED — 9 tests; 8 fail with module-not-found, F-02 passes against existing errors.ts contract as expected), `63c5f10` (GREEN — 9/9 tests pass after class-identity fix).
 
 ### Next Session
+
+Phase 4 Wave 0 is complete (Plan 04-01 infra + Plan 04-02 type contracts both green). Recommended starting move: `/gsd-execute-phase 4` to continue with Plan 04-03 (domain stats — `median.ts` + `mad.ts` + `mann-whitney.ts` + `fdr.ts`), the first Wave 1 plan implementing pure-math functions against the BaselineStats contract shipped in Plan 04-02. The 5 new discriminated unions (ZAnalysis 3-variant, WeeklyPattern 2-arm, Pattern 1-arm placeholder, DecisionPrompt 2-arm, ReviewDecisionsInput 2-arm) all compile-checked and ready; the 8-arm QueryCacheInput closes T-04-S4 at the type level. Plan 04-03 imports `simple-statistics` (`median`, `medianAbsoluteDeviation`, `wilcoxonRankSum`, `cumulativeStdNormalProbability` — Plan 04-01 verified all 4 at runtime).
 
 Phase 3 is closed. Recommended starting move: `/gsd-context-phase 4` (or `/gsd-mvp-phase 4` for MVP user-story reframing) to begin Phase 4 (Domain Math, Reviews, Decision Ledger & MCP Surface). Phase 4 depends on Phase 3 — reviews are pure functions over the cached entities; baseline math hinges on the score_state-disciplined, DST-flagged data Phase 3 produces. The Score discriminated union (Plan 03-03) is the forcing function that keeps the baseline calculator from accidentally consuming PENDING_SCORE or UNSCORABLE rows; the `(score_state, start)` covering indexes (Plan 03-02 / DATA-03) make the SCORED-only baseline queries fast; the `baseline_excluded` + `exclusion_reason` columns on cycles (Plan 03-09 / DATA-06) let the baseline aggregator filter DST/tz-shift cycles by JOIN. Phase 4 covers REV-01..08 + DEC-01..04 + MCP-01..06 (18 REQ-IDs): median + MAD baselines, confidence-tier gating (insufficient / weak / strong), Benjamini-Hochberg FDR correction at q=0.10 on ≤ 5 pre-registered candidate factors, daily + weekly reviews with text-fallback rendering, decision ledger with status (open / followed_up / abandoned) + outcome_notes, 8 MCP tools (whoop_sync, whoop_daily_review, whoop_weekly_review, whoop_query_cache, whoop_add_decision, whoop_review_decisions, whoop_api_gap, whoop_doctor) + 6 resources + 4 prompts, banned-word tone CI lint per ADR-0005. D-33 + D-34 attestations continue forward: whoop_sync is Phase 4's first new MCP tool registration; sanitize.ts + register.ts get modified deliberately when whoop_sync lands (D-34 closes at Phase 4 close). AuthError FROZEN at 6 kinds; WhoopApiError shipped at 6 kinds — both remain locked. Recommended pre-planning research item: Zod → JSON-Schema fidelity at the pinned SDK × Zod combination (MCP tool schemas are Zod-shaped but exposed as JSON Schema over the wire), MAD scaling for small samples (the 1.4826 constant assumes Gaussian; gentle adjustment may be warranted for n < 20), FDR q-value default + the "no reliable pattern detected" typed positive output shape per ADR-0004. Branch policy: Phase 4 ships through worktree-free feature branch → PR → main per AGENTS.md §Branch policy; carve-out has expired.
 
