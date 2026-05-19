@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { METRIC_NAMES, METRIC_NAMES_SET, type BaselineStats, type MetricName } from './types.js';
+import { type BaselineStats, METRIC_NAMES, METRIC_NAMES_SET, type MetricName } from './types.js';
 
 // Task 1 (Plan 04-02) — D-04 metric tuple + BaselineStats shape contract.
 // The closed-tuple + ReadonlySet pattern is Shared Pattern 2 (Phase 3
@@ -51,8 +51,10 @@ describe('BaselineStats shape', () => {
   it('narrows metric to MetricName at the type boundary', () => {
     // Exhaustive switch — adding a 10th metric to METRIC_NAMES (and not to the
     // switch below) would be a `tsc --noEmit` error at compile time. This is
-    // the Shared Pattern 2 forcing function.
-    const name: MetricName = 'recovery_score';
+    // the Shared Pattern 2 forcing function. We cast through `as MetricName`
+    // to widen the value past TS's literal-narrowing so every branch stays
+    // reachable and the exhaustiveness check is meaningful.
+    const name = METRIC_NAMES[0] as MetricName;
     let touched = false;
     switch (name) {
       case 'recovery_score':
