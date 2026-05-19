@@ -1,0 +1,10 @@
+{
+  "_comment": "D-35 secondary fixture preserving D-15's original numbers. p-values [0.01, 0.04, 0.05, 0.20, 0.50] at q=0.10 yield three rejections: walking k=5 down, thresholds are [0.02, 0.04, 0.06, 0.08, 0.10]; first hit is k=3 where 0.05 <= 0.06. kStar=3 rejects positions 0, 1, 2 (the three smallest p-values). Exercises the 'BH rejects some but not all' path used by the D-34 pattern_confidence annotation in the next plan.",
+  "pvalues": [0.01, 0.04, 0.05, 0.2, 0.5],
+  "q": 0.1,
+  "expected": {
+    "kStar": 3,
+    "rejected_count": 3,
+    "rejected_positions": [0, 1, 2]
+  }
+}

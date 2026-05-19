@@ -1,0 +1,9 @@
+{
+  "_comment": "D-35 load-bearing REV-07 fixture. p-values [0.05, 0.20, 0.30, 0.45, 0.60] at q=0.10 yield zero rejections under BH step-up: walking k=5 down, thresholds are [0.02, 0.04, 0.06, 0.08, 0.10] and no p_(k) <= (k/m)*q at any rank. kStar=-1; the smallest p (0.05) WOULD have been significant at unadjusted alpha=0.05 but FDR correctly suppresses it. Anchors the ADR-0004 'no reliable pattern detected' typed positive output.",
+  "pvalues": [0.05, 0.20, 0.30, 0.45, 0.60],
+  "q": 0.1,
+  "expected": {
+    "kStar": -1,
+    "rejected_count": 0
+  }
+}
