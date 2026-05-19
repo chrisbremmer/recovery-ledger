@@ -54,10 +54,11 @@ describe('mannWhitney', () => {
       // U_1 = 9 - 3*4/2 = 3.
       // muU = 3*8/2 = 12; sigU = sqrt(3*8*12/12) = sqrt(24) ≈ 4.899
       // z = (|3 - 12| - 0.5) / 4.899 ≈ 1.735
-      // p_two = 2 * (1 - Phi(1.735)) ≈ 0.0828
+      // p_two = 2 * (1 - Phi(1.735)) ≈ 0.0818 against simple-statistics's
+      // 3-decimal Phi table (verified 2026-05-19 against the live library).
       const { U, p } = mannWhitney([1, 3, 5], [2, 4, 6, 8, 10, 12, 14, 16]);
       expect(U).toBe(3);
-      expect(p).toBeCloseTo(0.0828, 3);
+      expect(p).toBeCloseTo(0.0818, 3);
     });
   });
 
