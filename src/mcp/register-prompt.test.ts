@@ -130,22 +130,17 @@ describe('registerPrompt() — D-36 sanitize-wrapped prompt registration', () =>
 
   test('clean text passes through unchanged', async () => {
     const { server, captured } = makeMockServer();
-    registerPrompt(
-      server,
-      'clean_prompt',
-      { description: 'clean payload' },
-      async () => ({
-        messages: [
-          {
-            role: 'user' as const,
-            content: {
-              type: 'text' as const,
-              text: 'Summarize recovery 73 and 4.5h sleep.',
-            },
+    registerPrompt(server, 'clean_prompt', { description: 'clean payload' }, async () => ({
+      messages: [
+        {
+          role: 'user' as const,
+          content: {
+            type: 'text' as const,
+            text: 'Summarize recovery 73 and 4.5h sleep.',
           },
-        ],
-      }),
-    );
+        },
+      ],
+    }));
 
     const reg = captured[0];
     if (!reg) throw new Error('unreachable');
