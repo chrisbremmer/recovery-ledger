@@ -14,8 +14,8 @@ import { describe, expect, test } from 'vitest';
 import {
   BANNED_TONE_WORDS,
   BANNED_TONE_WORDS_SET,
-  EMOJI_RE,
   containsBannedToneToken,
+  EMOJI_RE,
 } from './banned-words.js';
 
 describe('BANNED_TONE_WORDS — ADR-0005 single source of truth', () => {

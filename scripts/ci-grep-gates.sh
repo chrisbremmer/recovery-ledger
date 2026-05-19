@@ -72,7 +72,9 @@ export LC_ALL=C
 # Self-exempt files: CLAUDE.md and this script (each spell the banned
 # words by necessity), plus ADR-0005 itself (the ADR is the authoritative
 # source of the rule and lists the words verbatim — same logic as the
-# CLAUDE.md self-exemption).
+# CLAUDE.md self-exemption), plus src/domain/banned-words.ts (Phase 4
+# D-26 — the TS-callable source of truth for the same word list; same
+# self-exemption logic).
 REPO_EXCLUDES=(
   --exclude-dir=.git
   --exclude-dir=.planning
@@ -84,6 +86,7 @@ REPO_EXCLUDES=(
   --exclude=CLAUDE.md
   --exclude=ci-grep-gates.sh
   --exclude=0005-banned-tone-words.md
+  --exclude=banned-words.ts
 )
 
 # ----------------------------------------------------------------------------
