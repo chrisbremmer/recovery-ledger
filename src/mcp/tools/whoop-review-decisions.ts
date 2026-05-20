@@ -32,32 +32,47 @@ function renderResult(r: ReviewDecisionsResult): string {
     : renderDecisionUpdate(r.decision);
 }
 
-// D-21 dual-mode: discriminator on optional `mode` literal. List mode
-// defaults (`mode` omitted or 'list'); update mode requires `mode:
-// 'update'` + `id` + `status`. The two-arm `z.union` is the right tool
-// (not `discriminatedUnion`) because the 'list' arm makes the
-// discriminator optional.
-const REVIEW_DECISIONS_INPUT = z.union([
-  z.object({ mode: z.literal('list').optional(), includeAll: z.boolean().optional() }),
-  z.object({
-    mode: z.literal('update'),
-    id: z.string(),
-    status: z.enum(['open', 'followed_up', 'abandoned']),
-    notes: z.string().nullable().optional(),
-  }),
-]);
+// D-21 dual-mode flattened to top-level fields (Review #7) so this tool
+// uses the same flat-field calling convention as the other six (callers no
+// longer have to wrap the payload under `{ input: ... }`). The discriminator
+// is the optional `mode` literal — list mode defaults (`mode` omitted or
+// 'list'); update mode requires `mode: 'update'` + `id` + `status`. The
+// per-mode field requirements are checked in `normalizeInput` since Zod
+// can't express the "id+status required when mode=update" constraint on
+// flat fields without `superRefine` machinery.
+const REVIEW_DECISIONS_SHAPE = {
+  mode: z.enum(['list', 'update']).optional(),
+  id: z.string().optional(),
+  status: z.enum(['open', 'followed_up', 'abandoned']).optional(),
+  notes: z.string().nullable().optional(),
+  includeAll: z.boolean().optional(),
+};
+
+type ReviewDecisionsRawInput = {
+  mode?: 'list' | 'update';
+  id?: string;
+  status?: 'open' | 'followed_up' | 'abandoned';
+  notes?: string | null;
+  includeAll?: boolean;
+};
 
 const TOOL_DESCRIPTION =
-  'List open decisions (default) or update a decision (mode=update with id/status). Use includeAll=true to list every decision including followed_up/abandoned.';
+  'List open decisions (default) or update a decision (mode=update with id/status). Use includeAll=true to list every decision including followed_up/abandoned. Update mode requires the full 26-character ULID (use mode=list or the whoop://decisions/open resource to discover the id; short-prefix lookup is CLI-only).';
 
-function normalizeInput(input: z.infer<typeof REVIEW_DECISIONS_INPUT>): ReviewDecisionsInput {
-  if ('mode' in input && input.mode === 'update') {
-    return { mode: 'update', id: input.id, status: input.status, notes: input.notes ?? null };
+function normalizeInput(raw: ReviewDecisionsRawInput): ReviewDecisionsInput {
+  if (raw.mode === 'update') {
+    if (raw.id === undefined) {
+      throw new Error('whoop_review_decisions: mode=update requires `id`');
+    }
+    if (raw.status === undefined) {
+      throw new Error('whoop_review_decisions: mode=update requires `status`');
+    }
+    return { mode: 'update', id: raw.id, status: raw.status, notes: raw.notes ?? null };
   }
   // List mode: include `includeAll` only when defined (exactOptionalPropertyTypes
   // refuses an explicit `undefined` value in the optional slot).
-  if ('includeAll' in input && input.includeAll !== undefined) {
-    return { mode: 'list', includeAll: input.includeAll };
+  if (raw.includeAll !== undefined) {
+    return { mode: 'list', includeAll: raw.includeAll };
   }
   return { mode: 'list' };
 }
@@ -66,9 +81,9 @@ export function registerWhoopReviewDecisions(server: McpServer, services: Servic
   register(
     server,
     'whoop_review_decisions',
-    { description: TOOL_DESCRIPTION, inputSchema: { input: REVIEW_DECISIONS_INPUT } },
-    async ({ input }) => {
-      const result = await services.reviewDecisions(normalizeInput(input));
+    { description: TOOL_DESCRIPTION, inputSchema: REVIEW_DECISIONS_SHAPE },
+    async (input) => {
+      const result = await services.reviewDecisions(normalizeInput(input as ReviewDecisionsRawInput));
       return {
         content: [{ type: 'text', text: renderResult(result) }],
         structuredContent: toStructuredContent(result),

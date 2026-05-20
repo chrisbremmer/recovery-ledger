@@ -22,72 +22,50 @@ function toStructuredContent(r: QueryCacheResult): { [k: string]: unknown } {
   return JSON.parse(JSON.stringify(r)) as { [k: string]: unknown };
 }
 
-// 8 arms — one per QueryCacheInput resource. Per-arm filter sets carry
+// Per-arm union of resource discriminators + per-arm filter sets carrying
 // the D-24 escape hatches (includeUnscored / includeExcluded) and
 // per-resource fields (minRecoveryScore / sportId / status / category).
-const QUERY_CACHE_INPUT = z.discriminatedUnion('resource', [
-  z.object({
-    resource: z.literal('cycles'),
-    since: z.string().optional(),
-    until: z.string().optional(),
-    includeUnscored: z.boolean().optional(),
-    includeExcluded: z.boolean().optional(),
-    limit: z.number().int().positive().optional(),
-  }),
-  z.object({
-    resource: z.literal('recoveries'),
-    since: z.string().optional(),
-    until: z.string().optional(),
-    includeUnscored: z.boolean().optional(),
-    minRecoveryScore: z.number().optional(),
-    maxRecoveryScore: z.number().optional(),
-    limit: z.number().int().positive().optional(),
-  }),
-  z.object({
-    resource: z.literal('sleeps'),
-    since: z.string().optional(),
-    until: z.string().optional(),
-    includeUnscored: z.boolean().optional(),
-    limit: z.number().int().positive().optional(),
-  }),
-  z.object({
-    resource: z.literal('workouts'),
-    since: z.string().optional(),
-    until: z.string().optional(),
-    includeUnscored: z.boolean().optional(),
-    sportId: z.number().int().optional(),
-    limit: z.number().int().positive().optional(),
-  }),
-  z.object({ resource: z.literal('profile') }),
-  z.object({
-    resource: z.literal('body_measurements'),
-    since: z.string().optional(),
-    until: z.string().optional(),
-    limit: z.number().int().positive().optional(),
-  }),
-  z.object({
-    resource: z.literal('sync_runs'),
-    status: z.enum(['ok', 'partial', 'failed', 'running']).optional(),
-    since: z.string().optional(),
-    limit: z.number().int().positive().optional(),
-  }),
-  z.object({
-    resource: z.literal('decisions'),
-    status: z.enum(['open', 'followed_up', 'abandoned']).optional(),
-    category: z.string().optional(),
-    limit: z.number().int().positive().optional(),
-  }),
-]);
+// MCP `inputSchema` is a `ZodRawShape` (key→ZodType), so we flatten the
+// discriminated union to top-level fields (Review #7) for parity with the
+// other six tools. The 8-arm narrowing still lives in `services.queryCache`
+// — the SDK boundary just admits the superset of fields here.
+const QUERY_CACHE_SHAPE = {
+  resource: z.enum([
+    'cycles',
+    'recoveries',
+    'sleeps',
+    'workouts',
+    'profile',
+    'body_measurements',
+    'sync_runs',
+    'decisions',
+  ]),
+  since: z.string().optional(),
+  until: z.string().optional(),
+  includeUnscored: z.boolean().optional(),
+  includeExcluded: z.boolean().optional(),
+  minRecoveryScore: z.number().optional(),
+  maxRecoveryScore: z.number().optional(),
+  sportId: z.number().int().optional(),
+  // `status` is shared between sync_runs (ok|partial|failed|running) and
+  // decisions (open|followed_up|abandoned). Admit both at the SDK boundary
+  // — the service-layer narrowing rejects mismatched combinations.
+  status: z
+    .enum(['ok', 'partial', 'failed', 'running', 'open', 'followed_up', 'abandoned'])
+    .optional(),
+  category: z.string().optional(),
+  limit: z.number().int().positive().optional(),
+};
 
 const TOOL_DESCRIPTION =
-  'Query the local cache for one of 8 resources (cycles, recoveries, sleeps, workouts, profile, body_measurements, sync_runs, decisions). Default limit 100, hard cap 500.';
+  'Query the local cache for one of 8 resources (cycles, recoveries, sleeps, workouts, profile, body_measurements, sync_runs, decisions). Default limit 100, hard cap 500. Flat-field input: callers pass {resource, since?, until?, limit?, ...per-resource filters} at the top level.';
 
 export function registerWhoopQueryCache(server: McpServer, services: Services): void {
   register(
     server,
     'whoop_query_cache',
-    { description: TOOL_DESCRIPTION, inputSchema: { input: QUERY_CACHE_INPUT } },
-    async ({ input }) => {
+    { description: TOOL_DESCRIPTION, inputSchema: QUERY_CACHE_SHAPE },
+    async (input) => {
       const result = await services.queryCache(input as QueryCacheInput);
       return {
         content: [{ type: 'text', text: renderQueryCache(result) }],

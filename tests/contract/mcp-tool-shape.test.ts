@@ -58,12 +58,12 @@ interface ToolCase {
 const HAPPY_CASES: readonly ToolCase[] = [
   { name: 'whoop_doctor', args: {} },
   { name: 'whoop_api_gap', args: {} },
-  { name: 'whoop_query_cache', args: { input: { resource: 'profile' } } },
+  { name: 'whoop_query_cache', args: { resource: 'profile' } },
   {
     name: 'whoop_add_decision',
     args: { decision: 'walk 30 minutes after lunch' },
   },
-  { name: 'whoop_review_decisions', args: { input: {} } },
+  { name: 'whoop_review_decisions', args: {} },
 ];
 
 // MCP-02 dual-shape asserter — reused across happy + error tests.
@@ -157,7 +157,7 @@ describe('Phase 4 MCP tool dual-shape contract — MCP-02 + D-29', () => {
   test('whoop_query_cache with unknown resource arm returns error shape (no token leak)', async () => {
     const result = await client.callTool({
       name: 'whoop_query_cache',
-      arguments: { input: { resource: 'nonexistent_resource' } },
+      arguments: { resource: 'nonexistent_resource' },
     });
     const text = JSON.stringify(result);
     assertNoSecretLeak(text);
