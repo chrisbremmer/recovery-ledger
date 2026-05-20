@@ -94,7 +94,7 @@
 - [x] 04-01-PLAN.md — Wave 0 deps install + D-36 wrappers + Gates H/I/J + 6 contract scaffolds (REV-08, MCP-02/03/04/05/06)
 - [x] 04-02-PLAN.md — Type contracts (8 type files + 4 narrowing tests) (REV-01/02/03/06/07, DEC-01/02/03)
 - [x] 04-03-PLAN.md — Stats primitives (median + MAD + Mann-Whitney + BH-FDR + REV-07 fixtures) (REV-01, REV-07) — completed 2026-05-19
-- [ ] 04-04-PLAN.md — Baseline + anomaly + confidence pure-domain layer (REV-01, REV-02, REV-05)
+- [x] 04-04-PLAN.md — Baseline + anomaly + confidence pure-domain layer (REV-01, REV-02, REV-05)
 - [ ] 04-05-PLAN.md — Patterns + action/decision-prompt catalogs + select (REV-06, REV-07, REV-08, DEC-04)
 - [ ] 04-06-PLAN.md — Decisions repo extension + decision service + api-gap data (DEC-01, DEC-02, DEC-03, MCP-01)
 - [ ] 04-07-PLAN.md — Review services (daily + weekly orchestrators) + 10 fixtures (REV-01..07, DEC-04)
@@ -150,4 +150,4 @@ Concerns originate in the phase where the first vulnerable code is introduced; t
 
 ---
 *Roadmap created: 2026-05-11*
-*Last updated: 2026-05-19 — Phase 4 Wave 0 (plans 04-01 + 04-02) and Wave 1 stats (plan 04-03) complete. 30 / 39 plans complete across Phases 1 + 2 + 3 + 4 (formula-based; Phase 4 has 12 plans total, 3 complete).*
+*Last updated: 2026-05-20 — Phase 4 Wave 0 (plans 04-01 + 04-02) + Wave 1 stats (plan 04-03) + Wave 1 baselines/anomalies/confidence (plan 04-04) complete. 31 / 39 plans complete across Phases 1 + 2 + 3 + 4 (formula-based; Phase 4 has 12 plans total, 4 complete).*
