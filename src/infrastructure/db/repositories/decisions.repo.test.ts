@@ -220,6 +220,23 @@ describe('decisions repo — findByPrefix (D-20 short-prefix lookup)', () => {
     expect(matches).toHaveLength(1);
     expect(matches[0]?.id).toBe('01HK7AAAAAAAAAAAAAAAAAAAAA');
   });
+
+  it('Test 16a: LIKE meta-characters in prefix are escaped (underscore is literal, not single-char wildcard)', () => {
+    const repo = createDecisionsRepo(mem.db);
+    insertDecision(repo, { id: '01HK7AAAAAAAAAAAAAAAAAAAAA' });
+    insertDecision(repo, { id: '01HK7BBBBBBBBBBBBBBBBBBBBB' });
+    // `_` would match any single char if unescaped → would match every 26-char ULID.
+    // Escaped, it is a literal underscore that no ULID contains, so the result is empty.
+    expect(repo.findByPrefix('_')).toEqual([]);
+  });
+
+  it('Test 16b: LIKE meta-characters in prefix are escaped (percent is literal, not wildcard)', () => {
+    const repo = createDecisionsRepo(mem.db);
+    insertDecision(repo, { id: '01HK7AAAAAAAAAAAAAAAAAAAAA' });
+    insertDecision(repo, { id: '01HK7BBBBBBBBBBBBBBBBBBBBB' });
+    // `%` would match all rows if unescaped. Escaped, it is a literal % that no ULID contains.
+    expect(repo.findByPrefix('%')).toEqual([]);
+  });
 });
 
 describe('decisions repo — listAll (D-20 --all flag)', () => {

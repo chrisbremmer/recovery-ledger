@@ -129,11 +129,14 @@ export function createDecisionsRepo(db: ReturnType<typeof drizzle>): DecisionsRe
     },
 
     findByPrefix(prefix): Decision[] {
-      const normalized = `${prefix.toUpperCase()}%`;
+      // Escape LIKE meta-characters (`%`, `_`, `\`) so caller-controlled prefixes
+      // cannot match more rows than intended (e.g. `_` matches any single char).
+      const escaped = prefix.toUpperCase().replace(/[\\%_]/g, '\\$&');
+      const normalized = `${escaped}%`;
       const rows = db
         .select()
         .from(decisionsTable)
-        .where(sql`${decisionsTable.id} LIKE ${normalized}`)
+        .where(sql`${decisionsTable.id} LIKE ${normalized} ESCAPE '\\'`)
         .all();
       return rows.map(rowToDecision);
     },
