@@ -64,23 +64,17 @@ export async function resolveReviewedDate(
     return { date: input.date, source: 'cli_flag' };
   }
 
-  // Read the full default-filtered cycles range. Personal-tool scale: the
-  // cycles table grows by ~1 row/day; an unbounded scan is cheap. The
-  // default `byRange` filter applies SCORED + non-excluded discipline
-  // (Phase 3 D-04/D-16).
-  const cycles = deps.repos.cycles.byRange('0000-01-01T00:00:00.000Z', '9999-12-31T23:59:59.999Z');
-  if (cycles.length === 0) {
+  // Review #46: use `latestScoredDate()` — a single SELECT MAX aggregate —
+  // instead of `byRange(MIN_ISO, MAX_ISO)` which pulled the entire SCORED
+  // history into memory just to walk for the max. The default repo filter
+  // (`SCORED + baseline_excluded = 0`, Phase 3 D-04/D-16) is preserved
+  // inside the new repo method.
+  const latestDate = deps.repos.cycles.latestScoredDate();
+  if (latestDate === null) {
     return {
       date: deps.clock().toISOString().slice(0, 10),
       source: 'fallback_today',
     };
-  }
-
-  // MAX(start.slice(0,10)). byRange returns rows ASC; take the tail's date.
-  let latestDate = cycles[0]?.start.slice(0, 10) ?? '';
-  for (const cycle of cycles) {
-    const candidate = cycle.start.slice(0, 10);
-    if (candidate > latestDate) latestDate = candidate;
   }
   return { date: latestDate, source: 'latest_scored' };
 }
