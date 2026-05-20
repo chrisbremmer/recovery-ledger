@@ -42,6 +42,17 @@ import { WhoopApiError } from './errors.js';
 export const PAGE_SIZE = 25;
 
 /**
+ * Safety caps for `paginateAll` (Review #6). A malformed `next_token` chain
+ * or `--since 1900-01-01` will otherwise accumulate the entire history into
+ * a single in-memory array + Set. At PAGE_SIZE=25, 1000 pages == 25_000 rows
+ * (~10y of cycles), which is well past the personal-tool envelope. The row
+ * cap is a parallel ceiling that also catches a degenerate "every page is
+ * full" run that races the page cap.
+ */
+export const DEFAULT_MAX_PAGES = 1000;
+export const DEFAULT_MAX_ROWS = 50_000;
+
+/**
  * Wire-shape page returned by every paginated WHOOP v2 list endpoint.
  * `next_token` is snake_case verbatim — the request-side
  * `nextToken` camel translation lives in the resource module that
@@ -76,14 +87,19 @@ export interface WhoopPage<T> {
 export async function paginateAll<T>(
   fetchPage: (nextToken: string | null) => Promise<WhoopPage<T>>,
   keyFn?: (row: T) => string,
+  options?: { maxPages?: number; maxRows?: number },
 ): Promise<T[]> {
+  const maxPages = options?.maxPages ?? DEFAULT_MAX_PAGES;
+  const maxRows = options?.maxRows ?? DEFAULT_MAX_ROWS;
   const resolveKey = keyFn ?? ((row: T) => String((row as { id?: unknown }).id));
   const all: T[] = [];
   const seenKeys = new Set<string>();
   const seenTokens = new Set<string>();
   let nextToken: string | null = null;
+  let pages = 0;
   do {
     const page = await fetchPage(nextToken);
+    pages += 1;
     for (const row of page.records) {
       const key = resolveKey(row);
       if (seenKeys.has(key)) {
@@ -94,6 +110,12 @@ export async function paginateAll<T>(
       }
       seenKeys.add(key);
       all.push(row);
+      if (all.length > maxRows) {
+        throw new WhoopApiError({
+          kind: 'validation',
+          detail: `pagination exceeded ${maxRows} rows (safety cap; check --since range)`,
+        });
+      }
     }
     nextToken = page.next_token;
     // Defense-in-depth: detect a next_token cycle (WHOOP returning the same
@@ -107,6 +129,12 @@ export async function paginateAll<T>(
         });
       }
       seenTokens.add(nextToken);
+    }
+    if (pages >= maxPages && nextToken !== null) {
+      throw new WhoopApiError({
+        kind: 'validation',
+        detail: `pagination exceeded ${maxPages} pages (safety cap; check --since range or for malformed next_token chain)`,
+      });
     }
   } while (nextToken !== null);
   return all;
