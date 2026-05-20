@@ -52,12 +52,22 @@ export interface ReviewDecisionsDeps {
  * Pitfall 17: the decision text is PII-adjacent and never appears in the
  * structured log payload — `{ event, id, category }` only.
  */
+/** D-19 smart default: undefined followUpDate → now() + 7 days. Centralized
+ *  here (Review #22) so both CLI and MCP get the default for free instead
+ *  of having the CLI compute it and the MCP tool ship without one. */
+const DEFAULT_FOLLOW_UP_DAYS = 7;
+const MS_PER_DAY = 86_400_000;
+
 export async function addDecision(
   input: AddDecisionInput,
   deps: AddDecisionDeps,
 ): Promise<Decision> {
   const id = ulid();
-  const createdAt = deps.clock().toISOString();
+  const now = deps.clock();
+  const createdAt = now.toISOString();
+  const followUpDate =
+    input.followUpDate ??
+    new Date(now.getTime() + DEFAULT_FOLLOW_UP_DAYS * MS_PER_DAY).toISOString().slice(0, 10);
   deps.repos.decisions.insert({
     id,
     createdAt,
@@ -66,7 +76,7 @@ export async function addDecision(
     rationale: input.rationale ?? null,
     confidence: input.confidence ?? null,
     expectedEffect: input.expectedEffect ?? null,
-    followUpDate: input.followUpDate ?? null,
+    followUpDate,
   });
   const created = deps.repos.decisions.byId(id);
   if (created === null) {

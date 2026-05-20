@@ -177,7 +177,11 @@ describe('runDecisionAddCommand happy path', () => {
     expect(addSpy).toHaveBeenCalledTimes(1);
     const arg = addSpy.mock.calls[0]?.[0] as { decision: string; followUpDate?: string };
     expect(arg.decision).toBe('sleep more');
-    expect(arg.followUpDate).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+    // Review #22: when --follow-up is omitted, CLI no longer pre-computes
+    // the now()+7d default; it leaves followUpDate undefined so the service
+    // layer (shared with MCP) applies the default. This test asserts the
+    // CLI passes nothing through.
+    expect(arg.followUpDate).toBeUndefined();
     expect(writtenBody).toContain('Decision');
     expect(exitCode).toBe(0);
   });

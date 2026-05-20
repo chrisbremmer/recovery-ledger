@@ -155,7 +155,13 @@ export async function runDecisionAddCommand(
   }
 
   // 2. Validate --follow-up against a live clock (D-19 default).
-  const parsedFollowUp = parseFollowUp(opts.followUp, () => new Date());
+  // Review #22: when `--follow-up` is omitted, leave it undefined and let
+  // `services.addDecision` apply the now()+7d default. Both CLI and MCP
+  // surfaces now share that default — no drift.
+  const parsedFollowUp =
+    opts.followUp === undefined
+      ? ({ ok: true, value: undefined } as const)
+      : parseFollowUp(opts.followUp, () => new Date());
   if (!parsedFollowUp.ok) {
     process.stdout.write(`${parsedFollowUp.message}\n`, () => {
       process.exit(DECISION_ADD_EXIT_CODES.invalid_input);
@@ -188,7 +194,7 @@ export async function runDecisionAddCommand(
       ...(opts.rationale !== undefined && { rationale: opts.rationale }),
       ...(parsedConfidence.value !== null && { confidence: parsedConfidence.value }),
       ...(opts.expectedEffect !== undefined && { expectedEffect: opts.expectedEffect }),
-      followUpDate: parsedFollowUp.value,
+      ...(parsedFollowUp.value !== undefined && { followUpDate: parsedFollowUp.value }),
     });
     const body = renderDecisionDetail(created);
     process.stdout.write(`${body}\n`, () => {

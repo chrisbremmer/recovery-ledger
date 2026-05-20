@@ -68,7 +68,7 @@ describe('services/decision — addDecision (D-19 smart defaults)', () => {
   });
   afterEach(() => h.mem.close());
 
-  it('Test 1: minimal input gets a ULID id, category=general, null optional fields', async () => {
+  it('Test 1: minimal input gets a ULID id, category=general, defaulted follow-up, null other optional fields', async () => {
     const created = await addDecision({ decision: 'sleep earlier tonight' }, h.deps);
     expect(created.id).toMatch(/^[0-9A-HJKMNP-TV-Z]{26}$/); // Crockford Base32 ULID
     expect(created.category).toBe('general');
@@ -76,7 +76,9 @@ describe('services/decision — addDecision (D-19 smart defaults)', () => {
     expect(created.rationale).toBeNull();
     expect(created.confidence).toBeNull();
     expect(created.expectedEffect).toBeNull();
-    expect(created.followUpDate).toBeNull();
+    // Review #22: undefined `followUpDate` is defaulted at the service layer
+    // to clock.now() + 7 days so both CLI and MCP surfaces share the default.
+    expect(created.followUpDate).toMatch(/^\d{4}-\d{2}-\d{2}$/);
     expect(created.status).toBe('open');
     expect(created.outcomeNotes).toBeNull();
   });
