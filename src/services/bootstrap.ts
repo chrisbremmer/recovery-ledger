@@ -102,6 +102,8 @@ import type {
   ReviewDecisionsInput,
   ReviewDecisionsResult,
 } from './decision/types.js';
+import { runDoctor } from './doctor/index.js';
+import { refreshOrchestrator } from './refresh-orchestrator.js';
 import { getDailyReview } from './review/daily.js';
 import { getWeeklyReview } from './review/weekly.js';
 import { type RunSyncDeps, runSync } from './sync/index.js';
@@ -138,6 +140,14 @@ export interface Bootstrapped {
     reviewDecisions(input: ReviewDecisionsInput): Promise<ReviewDecisionsResult>;
     queryCache(input: QueryCacheInput): Promise<QueryCacheResult>;
     getApiGap(): Promise<ApiGapResult>;
+    // Phase 1+2 surfaces re-exposed on the bootstrap services map. The
+    // MCP entry (Plan 04-10) switched from createServices() to
+    // bootstrap(); for the runtime to satisfy the full `Services`
+    // interface (which `register*` tool factories consume), the doctor
+    // + refreshOrchestrator surfaces must be present on this map too.
+    // Both are zero-DB-dependency, so wiring them here costs nothing.
+    runDoctor: typeof runDoctor;
+    refreshOrchestrator: typeof refreshOrchestrator;
   };
   close(): void;
 }
@@ -275,6 +285,13 @@ export function bootstrap(opts: BootstrapOptions = {}): Bootstrapped {
       reviewDecisions: (input) => reviewDecisions(input, decisionDeps),
       queryCache: (input) => queryCache(input, cacheDeps),
       getApiGap: () => getApiGap(),
+      // Phase 1+2 surfaces — direct re-export; both are pure-functional
+      // (runDoctor calls Phase 1 doctor checks; refreshOrchestrator is a
+      // policy wrapper). No DB needed; wiring through bootstrap so the
+      // MCP entry's `app.services` satisfies the full `Services`
+      // interface for the 8 Phase 4 tool registrars.
+      runDoctor,
+      refreshOrchestrator,
     },
     close: () => {
       try {
