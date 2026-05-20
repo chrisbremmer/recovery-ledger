@@ -137,6 +137,15 @@ describe('parseFollowUp', () => {
     const result = parseFollowUp('not-a-date', clock);
     expect(result.ok).toBe(false);
   });
+
+  test('Review #12: non-ISO date forms are rejected', async () => {
+    const { parseFollowUp } = await import('./decision-add.js');
+    const clock = () => new Date('2026-03-15T00:00:00.000Z');
+    expect(parseFollowUp('03/15/2026', clock).ok).toBe(false);
+    expect(parseFollowUp('March 15 2026', clock).ok).toBe(false);
+    expect(parseFollowUp('2026/3/1', clock).ok).toBe(false);
+    expect(parseFollowUp('2026-3-1', clock).ok).toBe(false);
+  });
 });
 
 describe('parseConfidence', () => {

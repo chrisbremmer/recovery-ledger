@@ -94,11 +94,21 @@ export function parseFollowUp(
     const d = new Date(clock().getTime() + n * MS_PER_DAY);
     return { ok: true, value: d.toISOString().slice(0, 10) };
   }
-  const parsed = new Date(raw);
+  // Strict yyyy-mm-dd ISO check (Review #12). `new Date(raw)` happily
+  // accepts MM/DD/YYYY, "March 15 2026", etc. — implementation-defined
+  // shapes that silently round-trip to a non-NaN Date. We only want the
+  // explicit ISO date form.
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(raw)) {
+    return {
+      ok: false,
+      message: `Invalid --follow-up: ${sanitize(raw)} is not "in Nd" or yyyy-mm-dd.`,
+    };
+  }
+  const parsed = new Date(`${raw}T00:00:00.000Z`);
   if (Number.isNaN(parsed.getTime())) {
     return {
       ok: false,
-      message: `Invalid --follow-up: ${sanitize(raw)} is not "in Nd" or ISO 8601.`,
+      message: `Invalid --follow-up: ${sanitize(raw)} is not a valid date.`,
     };
   }
   return { ok: true, value: parsed.toISOString().slice(0, 10) };
