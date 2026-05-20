@@ -14,8 +14,8 @@
 // (Plan 04-10). The CLI shim resolves any "in 7d"-style follow-up syntax
 // BEFORE calling here — the service only sees the resolved ISO date.
 
-import { ulid } from 'ulid';
 import type { Logger } from 'pino';
+import { ulid } from 'ulid';
 import type { Decision } from '../../domain/types/entities.js';
 import type { DecisionsRepo } from '../../infrastructure/db/repositories/decisions.repo.js';
 import type {
@@ -93,9 +93,7 @@ export async function reviewDecisions(
 ): Promise<ReviewDecisionsResult> {
   if (input.mode === 'list') {
     const decisions =
-      input.includeAll === true
-        ? deps.repos.decisions.listAll()
-        : deps.repos.decisions.listOpen();
+      input.includeAll === true ? deps.repos.decisions.listAll() : deps.repos.decisions.listOpen();
     return { mode: 'list', decisions };
   }
   // input.mode === 'update'

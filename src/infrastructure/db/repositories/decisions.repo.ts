@@ -42,7 +42,11 @@ export interface DecisionsRepo {
   /** DEC-02 outcome write. Idempotent: writing the same status + notes
    *  twice is a no-op. A non-existent id silently no-ops (0 rows changed);
    *  the caller verifies via `byId(id)` if surfacing an error is desired. */
-  updateOutcome(id: string, status: 'open' | 'followed_up' | 'abandoned', notes: string | null): void;
+  updateOutcome(
+    id: string,
+    status: 'open' | 'followed_up' | 'abandoned',
+    notes: string | null,
+  ): void;
   /** D-22 weekly-prompt gating. Returns the count of rows whose
    *  `created_at >= date`. `date` is any ISO-8601 string (yyyy-mm-dd or
    *  full timestamp) — SQLite lexicographic comparison gives correct
@@ -135,11 +139,7 @@ export function createDecisionsRepo(db: ReturnType<typeof drizzle>): DecisionsRe
     },
 
     listAll(): Decision[] {
-      const rows = db
-        .select()
-        .from(decisionsTable)
-        .orderBy(desc(decisionsTable.created_at))
-        .all();
+      const rows = db.select().from(decisionsTable).orderBy(desc(decisionsTable.created_at)).all();
       return rows.map(rowToDecision);
     },
   };

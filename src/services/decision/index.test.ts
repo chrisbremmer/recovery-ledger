@@ -10,8 +10,8 @@
 // payloads round-trip unchanged through the service+repo+ORM prepared-statement
 // chain. See `Test 8` + `Test 9`.
 
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Logger } from 'pino';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createInMemoryDb, type InMemoryDbResult } from '../../../tests/helpers/in-memory-db.js';
 import {
   createDecisionsRepo,
@@ -193,7 +193,7 @@ describe('services/decision — T-04-S2 injection-style payloads round-trip', ()
   });
   afterEach(() => h.mem.close());
 
-  it("Test 9: SQL-injection-style decision text round-trips unchanged; DB intact", async () => {
+  it('Test 9: SQL-injection-style decision text round-trips unchanged; DB intact', async () => {
     const payload = "'; DROP TABLE decisions; --";
     const created = await addDecision({ decision: payload }, h.deps);
     expect(created.decision).toBe(payload);
