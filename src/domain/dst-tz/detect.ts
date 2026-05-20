@@ -66,7 +66,15 @@ export interface DstDetectOutput {
 
 export function detectExclusion(input: DstDetectInput): DstDetectOutput {
   // Rule 1 — dst_straddle. Skipped when `end` is null (in-progress cycle).
+  // Review #26: a malformed cycle.start / cycle.end string would yield
+  // NaN tz-offsets and `NaN !== NaN === true`, silently flagging the cycle
+  // as dst_straddle. Guard with an ISO format check and bail to non-excluded
+  // rather than mis-flagging; the caller can choose to surface the bad row
+  // (the sync orchestrator already logs schema-validation failures upstream).
   if (input.cycle.end !== null) {
+    if (!isParsableIsoDate(input.cycle.start) || !isParsableIsoDate(input.cycle.end)) {
+      return { baseline_excluded: false, exclusion_reason: null };
+    }
     const startOffset = tzOffset(input.ianaZone, new Date(input.cycle.start));
     const endOffset = tzOffset(input.ianaZone, new Date(input.cycle.end));
     if (startOffset !== endOffset) {
@@ -83,4 +91,14 @@ export function detectExclusion(input: DstDetectInput): DstDetectOutput {
   }
 
   return { baseline_excluded: false, exclusion_reason: null };
+}
+
+// Defensive ISO format check (Review #26). Accepts the WHOOP wire format
+// (`YYYY-MM-DDTHH:MM:SS.sssZ` and the `+HH:MM` offset variant) and rejects
+// anything else. Malformed strings produce NaN at `new Date(...)`, which
+// silently passes the `!==` comparison above.
+function isParsableIsoDate(s: string): boolean {
+  if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/.test(s)) return false;
+  const t = Date.parse(s);
+  return !Number.isNaN(t);
 }
