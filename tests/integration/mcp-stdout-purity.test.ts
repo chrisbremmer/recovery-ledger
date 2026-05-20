@@ -100,6 +100,17 @@ describe('MCP stdout purity (dist smoke)', () => {
       path.resolve(REPO_ROOT, 'src', 'mcp', 'tools', 'whoop-doctor.ts'),
       path.resolve(REPO_ROOT, 'src', 'services', 'doctor', 'index.ts'),
       path.resolve(REPO_ROOT, 'src', 'services', 'bootstrap.ts'),
+      // Review #42: Phase 4 added 7 new tool files. A stale dist that
+      // does not yet reflect changes to any of these would silently mask
+      // the change under test. Watch the whole set so the stale-dist
+      // warning fires for any tool-level edit.
+      path.resolve(REPO_ROOT, 'src', 'mcp', 'tools', 'whoop-sync.ts'),
+      path.resolve(REPO_ROOT, 'src', 'mcp', 'tools', 'whoop-daily-review.ts'),
+      path.resolve(REPO_ROOT, 'src', 'mcp', 'tools', 'whoop-weekly-review.ts'),
+      path.resolve(REPO_ROOT, 'src', 'mcp', 'tools', 'whoop-query-cache.ts'),
+      path.resolve(REPO_ROOT, 'src', 'mcp', 'tools', 'whoop-add-decision.ts'),
+      path.resolve(REPO_ROOT, 'src', 'mcp', 'tools', 'whoop-review-decisions.ts'),
+      path.resolve(REPO_ROOT, 'src', 'mcp', 'tools', 'whoop-api-gap.ts'),
     ];
     for (const src of watchedSources) {
       const srcMtime = (await stat(src)).mtimeMs;

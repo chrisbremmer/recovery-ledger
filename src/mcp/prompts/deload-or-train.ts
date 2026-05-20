@@ -30,8 +30,11 @@ export function registerDeloadOrTrain(server: McpServer, services: Services): vo
       // unrestricted; pass a 7-day `since` window so the limit picks the
       // most recent 7 cycles (the trend the prompt cares about), not the
       // first 7 the user ever recorded.
-      const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
-      const strain = await services.queryCache({ resource: 'cycles', since: sevenDaysAgo, limit: 7 });
+      const strain = await services.queryCache({
+        resource: 'cycles',
+        since: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString(),
+        limit: 7,
+      });
       const text = `${renderDailyReview(daily)}\n\nTrailing-7 cycles (count=${strain.count}, truncated=${strain.truncated})\n\nInstruction: ${DELOAD_OR_TRAIN_INSTRUCTION}`;
       return buildPromptMessage(text);
     },
