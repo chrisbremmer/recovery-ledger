@@ -33,11 +33,11 @@
 // SCORED-discipline (ADR-0003): score_state narrowing happens at the
 // filter step; downstream helpers receive only `SCORED` variants.
 
-import { median } from '../stats/median.js';
-import { mannWhitney } from '../stats/mann-whitney.js';
-import { benjaminiHochberg } from '../stats/fdr.js';
 import type { BaselineStats } from '../baselines/types.js';
+import { benjaminiHochberg } from '../stats/fdr.js';
 import { MAD_CONSISTENCY } from '../stats/mad.js';
+import { mannWhitney } from '../stats/mann-whitney.js';
+import { median } from '../stats/median.js';
 import type {
   Cycle,
   CycleScored,
@@ -139,7 +139,10 @@ export function detectWeeklyPattern(
     a.cycle.start.localeCompare(b.cycle.start),
   );
   const cycleStartIndex = new Map<number, number>();
-  cyclesByStartAsc.forEach((p, i) => cycleStartIndex.set(p.cycle.id, i));
+  for (let i = 0; i < cyclesByStartAsc.length; i++) {
+    const pair = cyclesByStartAsc[i];
+    if (pair !== undefined) cycleStartIndex.set(pair.cycle.id, i);
+  }
 
   const sleepsScored: SleepScored[] = input.sleeps.filter(
     (s): s is SleepScored => s.scoreState === 'SCORED',

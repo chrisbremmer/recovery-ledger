@@ -29,12 +29,7 @@
 import { describe, expect, it } from 'vitest';
 
 import type { BaselineStats } from '../baselines/types.js';
-import type {
-  CycleScored,
-  RecoveryScored,
-  SleepScored,
-  WorkoutScored,
-} from '../types/entities.js';
+import type { CycleScored, RecoveryScored, SleepScored, WorkoutScored } from '../types/entities.js';
 
 import { detectWeeklyPattern } from './pattern.js';
 
@@ -45,10 +40,7 @@ const IANA_ZONE = 'America/Los_Angeles';
 // will carry; `strain` is the cycle's own day_strain (used as a candidate
 // signal). Cycle.start uses 08:00:00-08:00 (LA wall clock 00:00) so the
 // calendar day matches `dayIndex`.
-const cycleAt = (
-  dayIndex: number,
-  strain: number,
-): CycleScored => {
+const cycleAt = (dayIndex: number, strain: number): CycleScored => {
   const startDate = new Date(Date.UTC(2026, 0, 1 + dayIndex, 8, 0, 0)).toISOString();
   const endDate = new Date(Date.UTC(2026, 0, 2 + dayIndex, 8, 0, 0)).toISOString();
   return {
@@ -288,7 +280,7 @@ describe('detectWeeklyPattern', () => {
           if (i === 5) return 32;
           return 50 + i;
         },
-        sleepDurationFn: (i) => 420,
+        sleepDurationFn: () => 420,
       });
       const result = detectWeeklyPattern(input);
       // worst_days length = 3.

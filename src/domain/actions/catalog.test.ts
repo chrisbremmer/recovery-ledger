@@ -15,9 +15,8 @@
 //   6. Determinism: Object.isFrozen(ACTION_CATALOG) === true.
 
 import { describe, expect, it } from 'vitest';
-
-import { METRIC_NAMES_SET, type MetricName } from '../baselines/types.js';
 import { containsBannedToneToken } from '../banned-words.js';
+import { METRIC_NAMES_SET, type MetricName } from '../baselines/types.js';
 
 import { ACTION_CATALOG } from './catalog.js';
 
@@ -82,10 +81,7 @@ describe('ACTION_CATALOG (D-08 + D-09 source-layer contract)', () => {
       const match = ACTION_CATALOG.find(
         (e) => e.trigger.anomaly_metric === metric && e.trigger.direction === direction,
       );
-      expect(
-        match,
-        `no catalog entry covers ${metric} ${direction}`,
-      ).toBeDefined();
+      expect(match, `no catalog entry covers ${metric} ${direction}`).toBeDefined();
     }
   });
 

@@ -15,10 +15,8 @@
 // CANDIDATE_FACTORS_TYPE_ONLY is the type-level forcing function.
 
 import { describe, expect, it } from 'vitest';
-
-import { CANDIDATE_FACTORS_TYPE_ONLY } from './types.js';
-
 import { CANDIDATE_FACTORS, CANDIDATE_FACTORS_SET } from './candidates.js';
+import { CANDIDATE_FACTORS_TYPE_ONLY } from './types.js';
 
 describe('CANDIDATE_FACTORS (D-11 lock)', () => {
   it('has exactly 5 entries (D-11 5-tuple lock)', () => {
