@@ -39,6 +39,7 @@ import { confidenceFromCounts } from '../../domain/confidence/index.js';
 import { detectWeeklyPattern } from '../../domain/patterns/pattern.js';
 import type { CandidateName, WeeklyPattern } from '../../domain/patterns/types.js';
 import type { DecisionPrompt, WeeklyReviewResult, WeekSummary } from '../../domain/review/types.js';
+import type { Cycle, Recovery, Sleep } from '../../domain/types/entities.js';
 import type { BodyMeasurementsRepo } from '../../infrastructure/db/repositories/body-measurements.repo.js';
 import type { CyclesRepo } from '../../infrastructure/db/repositories/cycles.repo.js';
 import type { DailySummariesRepo } from '../../infrastructure/db/repositories/daily-summaries.repo.js';
@@ -207,13 +208,13 @@ export async function getWeeklyReview(
 // Helpers — kept private to the service.
 // ---------------------------------------------------------------------------
 
-function computeHrvBaseline(
-  recoveries: ReadonlyArray<{ scoreState: string; hrvRmssdMilli?: number }>,
-): BaselineStats {
+function computeHrvBaseline(recoveries: ReadonlyArray<Recovery>): BaselineStats {
+  // ADR-0003: narrow on the discriminator and let TS produce RecoveryScored
+  // (where `hrvRmssdMilli: number` is guaranteed) — no cast.
   const values: number[] = [];
   for (const r of recoveries) {
     if (r.scoreState !== 'SCORED') continue;
-    const hrv = (r as { hrvRmssdMilli: number }).hrvRmssdMilli;
+    const hrv = r.hrvRmssdMilli;
     if (Number.isFinite(hrv)) values.push(hrv);
   }
   if (values.length < HRV_BASELINE_MIN_DAYS) {
@@ -231,27 +232,17 @@ function computeHrvBaseline(
 }
 
 function buildWeekSummary(
-  cycles: ReadonlyArray<{
-    id: number;
-    scoreState: string;
-    strain?: number;
-    start: string;
-  }>,
-  recoveries: ReadonlyArray<{
-    cycleId: number;
-    scoreState: string;
-    recoveryScore?: number;
-  }>,
-  sleeps: ReadonlyArray<{
-    scoreState: string;
-    totalInBedTimeMilli?: number;
-    totalAwakeTimeMilli?: number;
-  }>,
+  cycles: ReadonlyArray<Cycle>,
+  recoveries: ReadonlyArray<Recovery>,
+  sleeps: ReadonlyArray<Sleep>,
   worstDays: WeekSummary['worst_days'],
 ): WeekSummary {
-  const scoredCycles = cycles.filter((c) => c.scoreState === 'SCORED');
-  const scoredRecoveries = recoveries.filter((r) => r.scoreState === 'SCORED');
-  const scoredSleeps = sleeps.filter((s) => s.scoreState === 'SCORED');
+  // ADR-0003: narrowed on scoreState === 'SCORED' so the TS narrower yields
+  // CycleScored / RecoveryScored / SleepScored where the optional metric
+  // fields are required `number`. No casts.
+  const scoredCycles = cycles.filter((c): c is Cycle & { scoreState: 'SCORED' } => c.scoreState === 'SCORED');
+  const scoredRecoveries = recoveries.filter((r): r is Recovery & { scoreState: 'SCORED' } => r.scoreState === 'SCORED');
+  const scoredSleeps = sleeps.filter((s): s is Sleep & { scoreState: 'SCORED' } => s.scoreState === 'SCORED');
 
   let bestDay: WeekSummary['best_day'] = null;
   for (const cycle of scoredCycles) {
