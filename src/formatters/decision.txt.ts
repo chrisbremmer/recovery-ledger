@@ -155,7 +155,10 @@ function computeExpectedWindow(d: Decision): number {
     return DEFAULT_FOLLOW_UP_DAYS;
   }
   const diffDays = Math.floor((followUp - created) / MS_PER_DAY);
-  return diffDays > 0 ? diffDays : DEFAULT_FOLLOW_UP_DAYS;
+  // Review #39: same-day follow-up (diffDays === 0) is a valid signal —
+  // "follow up today" — and should not collapse to the 7-day default.
+  // Only NEGATIVE diffs (follow-up before creation) fall back.
+  return diffDays >= 0 ? diffDays : DEFAULT_FOLLOW_UP_DAYS;
 }
 
 /** Truncate to `width - 4` characters with an ellipsis suffix if needed,

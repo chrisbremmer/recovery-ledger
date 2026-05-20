@@ -59,6 +59,26 @@ describe('renderDecisionList — list mode (Decision[])', () => {
     expect(rendered).toBe('No decisions recorded.');
   });
 
+  it('Review #39: same-day follow-up renders 0d expected window (not the 7d default fallback)', () => {
+    // createdAt + followUpDate are both 2026-03-15 (same calendar day).
+    // Pre-fix: diffDays === 0 was treated as "invalid" and fell back to
+    // DEFAULT_FOLLOW_UP_DAYS (7). Post-fix: 0d is the correct window.
+    const sameDay: Decision = {
+      id: '01HK7XYZABCD0001234567890B',
+      createdAt: '2026-03-15T00:00:00.000Z',
+      category: 'sleep',
+      decision: 'check in tonight',
+      rationale: null,
+      confidence: null,
+      expectedEffect: null,
+      followUpDate: '2026-03-15',
+      status: 'open',
+      outcomeNotes: null,
+    };
+    const rendered = renderDecisionList([sameDay], FIXED_NOW);
+    expect(rendered).toMatch(/0d\/0d/);
+  });
+
   it('long decision text truncates to ellipsis at the column width', () => {
     const long: Decision = {
       id: '01HK7XYZABCD0001234567890A',
