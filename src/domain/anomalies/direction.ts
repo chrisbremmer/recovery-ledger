@@ -28,16 +28,15 @@ import type { MetricName } from '../baselines/types.js';
  * extending METRIC_NAMES (in baselines/types.ts) AND adding a direction
  * here — both are compile-checked via the `satisfies` clause below.
  */
-export const ANOMALY_DIRECTION: Readonly<
-  Record<MetricName, 'low' | 'high' | 'bidirectional'>
-> = Object.freeze({
-  hrv_rmssd_milli: 'low',
-  recovery_score: 'low',
-  sleep_duration_minutes: 'low',
-  sleep_efficiency_percent: 'low',
-  resting_heart_rate: 'high',
-  respiratory_rate: 'high',
-  day_strain: 'bidirectional',
-  spo2_percentage: 'bidirectional',
-  skin_temp_celsius: 'bidirectional',
-} as const) satisfies Readonly<Record<MetricName, 'low' | 'high' | 'bidirectional'>>;
+export const ANOMALY_DIRECTION: Readonly<Record<MetricName, 'low' | 'high' | 'bidirectional'>> =
+  Object.freeze({
+    hrv_rmssd_milli: 'low',
+    recovery_score: 'low',
+    sleep_duration_minutes: 'low',
+    sleep_efficiency_percent: 'low',
+    resting_heart_rate: 'high',
+    respiratory_rate: 'high',
+    day_strain: 'bidirectional',
+    spo2_percentage: 'bidirectional',
+    skin_temp_celsius: 'bidirectional',
+  } as const) satisfies Readonly<Record<MetricName, 'low' | 'high' | 'bidirectional'>>;

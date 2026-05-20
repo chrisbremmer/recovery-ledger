@@ -32,9 +32,9 @@
 // `perMetricDaysAvailable: Record<MetricName, number>`. This domain
 // function consumes the pre-computed map.
 
-import { METRIC_NAMES, type BaselineStats, type MetricName } from '../baselines/types.js';
-import { MAD_CONSISTENCY } from '../stats/mad.js';
+import { type BaselineStats, METRIC_NAMES, type MetricName } from '../baselines/types.js';
 import type { TodayMetrics } from '../review/types.js';
+import { MAD_CONSISTENCY } from '../stats/mad.js';
 
 import { ANOMALY_DIRECTION } from './direction.js';
 
@@ -120,8 +120,7 @@ export function selectAnomalies(input: {
     }
 
     const z = analysis.value;
-    const fires =
-      (direction === 'low' && z <= -2) || (direction === 'high' && z >= 2);
+    const fires = (direction === 'low' && z <= -2) || (direction === 'high' && z >= 2);
     if (!fires) {
       continue;
     }

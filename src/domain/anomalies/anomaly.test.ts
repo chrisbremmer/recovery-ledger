@@ -17,10 +17,8 @@
 // exists; first run is the RED gate.
 
 import { describe, expect, it } from 'vitest';
-
-import type { TodayMetrics } from '../review/types.js';
-
 import type { BaselineStats, MetricName } from '../baselines/types.js';
+import type { TodayMetrics } from '../review/types.js';
 
 import { computeZAnalysis, selectAnomalies } from './anomaly.js';
 
