@@ -37,9 +37,7 @@ export function registerWhoopAddDecision(server: McpServer, services: Services):
     { description: TOOL_DESCRIPTION, inputSchema: ADD_DECISION_SHAPE },
     async (input) => {
       const i = input as AddDecisionInput;
-      const created = await services.addDecision(
-        i as Parameters<Services['addDecision']>[0],
-      );
+      const created = await services.addDecision(i as Parameters<Services['addDecision']>[0]);
       return {
         content: [{ type: 'text', text: renderDecisionDetail(created) }],
         structuredContent: toStructuredContent(created),

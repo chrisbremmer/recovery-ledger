@@ -33,9 +33,7 @@ export function registerWhoopDailyReview(server: McpServer, services: Services):
     { description: TOOL_DESCRIPTION, inputSchema: DAILY_REVIEW_SHAPE },
     async (input) => {
       const i = input as DailyReviewInput;
-      const result = await services.getDailyReview(
-        i.date === undefined ? {} : { date: i.date },
-      );
+      const result = await services.getDailyReview(i.date === undefined ? {} : { date: i.date });
       return {
         content: [{ type: 'text', text: renderDailyReview(result) }],
         structuredContent: toStructuredContent(result),

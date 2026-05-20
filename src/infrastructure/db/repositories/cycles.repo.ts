@@ -168,9 +168,7 @@ export function createCyclesRepo(db: ReturnType<typeof drizzle>): CyclesRepo {
       const row = db
         .select({ max: sql<string | null>`MAX(${cyclesTable.start})` })
         .from(cyclesTable)
-        .where(
-          and(eq(cyclesTable.score_state, 'SCORED'), eq(cyclesTable.baseline_excluded, false)),
-        )
+        .where(and(eq(cyclesTable.score_state, 'SCORED'), eq(cyclesTable.baseline_excluded, false)))
         .get();
       const max = row?.max ?? null;
       return max === null ? null : max.slice(0, 10);

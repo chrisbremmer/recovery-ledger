@@ -31,9 +31,7 @@ export function registerWhoopWeeklyReview(server: McpServer, services: Services)
     { description: TOOL_DESCRIPTION, inputSchema: WEEKLY_REVIEW_SHAPE },
     async (input) => {
       const i = input as WeeklyReviewInput;
-      const result = await services.getWeeklyReview(
-        i.date === undefined ? {} : { date: i.date },
-      );
+      const result = await services.getWeeklyReview(i.date === undefined ? {} : { date: i.date });
       return {
         content: [{ type: 'text', text: renderWeeklyReview(result) }],
         structuredContent: toStructuredContent(result),

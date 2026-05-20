@@ -201,8 +201,7 @@ describe('getWeeklyReview — D-35 partial-rejection path (D-18 multi-detection 
     // D-18 multi-detection: the reported pattern factor must equal the
     // cleared candidate with the smallest p_adjusted.
     const winner = cleared.reduce((min, c) =>
-      (c.p_adjusted ?? Number.POSITIVE_INFINITY) <
-      (min.p_adjusted ?? Number.POSITIVE_INFINITY)
+      (c.p_adjusted ?? Number.POSITIVE_INFINITY) < (min.p_adjusted ?? Number.POSITIVE_INFINITY)
         ? c
         : min,
     );
