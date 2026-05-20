@@ -137,7 +137,7 @@ export async function withRetry<T>(
       sleepMs,
     });
     await sleep(sleepMs);
-    return fn();
+    return await runSecondAttempt(fn);
   }
 
   if (first.status >= 500 && first.status < 600) {
@@ -147,12 +147,38 @@ export async function withRetry<T>(
     );
     logger.warn({ event: 'server_5xx_retry', status: first.status, sleepMs });
     await sleep(sleepMs);
-    return fn();
+    return await runSecondAttempt(fn);
   }
 
   // Non-retryable 4xx (400, 403, 404, 422, etc.) — return immediately and
   // let `classifyHttpError` route the kind. Budget never spent.
   return first;
+}
+
+/**
+ * Run the 2nd attempt (after a 429 or 5xx retry) inside the same network-
+ * error envelope used by the first attempt. Review #19: a bare `return
+ * fn();` would let DNS failures, dropped sockets, and AbortError surface
+ * as raw `Error` to `httpGet.classifyHttpError`, which then mis-classifies
+ * them as `failed_unknown` instead of `failed_network`.
+ */
+async function runSecondAttempt<T>(fn: () => Promise<RetryResult<T>>): Promise<RetryResult<T>> {
+  try {
+    return await fn();
+  } catch (err) {
+    if (isAbortError(err)) {
+      throw new WhoopApiError({
+        kind: 'network',
+        detail: 'request aborted (timeout)',
+        cause: err,
+      });
+    }
+    throw new WhoopApiError({
+      kind: 'network',
+      detail: err instanceof Error ? err.message : 'network error',
+      cause: err,
+    });
+  }
 }
 
 /** AbortError can surface as either a DOMException with name='AbortError'

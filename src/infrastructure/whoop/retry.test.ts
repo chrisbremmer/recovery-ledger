@@ -167,6 +167,44 @@ describe('withRetry', () => {
     expect(fn).toHaveBeenCalledTimes(2);
   });
 
+  test('Review #19: 5xx retry whose 2nd attempt throws a network error surfaces as WhoopApiError({kind:network})', async () => {
+    const spies = makeSpies(0.5);
+    const fn = vi
+      .fn<() => Promise<RetryResult<unknown>>>()
+      .mockResolvedValueOnce(makeResult(503, { transient: true }))
+      .mockRejectedValueOnce(new TypeError('socket dropped on 2nd attempt'));
+
+    let thrown: unknown;
+    try {
+      await withRetry(fn, spies);
+    } catch (e) {
+      thrown = e;
+    }
+    expect(thrown).toBeInstanceOf(WhoopApiError);
+    expect((thrown as WhoopApiError).kind).toBe('network');
+    expect(fn).toHaveBeenCalledTimes(2);
+  });
+
+  test('Review #19: 429 retry whose 2nd attempt throws AbortError surfaces as WhoopApiError({kind:network, detail:request aborted})', async () => {
+    const spies = makeSpies(0.5);
+    const abortErr = new Error('aborted');
+    abortErr.name = 'AbortError';
+    const fn = vi
+      .fn<() => Promise<RetryResult<unknown>>>()
+      .mockResolvedValueOnce(makeResult(429, { rate_limited: true }, { 'X-RateLimit-Reset': '1' }))
+      .mockRejectedValueOnce(abortErr);
+
+    let thrown: unknown;
+    try {
+      await withRetry(fn, spies);
+    } catch (e) {
+      thrown = e;
+    }
+    expect(thrown).toBeInstanceOf(WhoopApiError);
+    expect((thrown as WhoopApiError).kind).toBe('network');
+    expect((thrown as WhoopApiError).detail).toContain('aborted');
+  });
+
   test('Y-12: AbortError is NOT retried — surfaced as WhoopApiError({kind:network, detail:request aborted})', async () => {
     const spies = makeSpies(0.5);
     const abortErr = new Error('aborted');
