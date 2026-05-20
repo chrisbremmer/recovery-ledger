@@ -265,7 +265,7 @@ describe('runDecisionAddCommand failure paths', () => {
 // ---------------------------------------------------------------------------
 
 describe('runDecisionAddCommand T-04-S2 round-trip fixtures', () => {
-  test("SQL-injection payload: \"'; DROP TABLE decisions; --\" round-trips through service unchanged", async () => {
+  test('SQL-injection payload: "\'; DROP TABLE decisions; --" round-trips through service unchanged', async () => {
     const payload = "'; DROP TABLE decisions; --";
     const { addSpy } = mockBootstrap((input) =>
       makeDecision({ decision: (input as { decision: string }).decision }),

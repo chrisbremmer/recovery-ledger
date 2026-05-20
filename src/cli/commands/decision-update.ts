@@ -53,9 +53,7 @@ export interface RunDecisionUpdateCommandOpts {
  */
 export function parseStatus(
   raw: string | undefined,
-):
-  | { ok: true; value: 'open' | 'followed_up' | 'abandoned' }
-  | { ok: false; message: string } {
+): { ok: true; value: 'open' | 'followed_up' | 'abandoned' } | { ok: false; message: string } {
   if (raw === 'open' || raw === 'followed_up' || raw === 'abandoned') {
     return { ok: true, value: raw };
   }
@@ -108,9 +106,8 @@ export async function runDecisionUpdateCommand(
 
   if (matches.length === 0) {
     app.close();
-    process.stdout.write(
-      `No decision matches prefix ${sanitize(idOrPrefix)}.\n`,
-      () => process.exit(DECISION_UPDATE_EXIT_CODES.no_match),
+    process.stdout.write(`No decision matches prefix ${sanitize(idOrPrefix)}.\n`, () =>
+      process.exit(DECISION_UPDATE_EXIT_CODES.no_match),
     );
     return;
   }

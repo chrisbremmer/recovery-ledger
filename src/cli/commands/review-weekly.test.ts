@@ -169,9 +169,7 @@ describe('runReviewWeeklyCommand failure paths', () => {
       throw err;
     });
     vi.resetModules();
-    const { runReviewWeeklyCommand, REVIEW_WEEKLY_EXIT_CODES } = await import(
-      './review-weekly.js'
-    );
+    const { runReviewWeeklyCommand, REVIEW_WEEKLY_EXIT_CODES } = await import('./review-weekly.js');
     await runReviewWeeklyCommand({});
     expect(writtenBody).toContain('cp ');
     expect(exitCode).toBe(REVIEW_WEEKLY_EXIT_CODES.bootstrap_failed);
@@ -182,9 +180,7 @@ describe('runReviewWeeklyCommand failure paths', () => {
       throw new Error('something broke');
     });
     vi.resetModules();
-    const { runReviewWeeklyCommand, REVIEW_WEEKLY_EXIT_CODES } = await import(
-      './review-weekly.js'
-    );
+    const { runReviewWeeklyCommand, REVIEW_WEEKLY_EXIT_CODES } = await import('./review-weekly.js');
     await runReviewWeeklyCommand({});
     expect(writtenBody).toContain('Review failed');
     expect(exitCode).toBe(REVIEW_WEEKLY_EXIT_CODES.failed);

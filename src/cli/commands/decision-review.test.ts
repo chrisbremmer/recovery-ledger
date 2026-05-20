@@ -184,10 +184,7 @@ describe('runDecisionReviewCommand --interactive (Pitfall 10 stderr discipline)'
         decision: { ...target, status: 'followed_up', outcomeNotes: 'worked' },
       };
     });
-    const { questionSpy, outputSeenAs } = mockReadlinePromises([
-      'followed_up',
-      'worked',
-    ]);
+    const { questionSpy, outputSeenAs } = mockReadlinePromises(['followed_up', 'worked']);
     vi.resetModules();
     const { runDecisionReviewCommand } = await import('./decision-review.js');
     await runDecisionReviewCommand({ interactive: true });

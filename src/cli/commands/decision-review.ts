@@ -18,13 +18,13 @@
 //   bootstrap_failed = 1
 
 import { createInterface } from 'node:readline/promises';
+import type { Decision } from '../../domain/types/entities.js';
 import { renderDecisionList } from '../../formatters/decision.txt.js';
 import { formatBootstrapError } from '../../formatters/sync.txt.js';
 import { paths } from '../../infrastructure/config/paths.js';
 import { isMigrationError } from '../../infrastructure/db/migrate.js';
 import { sanitize } from '../../mcp/sanitize.js';
 import { type Bootstrapped, bootstrap } from '../../services/index.js';
-import type { Decision } from '../../domain/types/entities.js';
 
 export const DECISION_REVIEW_EXIT_CODES: Readonly<Record<string, number>> = Object.freeze({
   ok: 0,
@@ -68,9 +68,7 @@ function isPastWindow(d: Decision, now: Date): boolean {
  *      via reviewDecisions({mode:'update', ...}) per response
  *   4. renderDecisionList → stdout → exit 0
  */
-export async function runDecisionReviewCommand(
-  opts: RunDecisionReviewCommandOpts,
-): Promise<void> {
+export async function runDecisionReviewCommand(opts: RunDecisionReviewCommandOpts): Promise<void> {
   let app: Bootstrapped;
   try {
     app = bootstrap();
@@ -123,9 +121,7 @@ export async function runDecisionReviewCommand(
             // Treat unrecognized as skip — no destructive default.
             continue;
           }
-          const notesAnswer = (
-            await rl.question('Notes (optional, ENTER to skip): ')
-          ).trim();
+          const notesAnswer = (await rl.question('Notes (optional, ENTER to skip): ')).trim();
           const result = await app.services.reviewDecisions({
             mode: 'update',
             id: d.id,

@@ -83,7 +83,7 @@ export function parseFollowUp(
     return { ok: true, value: d.toISOString().slice(0, 10) };
   }
   const inNd = /^in\s+(\d+)d$/i.exec(raw);
-  if (inNd && inNd[1]) {
+  if (inNd?.[1]) {
     const n = Number.parseInt(inNd[1], 10);
     if (n > MAX_FOLLOW_UP_DAYS) {
       return {
@@ -110,9 +110,7 @@ export function parseFollowUp(
  */
 export function parseConfidence(
   raw: string | undefined,
-):
-  | { ok: true; value: 'low' | 'medium' | 'high' | null }
-  | { ok: false; message: string } {
+): { ok: true; value: 'low' | 'medium' | 'high' | null } | { ok: false; message: string } {
   if (raw === undefined) return { ok: true, value: null };
   if (raw === 'low' || raw === 'medium' || raw === 'high') {
     return { ok: true, value: raw };

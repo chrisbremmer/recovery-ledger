@@ -39,7 +39,7 @@ afterEach(() => {
 
 function mockBootstrap(
   queryImpl: (input: QueryCacheInput) => Promise<QueryCacheResult> | QueryCacheResult = (input) =>
-    ({ resource: input.resource, rows: [], count: 0, truncated: false } as QueryCacheResult),
+    ({ resource: input.resource, rows: [], count: 0, truncated: false }) as QueryCacheResult,
   bootstrapImpl?: () => void,
 ): { querySpy: ReturnType<typeof vi.fn>; closeSpy: ReturnType<typeof vi.fn> } {
   const querySpy = vi.fn(async (input: QueryCacheInput) => queryImpl(input));
