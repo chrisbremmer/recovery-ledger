@@ -57,6 +57,10 @@ import { createRecoveryRepo } from '../../src/infrastructure/db/repositories/rec
 import { createSleepsRepo } from '../../src/infrastructure/db/repositories/sleep.repo.js';
 import { createSyncRunsRepo } from '../../src/infrastructure/db/repositories/sync-runs.repo.js';
 import { createWorkoutsRepo } from '../../src/infrastructure/db/repositories/workouts.repo.js';
+import { DAILY_DECISION_BRIEF_INSTRUCTION } from '../../src/mcp/prompts/daily-decision-brief.js';
+import { DELOAD_OR_TRAIN_INSTRUCTION } from '../../src/mcp/prompts/deload-or-train.js';
+import { EXPERIMENT_DESIGNER_INSTRUCTION } from '../../src/mcp/prompts/experiment-designer.js';
+import { WEEKLY_RECOVERY_INVESTIGATION_INSTRUCTION } from '../../src/mcp/prompts/weekly-recovery-investigation.js';
 import { API_GAP_ENTRIES } from '../../src/services/api-gap/data.js';
 import { getApiGap } from '../../src/services/api-gap/index.js';
 import { type DailyReviewDeps, getDailyReview } from '../../src/services/review/daily.js';
@@ -336,19 +340,30 @@ describe('rendered-output lint — Phase 1-3 formatters (retroactive D-26 covera
 });
 
 // ---------------------------------------------------------------------------
-// Wave 4 placeholder (Plan 04-10 will extend with prompt-instruction
-// constants).
+// Wave 4 — prompt-instruction lint (Plan 04-10 D-26 layer 2 extension).
 //
-// PROMPT_INSTRUCTIONS source: src/mcp/prompts/* — does not exist until
-// Plan 04-10 lands. This describe block is intentionally empty so the
-// extension lands by adding an iteration over the (then-existing)
-// PROMPT_INSTRUCTIONS array.
+// Each of the 4 MCP prompt instruction constants is the verbatim text
+// the user-role message carries to the LLM after the rendered review.
+// They are user-facing copy in the strongest sense — the LLM treats
+// them as the operative instruction. ADR-0005 banned-tone-word lint
+// applies; the same containsBannedToneToken + EMOJI_RE used for
+// formatter output applies here.
 // ---------------------------------------------------------------------------
 
-describe('Wave 4 placeholder — prompt-instruction lint (Plan 04-10 extension)', () => {
-  it('placeholder for PROMPT_INSTRUCTIONS lint — populated by Plan 04-10', () => {
-    // No-op assertion to keep the describe block visible in test output;
-    // Plan 04-10 will replace this with an it.each over the constants.
-    expect(true).toBe(true);
-  });
+describe('rendered-output lint — MCP prompt instructions (Plan 04-10 D-26 layer 2)', () => {
+  const PROMPT_INSTRUCTIONS: ReadonlyArray<{ name: string; text: string }> = [
+    { name: 'whoop_daily_decision_brief', text: DAILY_DECISION_BRIEF_INSTRUCTION },
+    {
+      name: 'whoop_weekly_recovery_investigation',
+      text: WEEKLY_RECOVERY_INVESTIGATION_INSTRUCTION,
+    },
+    { name: 'whoop_experiment_designer', text: EXPERIMENT_DESIGNER_INSTRUCTION },
+    { name: 'whoop_deload_or_train', text: DELOAD_OR_TRAIN_INSTRUCTION },
+  ];
+
+  for (const { name, text } of PROMPT_INSTRUCTIONS) {
+    it(`${name} prompt instruction passes tone lint`, () => {
+      assertCleanRendered(text, `PROMPT_INSTRUCTIONS[${name}]`);
+    });
+  }
 });
