@@ -95,7 +95,7 @@
 - [x] 04-02-PLAN.md — Type contracts (8 type files + 4 narrowing tests) (REV-01/02/03/06/07, DEC-01/02/03)
 - [x] 04-03-PLAN.md — Stats primitives (median + MAD + Mann-Whitney + BH-FDR + REV-07 fixtures) (REV-01, REV-07) — completed 2026-05-19
 - [x] 04-04-PLAN.md — Baseline + anomaly + confidence pure-domain layer (REV-01, REV-02, REV-05)
-- [ ] 04-05-PLAN.md — Patterns + action/decision-prompt catalogs + select (REV-06, REV-07, REV-08, DEC-04)
+- [x] 04-05-PLAN.md — Patterns + action/decision-prompt catalogs + select (REV-06, REV-07, REV-08, DEC-04)
 - [ ] 04-06-PLAN.md — Decisions repo extension + decision service + api-gap data (DEC-01, DEC-02, DEC-03, MCP-01)
 - [ ] 04-07-PLAN.md — Review services (daily + weekly orchestrators) + 10 fixtures (REV-01..07, DEC-04)
 - [ ] 04-08-PLAN.md — queryCache + bootstrap composition root extension (DEC-01..04, REV-01..07, MCP-01)
@@ -124,7 +124,7 @@
 | 1. Foundation & Stdout-Pure MCP Bootstrap | 6/6 | Complete | 2026-05-12 |
 | 2. OAuth, Token Store & Single-Flight Refresh | 8/8 | Complete | 2026-05-12 |
 | 3. Data Model, DB Layer & Sync Loop | 13/13 | Complete | 2026-05-16 |
-| 4. Domain Math, Reviews, Decision Ledger & MCP Surface | 3/12 | In Progress | - |
+| 4. Domain Math, Reviews, Decision Ledger & MCP Surface | 5/12 | In Progress | - |
 | 5. Doctor Polish, Install Guide & <20-Minute Setup Validation | 0/? | Not started | - |
 
 ## Coverage
@@ -150,4 +150,4 @@ Concerns originate in the phase where the first vulnerable code is introduced; t
 
 ---
 *Roadmap created: 2026-05-11*
-*Last updated: 2026-05-20 — Phase 4 Wave 0 (plans 04-01 + 04-02) + Wave 1 stats (plan 04-03) + Wave 1 baselines/anomalies/confidence (plan 04-04) complete. 31 / 39 plans complete across Phases 1 + 2 + 3 + 4 (formula-based; Phase 4 has 12 plans total, 4 complete).*
+*Last updated: 2026-05-20 — Phase 4 Wave 0 (plans 04-01 + 04-02) + Wave 1 stats (plan 04-03) + Wave 1 baselines/anomalies/confidence (plan 04-04) + Wave 1 patterns/actions (plan 04-05) complete. 32 / 39 plans complete across Phases 1 + 2 + 3 + 4 (formula-based; Phase 4 has 12 plans total, 5 complete).*
