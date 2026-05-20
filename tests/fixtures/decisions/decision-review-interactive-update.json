@@ -1,0 +1,20 @@
+{
+  "_comment": "Plan 04-09 fixture: a ReviewDecisionsResult with mode='update' representing the output of `decision update <id> --status followed_up --notes <text>` (or the equivalent MCP path). The decision is the same one as decision-add-happy-path.json but with status flipped to followed_up + outcome_notes populated. The renderer emits the D-21 single-line confirmation: `decision <ulid-prefix> updated to followed_up`.",
+  "kind": "decision-update-result",
+  "name": "decision-review-interactive-update",
+  "result": {
+    "mode": "update",
+    "decision": {
+      "id": "01HK7XYZABCD0001234567890A",
+      "createdAt": "2026-03-15T15:00:00.000Z",
+      "category": "sleep",
+      "decision": "sleep at least seven hours on training days",
+      "rationale": null,
+      "confidence": "medium",
+      "expectedEffect": "+5% HRV by next weekly review",
+      "followUpDate": "2026-03-22",
+      "status": "followed_up",
+      "outcomeNotes": "held seven-plus hours for six of seven nights"
+    }
+  }
+}

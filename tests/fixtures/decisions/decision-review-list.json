@@ -1,0 +1,43 @@
+{
+  "_comment": "Plan 04-09 fixture: 3 Decision rows for the `decision review` (or `whoop_review_decisions` mode='list') list-mode output. (1) open within window (3d/7d), (2) open over window (10d/7d → renders with the over-window asterisk), (3) followed_up (already addressed). All three texts are banned-word-free so the tone-lint contract test passes. Categories cover the three buckets the catalog uses: sleep, training, recovery.",
+  "kind": "decisions-list",
+  "name": "decision-review-list",
+  "decisions": [
+    {
+      "id": "01HK7XYZABCD0001234567890A",
+      "createdAt": "2026-03-12T15:00:00.000Z",
+      "category": "sleep",
+      "decision": "sleep at least seven hours on training days",
+      "rationale": null,
+      "confidence": "medium",
+      "expectedEffect": "+5% HRV",
+      "followUpDate": "2026-03-19",
+      "status": "open",
+      "outcomeNotes": null
+    },
+    {
+      "id": "01HK7ABCDEFG0001234567890B",
+      "createdAt": "2026-03-03T15:00:00.000Z",
+      "category": "training",
+      "decision": "deload week starting Monday",
+      "rationale": "two prior weeks above strain 16",
+      "confidence": "high",
+      "expectedEffect": "recovery score back above 60",
+      "followUpDate": "2026-03-10",
+      "status": "open",
+      "outcomeNotes": null
+    },
+    {
+      "id": "01HK7PQRSTUV0001234567890C",
+      "createdAt": "2026-02-20T15:00:00.000Z",
+      "category": "recovery",
+      "decision": "skip late-evening alcohol on training days",
+      "rationale": null,
+      "confidence": "low",
+      "expectedEffect": null,
+      "followUpDate": "2026-02-27",
+      "status": "followed_up",
+      "outcomeNotes": "stuck with it for five of seven nights"
+    }
+  ]
+}

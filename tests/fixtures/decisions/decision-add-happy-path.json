@@ -1,0 +1,17 @@
+{
+  "_comment": "Plan 04-09 fixture: a single Decision representing the happy-path output of `decision add`. category='sleep', decision text mirrors DECISION_PROMPT_CATALOG[sleep-duration-shorter] verbatim so the tone-lint contract test exercises the realistic add path. follow_up_date is exactly 7 days after created_at (the CLI default at D-19). Status defaults to 'open' (schema layer). outcome_notes is null until the outcome write lands.",
+  "kind": "decision",
+  "name": "decision-add-happy-path",
+  "decision": {
+    "id": "01HK7XYZABCD0001234567890A",
+    "createdAt": "2026-03-15T15:00:00.000Z",
+    "category": "sleep",
+    "decision": "sleep at least seven hours on training days",
+    "rationale": null,
+    "confidence": "medium",
+    "expectedEffect": "+5% HRV by next weekly review",
+    "followUpDate": "2026-03-22",
+    "status": "open",
+    "outcomeNotes": null
+  }
+}
