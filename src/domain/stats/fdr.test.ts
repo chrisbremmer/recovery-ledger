@@ -87,9 +87,17 @@ describe('benjaminiHochberg', () => {
   describe('D-35 secondary fixture bh_partial_rejection (kStar = 3 path)', () => {
     const fixture = loadFixture('bh_partial_rejection.fixture.json');
 
-    it('rejects positions 0, 1, 2 (the three smallest p-values)', () => {
+    it('rejects exactly the fixture-declared positions', () => {
+      // Review #43: derive expectations from fixture.expected rather than
+      // hardcoding so a future fixture revision flows through without test
+      // edits, and the count + rejected positions stay in lockstep with
+      // the fixture's documented intent.
       const { rejected } = benjaminiHochberg(fixture.pvalues, fixture.q);
-      expect(rejected).toEqual([true, true, true, false, false]);
+      const expectedRejected = fixture.pvalues.map((_, i) =>
+        (fixture.expected.rejected_positions ?? []).includes(i),
+      );
+      expect(rejected).toEqual(expectedRejected);
+      expect(rejected.filter(Boolean).length).toBe(fixture.expected.rejected_count);
     });
 
     it('returns adjusted p-values matching the canonical BH monotonization', () => {
@@ -120,12 +128,14 @@ describe('benjaminiHochberg', () => {
     });
 
     it('respects original input ordering on shuffled input', () => {
-      // [0.05, 0.01, 0.04, 0.50, 0.20] is the bh_partial_rejection fixture
-      // permuted. Sorted ascending it matches the canonical fixture, so
+      // [0.5, 0.01, 0.2, 0.04, 0.05] is the bh_partial_rejection fixture
+      // permuted with the 3 smallest p-values spread to positions 1, 3, 4
+      // (not 0..2). Sorted ascending it matches the canonical fixture, so
       // rejections at sorted ranks 1..3 map back to ORIGINAL positions
-      // 1 (0.01), 2 (0.04), 0 (0.05) — and NOT positions 0, 1, 2.
-      const { rejected } = benjaminiHochberg([0.05, 0.01, 0.04, 0.5, 0.2], 0.1);
-      expect(rejected).toEqual([true, true, true, false, false]);
+      // 1 (0.01), 3 (0.04), 4 (0.05) — Review #13 hardens this against a
+      // mapping bug that the previous input would have silently masked.
+      const { rejected } = benjaminiHochberg([0.5, 0.01, 0.2, 0.04, 0.05], 0.1);
+      expect(rejected).toEqual([false, true, false, true, true]);
     });
   });
 });
