@@ -14,11 +14,7 @@ import { describe, expect, it } from 'vitest';
 import { containsBannedToneToken, EMOJI_RE } from '../domain/banned-words.js';
 import type { Decision } from '../domain/types/entities.js';
 import type { ReviewDecisionsResult } from '../services/decision/types.js';
-import {
-  renderDecisionDetail,
-  renderDecisionList,
-  renderDecisionUpdate,
-} from './decision.txt.js';
+import { renderDecisionDetail, renderDecisionList, renderDecisionUpdate } from './decision.txt.js';
 
 const FIXTURES_DIR = resolve(__dirname, '../../tests/fixtures/decisions');
 
@@ -107,9 +103,7 @@ describe('renderDecisionDetail — detail mode (single Decision)', () => {
 
 describe('renderDecisionUpdate — update mode (D-21 single-line)', () => {
   it("renders 'decision <prefix> updated to <status>' single-line confirmation", () => {
-    const fx = loadFixture<{ result: ReviewDecisionsResult }>(
-      'decision-review-interactive-update',
-    );
+    const fx = loadFixture<{ result: ReviewDecisionsResult }>('decision-review-interactive-update');
     if (fx.result.mode !== 'update') throw new Error('fixture is not update-mode');
     const rendered = renderDecisionUpdate(fx.result.decision);
     expect(rendered).toBe('decision 01HK7XYZ updated to followed_up');
@@ -131,9 +125,7 @@ describe('renderDecisionList — shape dispatch', () => {
   });
 
   it('dispatches ReviewDecisionsResult mode=update → D-21 confirmation', () => {
-    const fx = loadFixture<{ result: ReviewDecisionsResult }>(
-      'decision-review-interactive-update',
-    );
+    const fx = loadFixture<{ result: ReviewDecisionsResult }>('decision-review-interactive-update');
     const rendered = renderDecisionList(fx.result, FIXED_NOW);
     expect(rendered).toBe('decision 01HK7XYZ updated to followed_up');
   });
@@ -162,9 +154,7 @@ describe('renderDecisionList — ADR-0005 / D-26 per-formatter sanity sweep', ()
   });
 
   it('update output free of banned tokens + emoji', () => {
-    const fx = loadFixture<{ result: ReviewDecisionsResult }>(
-      'decision-review-interactive-update',
-    );
+    const fx = loadFixture<{ result: ReviewDecisionsResult }>('decision-review-interactive-update');
     if (fx.result.mode !== 'update') throw new Error('fixture is not update-mode');
     const rendered = renderDecisionUpdate(fx.result.decision);
     expect(containsBannedToneToken(rendered).hit).toBe(false);

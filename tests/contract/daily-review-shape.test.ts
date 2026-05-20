@@ -28,10 +28,7 @@ import { createSleepsRepo } from '../../src/infrastructure/db/repositories/sleep
 import { createSyncRunsRepo } from '../../src/infrastructure/db/repositories/sync-runs.repo.js';
 import { createWorkoutsRepo } from '../../src/infrastructure/db/repositories/workouts.repo.js';
 import { type DailyReviewDeps, getDailyReview } from '../../src/services/review/daily.js';
-import {
-  type DailyFixtureSpec,
-  expandDailyFixture,
-} from '../fixtures/review/_generators/daily.js';
+import { type DailyFixtureSpec, expandDailyFixture } from '../fixtures/review/_generators/daily.js';
 import { createInMemoryDb, type InMemoryDbResult } from '../helpers/in-memory-db.js';
 
 const FIXTURES_DIR = resolve(__dirname, '..', 'fixtures', 'review');

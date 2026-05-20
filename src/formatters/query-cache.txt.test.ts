@@ -20,7 +20,11 @@ import type {
 import type { QueryCacheResult } from '../services/cache/types.js';
 import { renderQueryCache } from './query-cache.txt.js';
 
-function asResult(resource: QueryCacheResult['resource'], rows: unknown[], opts?: { count?: number; truncated?: boolean }): QueryCacheResult {
+function asResult(
+  resource: QueryCacheResult['resource'],
+  rows: unknown[],
+  opts?: { count?: number; truncated?: boolean },
+): QueryCacheResult {
   return {
     resource,
     rows,
@@ -163,7 +167,7 @@ describe('renderQueryCache — body_measurements arm', () => {
     const bm: BodyMeasurement = {
       id: 1,
       userId: 99,
-      heightMeter: 1.80,
+      heightMeter: 1.8,
       weightKilogram: 75.5,
       maxHeartRate: 185,
       capturedAt: '2026-03-15T08:00:00.000Z',

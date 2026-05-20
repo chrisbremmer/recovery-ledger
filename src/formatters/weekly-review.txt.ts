@@ -114,9 +114,7 @@ export function renderWeeklyReview(result: WeeklyReviewResult): string {
 // at a glance which dates the two downstream sections cover.
 // ---------------------------------------------------------------------------
 
-function renderDataStatusSection(
-  ds: WeeklyReviewResult['data_status'],
-): string {
+function renderDataStatusSection(ds: WeeklyReviewResult['data_status']): string {
   const lines: string[] = ['Data status:'];
 
   lines.push(
@@ -150,25 +148,17 @@ function renderDataStatusSection(
 // DISTINCT from the pattern-test header below (which reads trailing-28).
 // ---------------------------------------------------------------------------
 
-function renderWeekSummarySection(
-  ws: WeekSummary,
-  weekStart: string,
-  weekEnd: string,
-): string {
+function renderWeekSummarySection(ws: WeekSummary, weekStart: string, weekEnd: string): string {
   const lines: string[] = [`Week summary (This week: ${weekStart} to ${weekEnd}):`];
   lines.push(`${SECTION_INDENT}Days scored: ${ws.scored_day_count}`);
 
   if (ws.worst_days.length > 0) {
-    const worst = ws.worst_days
-      .map((d) => `${d.date} (${d.recovery_score})`)
-      .join(', ');
+    const worst = ws.worst_days.map((d) => `${d.date} (${d.recovery_score})`).join(', ');
     lines.push(`${SECTION_INDENT}Worst days: ${worst}`);
   }
 
   if (ws.best_day !== null) {
-    lines.push(
-      `${SECTION_INDENT}Best day: ${ws.best_day.date} (${ws.best_day.recovery_score})`,
-    );
+    lines.push(`${SECTION_INDENT}Best day: ${ws.best_day.date} (${ws.best_day.recovery_score})`);
   }
 
   if (ws.avg_strain !== null) {
@@ -236,10 +226,7 @@ function renderCandidateResultsSection(results: readonly CandidateResult[]): str
   // Refused rows go to the bottom; non-refused sorted ASC by p_adjusted.
   const nonRefused = results.filter((r) => !r.refused);
   const refused = results.filter((r) => r.refused);
-  const sorted = [
-    ...nonRefused.slice().sort((a, b) => a.p_adjusted - b.p_adjusted),
-    ...refused,
-  ];
+  const sorted = [...nonRefused.slice().sort((a, b) => a.p_adjusted - b.p_adjusted), ...refused];
 
   sorted.forEach((r, i) => {
     const factor = r.factor.padEnd(FACTOR_COL_WIDTH);
@@ -249,7 +236,9 @@ function renderCandidateResultsSection(results: readonly CandidateResult[]): str
         ? 'cleared'
         : 'not cleared';
     if (r.refused) {
-      lines.push(`${SECTION_INDENT}${i + 1}. ${factor}${'(refused)'.padEnd(P_RAW_COL_WIDTH)}${''.padEnd(P_ADJ_COL_WIDTH)}${status}`);
+      lines.push(
+        `${SECTION_INDENT}${i + 1}. ${factor}${'(refused)'.padEnd(P_RAW_COL_WIDTH)}${''.padEnd(P_ADJ_COL_WIDTH)}${status}`,
+      );
     } else {
       const pRaw = `p_raw=${formatPValue(r.p_raw)}`.padEnd(P_RAW_COL_WIDTH);
       const pAdj = `p_adj=${formatPValue(r.p_adjusted)}`.padEnd(P_ADJ_COL_WIDTH);

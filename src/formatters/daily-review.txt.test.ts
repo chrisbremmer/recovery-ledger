@@ -41,7 +41,9 @@ const DAILY_FIXTURE_NAMES = [
 ] as const;
 
 function loadDailyFixture(name: string): DailyFixtureSpec {
-  return JSON.parse(readFileSync(resolve(FIXTURES_DIR, `${name}.json`), 'utf-8')) as DailyFixtureSpec;
+  return JSON.parse(
+    readFileSync(resolve(FIXTURES_DIR, `${name}.json`), 'utf-8'),
+  ) as DailyFixtureSpec;
 }
 
 function makeStubLogger(): Logger {
@@ -126,7 +128,7 @@ describe('renderDailyReview — D-07 Patterns section ALWAYS omitted in v1', () 
   }
 });
 
-describe("renderDailyReview — REV-05 insufficient surface", () => {
+describe('renderDailyReview — REV-05 insufficient surface', () => {
   let h: Harness;
   beforeEach(() => {
     h = makeHarness();

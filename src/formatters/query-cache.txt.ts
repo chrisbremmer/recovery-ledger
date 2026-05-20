@@ -126,7 +126,9 @@ function renderRecoveriesTable(rows: readonly Recovery[]): string {
     const cycleId = r.cycleId.toString().padEnd(NUMBER_COL_WIDTH + 4);
     if (r.scoreState === 'SCORED') {
       const score = r.recoveryScore.toString().padEnd(NUMBER_COL_WIDTH + 8);
-      const hrv = roundDecimal(r.hrvRmssdMilli, 1).toString().padEnd(NUMBER_COL_WIDTH + 8);
+      const hrv = roundDecimal(r.hrvRmssdMilli, 1)
+        .toString()
+        .padEnd(NUMBER_COL_WIDTH + 8);
       const rhr = r.restingHeartRate.toString().padEnd(NUMBER_COL_WIDTH + 4);
       lines.push(`${cycleId}${score}${hrv}${rhr}${r.scoreState}`);
     } else {
@@ -154,7 +156,9 @@ function renderSleepsTable(rows: readonly Sleep[]): string {
     const end = s.end.padEnd(DATE_COL_WIDTH);
     if (s.scoreState === 'SCORED') {
       const durationMin = (s.totalInBedTimeMilli - s.totalAwakeTimeMilli) / 60_000;
-      const duration = roundDecimal(durationMin, 1).toString().padEnd(NUMBER_COL_WIDTH + 8);
+      const duration = roundDecimal(durationMin, 1)
+        .toString()
+        .padEnd(NUMBER_COL_WIDTH + 8);
       const efficiency = roundDecimal(s.sleepEfficiencyPercentage, 1)
         .toString()
         .padEnd(NUMBER_COL_WIDTH + 8);
@@ -215,8 +219,12 @@ function renderBodyMeasurementsTable(rows: readonly BodyMeasurement[]): string {
   const lines = [header];
   for (const b of rows) {
     const at = b.capturedAt.padEnd(DATE_COL_WIDTH);
-    const height = roundDecimal(b.heightMeter, 2).toString().padEnd(NUMBER_COL_WIDTH + 4);
-    const weight = roundDecimal(b.weightKilogram, 1).toString().padEnd(NUMBER_COL_WIDTH + 4);
+    const height = roundDecimal(b.heightMeter, 2)
+      .toString()
+      .padEnd(NUMBER_COL_WIDTH + 4);
+    const weight = roundDecimal(b.weightKilogram, 1)
+      .toString()
+      .padEnd(NUMBER_COL_WIDTH + 4);
     lines.push(`${at}${height}${weight}${b.maxHeartRate}`);
   }
   return lines.join('\n');

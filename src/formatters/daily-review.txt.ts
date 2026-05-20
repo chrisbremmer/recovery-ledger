@@ -135,7 +135,9 @@ function renderTodayMetricsSection(t: TodayMetrics): string {
   lines.push(formatMetricLine('HRV (rMSSD)', formatMillis(t.hrv_rmssd_milli)));
   lines.push(formatMetricLine('Resting HR', formatBpm(t.resting_heart_rate)));
   lines.push(formatMetricLine('Strain', formatDecimal1(t.day_strain)));
-  lines.push(formatMetricLine('Sleep', formatSleep(t.sleep_duration_minutes, t.sleep_efficiency_percent)));
+  lines.push(
+    formatMetricLine('Sleep', formatSleep(t.sleep_duration_minutes, t.sleep_efficiency_percent)),
+  );
   lines.push(formatMetricLine('Resp. rate', formatBpmDecimal1(t.respiratory_rate)));
   lines.push(formatMetricLine('SpO2', formatPercent(t.spo2_percentage)));
   lines.push(formatMetricLine('Skin temp', formatTemp(t.skin_temp_celsius)));

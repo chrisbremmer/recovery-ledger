@@ -175,9 +175,7 @@ describe('renderWeeklyReview — REV-07 no_pattern arm renders typed reason', ()
     loadIntoDb(h, spec);
     const result = await getWeeklyReview({ date: spec.reviewed_date }, h.deps);
     const rendered = renderWeeklyReview(result);
-    expect(rendered).toContain(
-      'No reliable pattern detected. Reason: insufficient_window_days',
-    );
+    expect(rendered).toContain('No reliable pattern detected. Reason: insufficient_window_days');
   });
 });
 
