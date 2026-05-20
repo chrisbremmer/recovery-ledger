@@ -163,10 +163,7 @@ export function createSyncRunsRepo(db: ReturnType<typeof drizzle>): SyncRunsRepo
       const base = db.select().from(syncRunsTable);
       const rows =
         conditions.length === 0
-          ? base
-              .orderBy(desc(syncRunsTable.started_at), desc(syncRunsTable.id))
-              .limit(limit)
-              .all()
+          ? base.orderBy(desc(syncRunsTable.started_at), desc(syncRunsTable.id)).limit(limit).all()
           : base
               .where(and(...conditions))
               .orderBy(desc(syncRunsTable.started_at), desc(syncRunsTable.id))

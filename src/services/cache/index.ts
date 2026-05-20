@@ -127,10 +127,7 @@ export async function queryCache(
   return result;
 }
 
-async function dispatch(
-  input: QueryCacheInput,
-  deps: QueryCacheDeps,
-): Promise<QueryCacheResult> {
+async function dispatch(input: QueryCacheInput, deps: QueryCacheDeps): Promise<QueryCacheResult> {
   switch (input.resource) {
     case 'cycles': {
       const limit = clampLimit(input.limit);
@@ -174,11 +171,9 @@ async function dispatch(
     }
     case 'workouts': {
       const limit = clampLimit(input.limit);
-      const repoRows = deps.repos.workouts.byRange(
-        input.since ?? MIN_ISO,
-        input.until ?? MAX_ISO,
-        { includeUnscored: input.includeUnscored ?? false },
-      );
+      const repoRows = deps.repos.workouts.byRange(input.since ?? MIN_ISO, input.until ?? MAX_ISO, {
+        includeUnscored: input.includeUnscored ?? false,
+      });
       const filtered =
         input.sportId === undefined
           ? repoRows

@@ -24,8 +24,8 @@ import { createRecoveryRepo } from '../../infrastructure/db/repositories/recover
 import { createSleepsRepo } from '../../infrastructure/db/repositories/sleep.repo.js';
 import { createSyncRunsRepo } from '../../infrastructure/db/repositories/sync-runs.repo.js';
 import { createWorkoutsRepo } from '../../infrastructure/db/repositories/workouts.repo.js';
-import { queryCache } from './index.js';
 import type { QueryCacheDeps } from './index.js';
+import { queryCache } from './index.js';
 
 function makeStubLogger(): Logger {
   const noop = vi.fn();
@@ -311,10 +311,7 @@ describe('services/cache — recoveries arm', () => {
       }),
     ]);
 
-    const filtered = await queryCache(
-      { resource: 'recoveries', minRecoveryScore: 60 },
-      h.deps,
-    );
+    const filtered = await queryCache({ resource: 'recoveries', minRecoveryScore: 60 }, h.deps);
     expect(filtered.rows).toHaveLength(2);
     const filteredHigh = await queryCache(
       { resource: 'recoveries', minRecoveryScore: 60, maxRecoveryScore: 70 },
@@ -493,19 +490,12 @@ describe('services/cache — decisions arm', () => {
       expectedEffect: null,
       followUpDate: null,
     });
-    h.deps.repos.decisions.updateOutcome(
-      '01HK0000000000000000000002',
-      'followed_up',
-      'hrv up',
-    );
+    h.deps.repos.decisions.updateOutcome('01HK0000000000000000000002', 'followed_up', 'hrv up');
 
     const openOnly = await queryCache({ resource: 'decisions', status: 'open' }, h.deps);
     expect(openOnly.rows).toHaveLength(1);
 
-    const followedUp = await queryCache(
-      { resource: 'decisions', status: 'followed_up' },
-      h.deps,
-    );
+    const followedUp = await queryCache({ resource: 'decisions', status: 'followed_up' }, h.deps);
     expect(followedUp.rows).toHaveLength(1);
   });
 
@@ -534,10 +524,7 @@ describe('services/cache — decisions arm', () => {
     const sleep = await queryCache({ resource: 'decisions', category: 'sleep' }, h.deps);
     expect(sleep.rows).toHaveLength(1);
 
-    const lifestyle = await queryCache(
-      { resource: 'decisions', category: 'lifestyle' },
-      h.deps,
-    );
+    const lifestyle = await queryCache({ resource: 'decisions', category: 'lifestyle' }, h.deps);
     expect(lifestyle.rows).toHaveLength(1);
   });
 });

@@ -10,7 +10,14 @@
 //   3. Construct every repository factory over the Drizzle handle (Plan
 //      03-08 repos).
 //   4. Construct the sync deps shape that `runSync` consumes.
-//   5. Return a `Bootstrapped` value with a `close()` lifecycle hook so
+//   5. Phase 4 extension: construct the review / decision / cache deps
+//      shapes and wire 6 new services (getDailyReview, getWeeklyReview,
+//      addDecision, reviewDecisions, queryCache, getApiGap) into the
+//      `Bootstrapped.services` interface alongside Phase 3's `runSync`.
+//      Wave 4 (Plans 04-10 + 04-11) — every MCP tool and CLI command
+//      composes against `Bootstrapped.services` per the Phase 3 ≤5-line
+//      CLI shim precedent.
+//   6. Return a `Bootstrapped` value with a `close()` lifecycle hook so
 //      callers (CLI shim, tests) can release the sqlite handle.
 //
 // Lite hexagonal discipline: this is the ONLY non-test module outside
@@ -24,9 +31,10 @@
 // `'drizzle-orm/better-sqlite3'`. A direct import here would silently
 // route around the gate.
 //
-// ADR-0001: no console.*, no process.stdout.write. The bootstrap layer
-// uses Pino → stderr via the production singleton from
-// `../infrastructure/config/logger.js`.
+// ADR-0001: no direct stdout writes; no terminal-banner emit. The
+// bootstrap layer uses Pino through stderr via the production singleton
+// from `../infrastructure/config/logger.js`. Phase 4 services that wire
+// here all observe the same discipline.
 //
 // Migrations dir resolution: computed from `import.meta.url` so it works
 // for both the dev path (src/ via tsx + vitest) and the built path (dist/
@@ -38,6 +46,8 @@ import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type Database from 'better-sqlite3';
 import type { Logger } from 'pino';
+import type { DailyReviewResult, WeeklyReviewResult } from '../domain/review/types.js';
+import type { Decision } from '../domain/types/entities.js';
 import type { RunSyncInput, RunSyncResult } from '../domain/types/sync.js';
 import { logger } from '../infrastructure/config/logger.js';
 import { paths } from '../infrastructure/config/paths.js';
@@ -82,6 +92,18 @@ import { getProfile } from '../infrastructure/whoop/resources/profile.js';
 import { listRecovery } from '../infrastructure/whoop/resources/recovery.js';
 import { listSleep } from '../infrastructure/whoop/resources/sleep.js';
 import { listWorkouts } from '../infrastructure/whoop/resources/workouts.js';
+import { getApiGap } from './api-gap/index.js';
+import type { ApiGapResult } from './api-gap/types.js';
+import { queryCache } from './cache/index.js';
+import type { QueryCacheInput, QueryCacheResult } from './cache/types.js';
+import { addDecision, reviewDecisions } from './decision/index.js';
+import type {
+  AddDecisionInput,
+  ReviewDecisionsInput,
+  ReviewDecisionsResult,
+} from './decision/types.js';
+import { getDailyReview } from './review/daily.js';
+import { getWeeklyReview } from './review/weekly.js';
 import { type RunSyncDeps, runSync } from './sync/index.js';
 
 export interface Bootstrapped {
@@ -104,6 +126,18 @@ export interface Bootstrapped {
   };
   services: {
     runSync(input: RunSyncInput): Promise<RunSyncResult>;
+    // Phase 4 additions — wired in the return block below using
+    // `reviewDeps`, `decisionDeps`, and `cacheDeps` shapes constructed
+    // once before the return. The Phase 3 `runSync` wiring stays
+    // untouched. Each method matches the exact signature of its
+    // underlying service function (declared on the function imports
+    // above) so callers narrow on the Bootstrapped type alone.
+    getDailyReview(input: { date?: string }): Promise<DailyReviewResult>;
+    getWeeklyReview(input: { date?: string }): Promise<WeeklyReviewResult>;
+    addDecision(input: AddDecisionInput): Promise<Decision>;
+    reviewDecisions(input: ReviewDecisionsInput): Promise<ReviewDecisionsResult>;
+    queryCache(input: QueryCacheInput): Promise<QueryCacheResult>;
+    getApiGap(): Promise<ApiGapResult>;
   };
   close(): void;
 }
@@ -197,12 +231,50 @@ export function bootstrap(opts: BootstrapOptions = {}): Bootstrapped {
     logger: log,
   };
 
+  // Phase 4 dep shapes. Each shape is the narrowest set the corresponding
+  // service consumes:
+  //
+  //  - `reviewDeps`: full `repos` set + clock + ianaZone + logger. Daily
+  //    and weekly reviews both compose multiple repos (cycles +
+  //    recoveries + sleeps + workouts + profile + body_measurements +
+  //    sync_runs + daily_summaries) and the weekly view additionally
+  //    reads `decisions.countSince(...)` for the D-22 prompt slot.
+  //  - `decisionDeps`: decisions repo only + clock + logger (D-19/D-20).
+  //  - `cacheDeps`: full `repos` set + logger (D-24 8-arm dispatch); no
+  //    clock or ianaZone — the cache surface is pure read pass-through.
+  //
+  // The `clock` and `ianaZone` lambdas are the same shape used by the
+  // sync orchestrator above — re-evaluated lazily per call so a laptop
+  // crossing time zones between two service calls picks up the right tz
+  // on the second call (D-13 carry-forward).
+  const reviewDeps = {
+    repos,
+    clock: () => new Date(),
+    ianaZone: () => Intl.DateTimeFormat().resolvedOptions().timeZone,
+    logger: log,
+  };
+  const decisionDeps = {
+    repos: { decisions: repos.decisions },
+    clock: () => new Date(),
+    logger: log,
+  };
+  const cacheDeps = { repos, logger: log };
+
   return {
     db,
     sqlite,
     repos,
     services: {
       runSync: (input) => runSync(input, syncDeps),
+      // Phase 4 wiring — every service receives its tailored deps shape.
+      // Each composition keeps the underlying service function ignorant
+      // of the bootstrap; deps flow in via the second parameter.
+      getDailyReview: (input) => getDailyReview(input, reviewDeps),
+      getWeeklyReview: (input) => getWeeklyReview(input, reviewDeps),
+      addDecision: (input) => addDecision(input, decisionDeps),
+      reviewDecisions: (input) => reviewDecisions(input, decisionDeps),
+      queryCache: (input) => queryCache(input, cacheDeps),
+      getApiGap: () => getApiGap(),
     },
     close: () => {
       try {
