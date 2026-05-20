@@ -191,7 +191,11 @@ async function dispatch(input: QueryCacheInput, deps: QueryCacheDeps): Promise<Q
       const limit = clampLimit(input.limit);
       // No SCORED filter here — body measurements are append-on-change history
       // (D-35) with no score_state column. Pass through to repo.byRange.
-      const rows = deps.repos.bodyMeasurements.byRange(input.since, input.until);
+      // Slice to `limit + 1` so applyTruncation can detect spillover the same
+      // way every other arm does (avoids a misleading count when the repo
+      // returns far more than `limit + 1` rows).
+      const rawRows = deps.repos.bodyMeasurements.byRange(input.since, input.until);
+      const rows = rawRows.slice(0, limit + 1);
       const truncated = applyTruncation(rows, limit);
       return { resource: 'body_measurements', ...truncated };
     }

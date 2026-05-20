@@ -426,6 +426,27 @@ describe('services/cache — body_measurements arm', () => {
     );
     expect(tight.rows).toHaveLength(1);
   });
+
+  it('Test 11a: truncation honors limit when more than limit rows are in range', async () => {
+    // Insert 25 body_measurement rows on distinct days; weight strictly
+    // increasing so every row is treated as a change and persisted.
+    for (let i = 0; i < 25; i += 1) {
+      const day = String(i + 1).padStart(2, '0');
+      h.deps.repos.bodyMeasurements.upsertOnChange(
+        { userId: 1001, heightMeter: 1.8, weightKilogram: 70 + i, maxHeartRate: 190, rawJson: '{}' },
+        { clock: new Date(`2026-04-${day}T08:00:00.000Z`) },
+      );
+    }
+    const limited = await queryCache(
+      { resource: 'body_measurements', since: '2026-04-01', until: '2026-04-30', limit: 10 },
+      h.deps,
+    );
+    // Result rows are sliced to `limit`; `count` follows the queryCache
+    // convention (`limit + 1` when truncated, matching other arms).
+    expect(limited.rows).toHaveLength(10);
+    expect(limited.truncated).toBe(true);
+    expect(limited.count).toBe(11);
+  });
 });
 
 describe('services/cache — sync_runs arm', () => {
