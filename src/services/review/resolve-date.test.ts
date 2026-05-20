@@ -12,8 +12,8 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { createInMemoryDb, type InMemoryDbResult } from '../../../tests/helpers/in-memory-db.js';
 import type { Cycle } from '../../domain/types/entities.js';
 import {
-  createCyclesRepo,
   type CyclesRepo,
+  createCyclesRepo,
 } from '../../infrastructure/db/repositories/cycles.repo.js';
 import { resolveReviewedDate } from './resolve-date.js';
 
@@ -87,7 +87,7 @@ describe('resolveReviewedDate — D-01 anchor for D-02 / D-12 / D-17', () => {
     expect(result).toEqual({ date: '2026-03-15', source: 'cli_flag' });
   });
 
-  it("Test 2: invalid input.date string throws (CLI parse-layer must catch it before the service)", async () => {
+  it('Test 2: invalid input.date string throws (CLI parse-layer must catch it before the service)', async () => {
     await expect(resolveReviewedDate({ date: 'not-a-date' }, h.deps)).rejects.toThrow();
     await expect(resolveReviewedDate({ date: '2026-13-40' }, h.deps)).rejects.toThrow();
     await expect(resolveReviewedDate({ date: '2026/03/15' }, h.deps)).rejects.toThrow();
@@ -110,7 +110,7 @@ describe('resolveReviewedDate — D-01 anchor for D-02 / D-12 / D-17', () => {
     expect(result).toEqual({ date: '2026-03-10', source: 'latest_scored' });
   });
 
-  it("Test 5: a SCORED cycle with baseline_excluded=1 is NOT returned (default-filter discipline)", async () => {
+  it('Test 5: a SCORED cycle with baseline_excluded=1 is NOT returned (default-filter discipline)', async () => {
     h.cycles.upsertBatch([
       makeScoredCycle(1, '2026-03-05T07:00:00.000Z'),
       makeExcludedScoredCycle(2, '2026-03-15T07:00:00.000Z'), // newer but excluded
@@ -120,7 +120,7 @@ describe('resolveReviewedDate — D-01 anchor for D-02 / D-12 / D-17', () => {
     expect(result.date).toBe('2026-03-05');
   });
 
-  it("Test 6: only PENDING_SCORE cycles in DB → falls back to clock()", async () => {
+  it('Test 6: only PENDING_SCORE cycles in DB → falls back to clock()', async () => {
     h.cycles.upsertBatch([
       makePendingCycle(1, '2026-03-10T07:00:00.000Z'),
       makePendingCycle(2, '2026-03-11T07:00:00.000Z'),
@@ -129,7 +129,7 @@ describe('resolveReviewedDate — D-01 anchor for D-02 / D-12 / D-17', () => {
     expect(result).toEqual({ date: '2026-05-20', source: 'fallback_today' });
   });
 
-  it("Test 7: D-02 reproducibility — same input.date returns the same output regardless of clock", async () => {
+  it('Test 7: D-02 reproducibility — same input.date returns the same output regardless of clock', async () => {
     const r1 = await resolveReviewedDate({ date: '2026-03-15' }, h.deps);
     const r2 = await resolveReviewedDate(
       { date: '2026-03-15' },
@@ -138,7 +138,7 @@ describe('resolveReviewedDate — D-01 anchor for D-02 / D-12 / D-17', () => {
     expect(r1).toEqual(r2);
   });
 
-  it("Test 8: returns yyyy-mm-dd, not ISO-with-time (D-01 truncation discipline)", async () => {
+  it('Test 8: returns yyyy-mm-dd, not ISO-with-time (D-01 truncation discipline)', async () => {
     h.cycles.upsertBatch([makeScoredCycle(1, '2026-03-10T07:30:45.000Z')]);
     const result = await resolveReviewedDate({}, h.deps);
     expect(result.date).toBe('2026-03-10');
