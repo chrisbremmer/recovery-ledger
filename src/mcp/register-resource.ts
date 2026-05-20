@@ -50,6 +50,13 @@ export type ResourceHandler = (uri: URL) => Promise<ResourceResult>;
  * - Walks `contents[].text` on the success path and sanitizes each string
  *   leaf in place (mirrors `register.ts` MR-12 discipline for tool content).
  */
+// Concrete SDK return type for ReadResourceCallback. Awaiting the
+// callback's return type yields the same union the SDK accepts at
+// runtime; naming it locally (Review #9) keeps the SDK contract visible
+// at the cast site, and a `Promise<infer R>` extends-clause that fails
+// to infer would otherwise silently resolve to `never`.
+type ReadResourceResult = Awaited<ReturnType<ReadResourceCallback>>;
+
 export function registerResource(
   server: McpServer,
   name: string,
@@ -61,9 +68,9 @@ export function registerResource(
     try {
       const result = await handler(uriArg);
       sanitizeContents(result.contents);
-      return result as unknown as ReturnType<ReadResourceCallback> extends Promise<infer R>
-        ? R
-        : never;
+      // Cast satisfies the SDK's ReadResourceResult union (contents[] +
+      // optional isError); our ResourceResult is a strict subset.
+      return result as unknown as ReadResourceResult;
     } catch (err) {
       return {
         contents: [
@@ -74,7 +81,7 @@ export function registerResource(
           },
         ],
         isError: true,
-      } as unknown as ReturnType<ReadResourceCallback> extends Promise<infer R> ? R : never;
+      } as unknown as ReadResourceResult;
     }
   };
   server.registerResource(name, uri, metadata, wrapped);

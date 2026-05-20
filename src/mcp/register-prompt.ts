@@ -100,13 +100,16 @@ export function registerPrompt(
   // into the SDK's narrower optional slot.
   // The SDK's PromptCallback union splits on whether `argsSchema` is
   // provided; without one (Phase 4 D-27 — all 4 prompts ship arg-less),
-  // the callback signature is `(extra) => ...`. We type-erase config +
-  // handler at the wrapper boundary so the SDK's overload resolves
-  // without dragging the `ZodRawShapeCompat` constraint into our public
-  // surface. The triple-cast through `never` is the documented escape
-  // hatch when `exactOptionalPropertyTypes` rejects a structurally-
-  // equivalent but optionality-mismatched shape.
-  server.registerPrompt(name, config as never, wrapped as never);
+  // the callback signature is `(extra) => ...`. We narrow the cast to the
+  // SDK's own parameter types (Review #10) instead of `as never` so the
+  // SDK overload still gets parameter-count + structural-shape checks,
+  // and a future SDK bump that adds/removes a parameter fails here at
+  // compile time rather than silently accepting the call.
+  server.registerPrompt(
+    name,
+    config as Parameters<typeof server.registerPrompt>[1],
+    wrapped as Parameters<typeof server.registerPrompt>[2],
+  );
 }
 
 // Walks `messages[]` and sanitizes each text-content `text` field in place.
