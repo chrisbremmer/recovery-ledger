@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-current_plan: 9
+current_plan: 10
 status: executing
-last_updated: "2026-05-20T19:06:43.868Z"
+last_updated: "2026-05-20T19:39:14.795Z"
 progress:
   total_phases: 5
   completed_phases: 3
   total_plans: 39
-  completed_plans: 35
-  percent: 90
+  completed_plans: 36
+  percent: 92
 ---
 
 # State: Recovery Ledger
@@ -26,16 +26,16 @@ progress:
 
 ## Current Position
 
-**Current Plan:** 9
+**Current Plan:** 10
 **Total Plans in Phase:** 12
 Phase: 04-domain-math-reviews-decision-ledger-mcp-surface — IN PROGRESS (8 of 12 plans complete)
-Plan: 9 of 12
+Plan: 10 of 12
 
 - **Milestone:** v1
 - **Phase:** 4
 - **Plan:** Plans 04-01..04-08 complete (Waves 0-2 closed: infrastructure + cross-cutting types + stats primitives + baselines/confidence/anomalies + patterns + decision/api-gap services + review services + composition-root wiring). Next move: `/gsd-execute-phase 4` to run Plan 04-09 (Wave 3 — formatters + D-26 banned-word contract test). Phase 4 covers REV-01..08 + DEC-01..04 + MCP-01..06 (18 REQ-IDs): baseline calculator, confidence-tier gating, FDR-corrected weekly patterns, daily + weekly reviews, decision ledger, 8 MCP tools + 6 resources + 4 prompts, banned-word tone lint. Depends on Phase 3 (reviews are pure functions over the cached entities; baseline math hinges on the score_state-disciplined, DST-flagged data Phase 3 produces).
 - **Status:** Ready to execute
-- **Progress:** [█████████░] 90%
+- **Progress:** [█████████░] 92%
 
 ```
 [██████████████░░░░░░] 3 / 5 phases complete + 8 / 12 plans in Phase 4 (6 / 6 in Phase 1; 8 / 8 in Phase 2; 13 / 13 in Phase 3)
@@ -81,6 +81,7 @@ Plan: 9 of 12
 | Phase 04 P06 | 4min 12s | 3 tasks | 8 files |
 | Phase 04 P07 | 13 | - tasks | - files |
 | Phase 04 P08 | 12min | 2 tasks | 6 files |
+| Phase 04 P09 | 35m | 3 tasks | 13 files |
 
 ### Plan Execution History
 
@@ -276,6 +277,9 @@ Plan: 9 of 12
 - [Phase ?]: Plan 04-08: queryCache uses limit+1 read-ahead for truncation detection (D-24); avoids second COUNT round-trip
 - [Phase ?]: Plan 04-08: getApiGap() routed through bootstrap() despite no DB dependency — preserves createServices()'s lightweight Phase 1-2 doctor + auth surface
 - [Phase ?]: Plan 04-08: sync_runs.byStatus + body_measurements.byRange added as proper repo methods (not in-memory filters); these surfaces are expected to grow into Phase 5 doctor data sources
+- [Phase 04]: D-07 anchored at rendering: renderDailyReview omits 'Patterns:' label across all 5 daily fixtures in v1
+- [Phase 04]: D-17 + D-12 anchored at rendering: weekly output carries two distinct labeled sections with correct trailing-7 and trailing-28 date ranges
+- [Phase 04]: D-26 defence-in-depth complete: Gate A source-level + tests/contract/formatter-tone.test.ts rendered-output level
 
 ### Open Todos
 
