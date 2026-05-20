@@ -58,14 +58,14 @@ Requirements for the initial release. Each maps to roadmap phases.
 
 ### Decision Ledger
 
-- [ ] **DEC-01**: `recovery-ledger decision add` accepts category, decision, rationale, confidence, expected effect, and follow-up date (ULID id, smart defaults for date and follow-up window) with a one-line happy path
-- [ ] **DEC-02**: Decisions persist with `status` (open / followed_up / abandoned) and `outcome_notes`
-- [ ] **DEC-03**: `recovery-ledger decision review` lists open decisions with elapsed time vs. expected effect window and prompts for outcome capture
+- [x] **DEC-01**: `recovery-ledger decision add` accepts category, decision, rationale, confidence, expected effect, and follow-up date (ULID id, smart defaults for date and follow-up window) with a one-line happy path
+- [x] **DEC-02**: Decisions persist with `status` (open / followed_up / abandoned) and `outcome_notes`
+- [x] **DEC-03**: `recovery-ledger decision review` lists open decisions with elapsed time vs. expected effect window and prompts for outcome capture
 - [ ] **DEC-04**: Weekly review prompts for at least one new decision when none has been recorded in the prior week
 
 ### MCP Surface
 
-- [ ] **MCP-01**: MCP server exposes tools `whoop_sync`, `whoop_daily_review`, `whoop_weekly_review`, `whoop_query_cache` (typed per-resource filters, not free-form SQL), `whoop_add_decision`, `whoop_review_decisions`, `whoop_api_gap`, `whoop_doctor`
+- [x] **MCP-01**: MCP server exposes tools `whoop_sync`, `whoop_daily_review`, `whoop_weekly_review`, `whoop_query_cache` (typed per-resource filters, not free-form SQL), `whoop_add_decision`, `whoop_review_decisions`, `whoop_api_gap`, `whoop_doctor`
 - [x] **MCP-02**: Every tool returns structured JSON (`structuredContent`) plus compact text (`content`) so weaker clients still work
 - [x] **MCP-03**: All MCP tools are ≤ 5-line shims over services — zero business logic in `src/mcp/`; identical behavior to the CLI equivalents
 - [x] **MCP-04**: MCP resources `whoop://summary/today`, `whoop://summary/week`, `whoop://baseline/30d`, `whoop://data-quality`, `whoop://api-gaps`, `whoop://decisions/open` are exposed and refresh from the cache
@@ -159,11 +159,11 @@ Explicitly excluded. Gated behind the hard scope guardrail in PROJECT.md (≥ 12
 | REV-06 | Phase 4 | Pending |
 | REV-07 | Phase 4 | Pending |
 | REV-08 | Phase 4 | Complete |
-| DEC-01 | Phase 4 | Pending |
-| DEC-02 | Phase 4 | Pending |
-| DEC-03 | Phase 4 | Pending |
+| DEC-01 | Phase 4 | Complete |
+| DEC-02 | Phase 4 | Complete |
+| DEC-03 | Phase 4 | Complete |
 | DEC-04 | Phase 4 | Pending |
-| MCP-01 | Phase 4 | Pending |
+| MCP-01 | Phase 4 | Complete |
 | MCP-02 | Phase 4 | Complete |
 | MCP-03 | Phase 4 | Complete |
 | MCP-04 | Phase 4 | Complete |

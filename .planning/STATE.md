@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-current_plan: 6
+current_plan: 7
 status: executing
-last_updated: "2026-05-20T18:22:22.271Z"
+last_updated: "2026-05-20T18:34:08.377Z"
 progress:
   total_phases: 5
   completed_phases: 3
   total_plans: 39
-  completed_plans: 32
-  percent: 82
+  completed_plans: 33
+  percent: 85
 ---
 
 # State: Recovery Ledger
@@ -26,16 +26,16 @@ progress:
 
 ## Current Position
 
-**Current Plan:** 6
+**Current Plan:** 7
 **Total Plans in Phase:** 12
 Phase: 04-domain-math-reviews-decision-ledger-mcp-surface — IN PROGRESS (5 of 12 plans complete)
-Plan: 6 of 12
+Plan: 7 of 12
 
 - **Milestone:** v1
 - **Phase:** 4
 - **Plan:** Plans 04-01 (wave-0 infrastructure: deps + Gate H/I/J wiring) + 04-02 (wave-0 cross-cutting type contracts) + 04-03 (wave-1 stats primitives) complete. Next move: `/gsd-execute-phase 4` to run Plan 04-04 (baselines + confidence-tier gating — first composition of `median` + `robustSigma` against the trailing-30-day SCORED-only window per metric). Phase 4 covers REV-01..08 + DEC-01..04 + MCP-01..06 (18 REQ-IDs): baseline calculator, confidence-tier gating, FDR-corrected weekly patterns, daily + weekly reviews, decision ledger, 8 MCP tools + 6 resources + 4 prompts, banned-word tone lint. Depends on Phase 3 (reviews are pure functions over the cached entities; baseline math hinges on the score_state-disciplined, DST-flagged data Phase 3 produces).
 - **Status:** Ready to execute
-- **Progress:** [████████░░] 82%
+- **Progress:** [█████████░] 85%
 
 ```
 [█████████████░░░░░░░] 3 / 5 phases complete + 5 / 12 plans in Phase 4 (6 / 6 in Phase 1; 8 / 8 in Phase 2; 13 / 13 in Phase 3)
@@ -78,6 +78,7 @@ Plan: 6 of 12
 | Phase 04 P04-03 | 5m 50s | 8 tasks | 10 files |
 | Phase 04 P04 | 5min 47s | 9 tasks | 8 files |
 | Phase 04 P05 | 9min 12s | 9 tasks | 10 files |
+| Phase 04 P06 | 4min 12s | 3 tasks | 8 files |
 
 ### Plan Execution History
 
@@ -264,6 +265,9 @@ Plan: 6 of 12
 - [Phase ?]: Pattern detector workout-timing-late-evening refuses cleanly when window has zero workouts (preserves all_candidates_refused as reachable arm; matches ADR-0004 typed-positive-refusal spirit; Plan 04-05)
 - [Phase ?]: SLEEP_NEED_MINUTES pinned at 480 (8h CDC/AASM norm) for sleep_debt_3d_rolling candidate; V2-10 path adds per-user sleep_need from WHOOP sleep score block (Plan 04-05)
 - [Phase ?]: detectWeeklyPattern returns 3 top-level slots (pattern, candidate_results, worst_days) rather than nesting under pattern.detected — preserves ADR-0004 unranked-context-not-recommendation in every no_pattern arm (Plan 04-05)
+- [Phase ?]: Plan 04-06 — service-layer ULID generation: ulid() runs inside addDecision BEFORE repo.insert (D-19). The repo trusts the caller; id allocation lives with smart-defaults policy.
+- [Phase ?]: Plan 04-06 — updateOutcome silent-no-op on missing id: repo returns 0 rows changed without throwing; service surfaces 'decision not found' via follow-up byId. Fail-loud at the policy boundary, not the persistence boundary.
+- [Phase ?]: Plan 04-06 — Object.freeze + readonly + literal-false type lock immutability at three layers for API_GAP_ENTRIES; Phase 5 markdown gen reads this same module (single source of truth).
 
 ### Open Todos
 
