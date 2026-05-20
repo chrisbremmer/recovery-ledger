@@ -101,7 +101,7 @@
 - [x] 04-08-PLAN.md — queryCache + bootstrap composition root extension (DEC-01..04, REV-01..07, MCP-01)
 - [x] 04-09-PLAN.md — Formatters + D-26 tone contract test (REV-03, REV-04, REV-08, DEC-03, MCP-04)
 - [x] 04-10-PLAN.md — MCP surface (8 tools + 6 resources + 4 prompts + D-29 attestation) (MCP-01..06)
-- [ ] 04-11-PLAN.md — CLI commands (7 new subcommands) (REV-03, REV-04, REV-08, DEC-01..03)
+- [x] 04-11-PLAN.md — CLI commands (7 new subcommands) (REV-03, REV-04, REV-08, DEC-01..03)
 - [ ] 04-12-PLAN.md — Phase close (full-suite green + 10 gates + REQ flips + STATE/ROADMAP/VALIDATION close) (all 18 REQ-IDs)
 **UI hint**: no
 

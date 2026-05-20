@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-current_plan: 11
+current_plan: 12
 status: executing
-last_updated: "2026-05-20T20:05:17.257Z"
+last_updated: "2026-05-20T20:24:40.235Z"
 progress:
   total_phases: 5
   completed_phases: 3
   total_plans: 39
-  completed_plans: 37
-  percent: 95
+  completed_plans: 38
+  percent: 97
 ---
 
 # State: Recovery Ledger
@@ -26,16 +26,16 @@ progress:
 
 ## Current Position
 
-**Current Plan:** 11
+**Current Plan:** 12
 **Total Plans in Phase:** 12
 Phase: 04-domain-math-reviews-decision-ledger-mcp-surface — IN PROGRESS (8 of 12 plans complete)
-Plan: 11 of 12
+Plan: 12 of 12
 
 - **Milestone:** v1
 - **Phase:** 4
 - **Plan:** Plans 04-01..04-08 complete (Waves 0-2 closed: infrastructure + cross-cutting types + stats primitives + baselines/confidence/anomalies + patterns + decision/api-gap services + review services + composition-root wiring). Next move: `/gsd-execute-phase 4` to run Plan 04-09 (Wave 3 — formatters + D-26 banned-word contract test). Phase 4 covers REV-01..08 + DEC-01..04 + MCP-01..06 (18 REQ-IDs): baseline calculator, confidence-tier gating, FDR-corrected weekly patterns, daily + weekly reviews, decision ledger, 8 MCP tools + 6 resources + 4 prompts, banned-word tone lint. Depends on Phase 3 (reviews are pure functions over the cached entities; baseline math hinges on the score_state-disciplined, DST-flagged data Phase 3 produces).
 - **Status:** Ready to execute
-- **Progress:** [██████████] 95%
+- **Progress:** [██████████] 97%
 
 ```
 [██████████████░░░░░░] 3 / 5 phases complete + 8 / 12 plans in Phase 4 (6 / 6 in Phase 1; 8 / 8 in Phase 2; 13 / 13 in Phase 3)
@@ -83,6 +83,7 @@ Plan: 11 of 12
 | Phase 04 P08 | 12min | 2 tasks | 6 files |
 | Phase 04 P09 | 35m | 3 tasks | 13 files |
 | Phase 04 P10 | 75m | 4 tasks | 32 files |
+| Phase 04 P11 | 14m 41s | 4 tasks | 15 files |
 
 ### Plan Execution History
 
@@ -282,6 +283,7 @@ Plan: 11 of 12
 - [Phase 04]: D-17 + D-12 anchored at rendering: weekly output carries two distinct labeled sections with correct trailing-7 and trailing-28 date ranges
 - [Phase 04]: D-26 defence-in-depth complete: Gate A source-level + tests/contract/formatter-tone.test.ts rendered-output level
 - [Phase ?]: Plan 04-10: 18 MCP surfaces shipped (7 tools + 6 resources + 4 prompts); D-29 atomic transition tools.length 1→8 + resources/prompts 6/4; D-25 fresh-from-cache discipline enforced for all 6 resources; D-30 sanitize.ts + register.ts UNMODIFIED across Phase 1-4.
+- [Phase ?]: Plan 04-11 ships 7 CLI subcommands as <=5-line bootstrap to service to formatter shims with per-command D-32 EXIT_CODES constants; Pitfall 10 stderr-prompt discipline tested in-process via vi.doMock of node:readline/promises.
 
 ### Open Todos
 
