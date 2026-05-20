@@ -17,7 +17,7 @@ import {
   createDecisionsRepo,
   type DecisionsRepo,
 } from '../../infrastructure/db/repositories/decisions.repo.js';
-import { addDecision, reviewDecisions, updateDecision } from './index.js';
+import { addDecision, reviewDecisions } from './index.js';
 
 // Pino offers a `.child()` / `.info()` surface. The service only calls
 // `logger.info({ ... })` so a typed stub is sufficient.
@@ -212,7 +212,7 @@ describe('services/decision — T-04-S2 injection-style payloads round-trip', ()
   });
 });
 
-describe('services/decision — updateDecision convenience wrapper', () => {
+describe('services/decision — reviewDecisions update mode (unwraps decision)', () => {
   let h: Harness;
 
   beforeEach(() => {
@@ -220,14 +220,16 @@ describe('services/decision — updateDecision convenience wrapper', () => {
   });
   afterEach(() => h.mem.close());
 
-  it('Test 11: updateDecision delegates to reviewDecisions and unwraps the decision', async () => {
+  it('Test 11: update mode round-trips through reviewDecisions and exposes the updated row', async () => {
     const created = await addDecision({ decision: 'reduce caffeine after noon' }, h.deps);
-    const updated = await updateDecision(
-      { id: created.id, status: 'followed_up', notes: 'hrv up' },
+    const result = await reviewDecisions(
+      { mode: 'update', id: created.id, status: 'followed_up', notes: 'hrv up' },
       h.deps,
     );
-    expect(updated.id).toBe(created.id);
-    expect(updated.status).toBe('followed_up');
-    expect(updated.outcomeNotes).toBe('hrv up');
+    expect(result.mode).toBe('update');
+    if (result.mode !== 'update') throw new Error('unreachable');
+    expect(result.decision.id).toBe(created.id);
+    expect(result.decision.status).toBe('followed_up');
+    expect(result.decision.outcomeNotes).toBe('hrv up');
   });
 });

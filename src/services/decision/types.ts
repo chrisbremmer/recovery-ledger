@@ -80,22 +80,8 @@ export type ReviewDecisionsResult =
   | { mode: 'list'; decisions: Decision[] }
   | { mode: 'update'; decision: Decision };
 
-/**
- * CLI-layer convenience type for `recovery-ledger decision update
- * <ulid-or-prefix> --status <s> [--notes "<n>"]` per D-20. The CLI
- * shim resolves the prefix to a full ULID via
- * `decisionsRepo.findByPrefix(prefix)` (Phase 4 extension), then
- * constructs a `ReviewDecisionsInput.mode: 'update'` payload before
- * calling the service. The service never sees the prefix — only the
- * full id.
- *
- * `notes` is `string | null` because D-20 allows clearing the field
- * via `--notes ""` (an explicit empty string flips the column to
- * `NULL` at the repo layer; omitting the flag leaves the column
- * unchanged).
- */
-export interface UpdateDecisionInput {
-  id: string;
-  status: 'open' | 'followed_up' | 'abandoned';
-  notes?: string | null;
-}
+// (Review #18) Removed unused `UpdateDecisionInput` and `updateDecision`
+// convenience surfaces. The CLI shim and MCP tool both build a
+// `ReviewDecisionsInput.mode: 'update'` payload directly; the separate
+// type was a phantom API exported through src/services/index.ts with no
+// runtime caller.

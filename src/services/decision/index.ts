@@ -22,7 +22,6 @@ import type {
   AddDecisionInput,
   ReviewDecisionsInput,
   ReviewDecisionsResult,
-  UpdateDecisionInput,
 } from './types.js';
 
 // ----------------------------------------------------------------------------
@@ -106,28 +105,3 @@ export async function reviewDecisions(
   return { mode: 'update', decision };
 }
 
-/**
- * CLI-convenience wrapper for `recovery-ledger decision update`. Delegates
- * to `reviewDecisions({mode:'update', ...})` and unwraps the discriminated-
- * union result into a bare `Decision`. The CLI shim has already resolved
- * any short-prefix lookup to a full ULID before calling here.
- */
-export async function updateDecision(
-  input: UpdateDecisionInput,
-  deps: ReviewDecisionsDeps,
-): Promise<Decision> {
-  const result = await reviewDecisions(
-    {
-      mode: 'update',
-      id: input.id,
-      status: input.status,
-      notes: input.notes ?? null,
-    },
-    deps,
-  );
-  // The discriminator narrows the result; this branch is exhaustive.
-  if (result.mode !== 'update') {
-    throw new Error('updateDecision: unexpected list-mode result from reviewDecisions');
-  }
-  return result.decision;
-}

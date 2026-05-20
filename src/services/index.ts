@@ -67,7 +67,6 @@ export type {
   AddDecisionInput,
   ReviewDecisionsInput,
   ReviewDecisionsResult,
-  UpdateDecisionInput,
 } from './decision/types.js';
 export type { DoctorCheck, DoctorResult, RunDoctorOptions } from './doctor/index.js';
 export type {

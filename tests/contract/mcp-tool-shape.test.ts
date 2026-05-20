@@ -64,6 +64,11 @@ const HAPPY_CASES: readonly ToolCase[] = [
     args: { decision: 'walk 30 minutes after lunch' },
   },
   { name: 'whoop_review_decisions', args: {} },
+  // Review #14: empty-DB bootstraps still produce a well-shaped (likely
+  // insufficient-confidence) review result. whoop_sync stays out because
+  // it legitimately needs WHOOP creds.
+  { name: 'whoop_daily_review', args: {} },
+  { name: 'whoop_weekly_review', args: {} },
 ];
 
 // MCP-02 dual-shape asserter — reused across happy + error tests.
