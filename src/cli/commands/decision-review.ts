@@ -144,7 +144,10 @@ export async function runDecisionReviewCommand(opts: RunDecisionReviewCommandOpt
     }
   }
 
-  const body = renderDecisionList(decisions);
+  // Review #53: pass `new Date()` explicitly to match the MCP tool. The
+  // formatter's elapsed-day column uses `now` to compute time-since-decision;
+  // omitting it falls back to the default the formatter ships with.
+  const body = renderDecisionList(decisions, new Date());
   process.stdout.write(`${body}\n`, () => {
     app.close();
     process.exit(DECISION_REVIEW_EXIT_CODES.ok);

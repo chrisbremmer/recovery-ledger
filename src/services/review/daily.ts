@@ -144,15 +144,20 @@ export async function getDailyReview(
   }
 
   // Step 11: per-metric values + per-metric daysAvailable (Pitfall 5).
+  // Review #51: build via Partial accumulator then assert the exhaustive
+  // fill at the boundary. The METRIC_NAMES loop fills every key — the
+  // cast is correct, but the Partial accumulator makes the type honest
+  // until the fill completes.
   const baselines: BaselineStats[] = [];
-  const perMetricDaysAvailable = {} as Record<MetricName, number>;
+  const perMetricDaysAvailablePartial: Partial<Record<MetricName, number>> = {};
   for (const metric of METRIC_NAMES) {
     const values = collectMetricValues(metric, cyclesWindow, recoveriesWindow, sleepsWindow);
-    perMetricDaysAvailable[metric] = values.length;
+    perMetricDaysAvailablePartial[metric] = values.length;
     if (values.length >= 14) {
       baselines.push(computeBaseline(metric, values, BASELINE_WINDOW_DAYS));
     }
   }
+  const perMetricDaysAvailable = perMetricDaysAvailablePartial as Record<MetricName, number>;
 
   // Step 12-13: anomalies → actions.
   const anomalies = selectAnomalies({

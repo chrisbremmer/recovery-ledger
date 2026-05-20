@@ -387,9 +387,16 @@ export function pruneBackups(backupsDir: string, keep: number): void {
       const targetPath = join(backupsDir, baseName + suffix);
       try {
         unlinkSync(targetPath);
-      } catch {
-        // Missing companion is expected — WAL / shm may not exist on a
-        // checkpointed-clean DB. Swallow ENOENT silently.
+      } catch (err) {
+        // Review #47: narrow the catch — ENOENT (missing companion) is
+        // expected when a checkpointed-clean DB has no WAL/shm sidecar.
+        // Anything else (EPERM, EBUSY, EIO) is a real failure we should
+        // re-throw rather than silently absorb. This module follows the
+        // no-logger discipline (top-of-file note) so we re-throw instead
+        // of logging.
+        if ((err as NodeJS.ErrnoException).code !== 'ENOENT') {
+          throw err;
+        }
       }
     }
   }
