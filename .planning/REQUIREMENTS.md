@@ -47,13 +47,13 @@ Requirements for the initial release. Each maps to roadmap phases.
 
 ### Review
 
-- [ ] **REV-01**: Baseline calculator computes trailing-30-day weighted baselines for HRV (median + MAD), RHR (median + MAD), sleep duration, sleep efficiency, day strain, and respiratory rate from `SCORED` entities only, excluding DST/tz-flagged cycles
-- [ ] **REV-02**: Confidence-tier gating — `insufficient` when < 10 SCORED days, `weak` ≥ 10, `strong` ≥ 20 with ≥ 70% baseline-window coverage; Z-score refused when < 14 days available
-- [ ] **REV-03**: `recovery-ledger review daily` returns the documented daily-review schema (data_status, today_state, anomalies, patterns, actions ≤ 3) with text-fallback rendering
-- [ ] **REV-04**: Daily review surfaces data freshness (latest sync, baseline window, missing/stale resources) at the top of every brief
-- [ ] **REV-05**: When data is insufficient, the daily review states what is missing and declines to make confident recommendations
-- [ ] **REV-06**: `recovery-ledger review weekly` identifies the lowest-recovery days of the week and runs pattern checks on preceding sleep duration / sleep debt / strain / workout timing / HRV delta / RHR delta / respiratory-rate anomaly
-- [ ] **REV-07**: Weekly review applies Benjamini-Hochberg FDR correction at q = 0.10 across ≤ 5 pre-registered candidate factors and returns "no reliable pattern detected" as a typed positive output when nothing crosses threshold
+- [x] **REV-01**: Baseline calculator computes trailing-30-day weighted baselines for HRV (median + MAD), RHR (median + MAD), sleep duration, sleep efficiency, day strain, and respiratory rate from `SCORED` entities only, excluding DST/tz-flagged cycles
+- [x] **REV-02**: Confidence-tier gating — `insufficient` when < 10 SCORED days, `weak` ≥ 10, `strong` ≥ 20 with ≥ 70% baseline-window coverage; Z-score refused when < 14 days available
+- [x] **REV-03**: `recovery-ledger review daily` returns the documented daily-review schema (data_status, today_state, anomalies, patterns, actions ≤ 3) with text-fallback rendering
+- [x] **REV-04**: Daily review surfaces data freshness (latest sync, baseline window, missing/stale resources) at the top of every brief
+- [x] **REV-05**: When data is insufficient, the daily review states what is missing and declines to make confident recommendations
+- [x] **REV-06**: `recovery-ledger review weekly` identifies the lowest-recovery days of the week and runs pattern checks on preceding sleep duration / sleep debt / strain / workout timing / HRV delta / RHR delta / respiratory-rate anomaly
+- [x] **REV-07**: Weekly review applies Benjamini-Hochberg FDR correction at q = 0.10 across ≤ 5 pre-registered candidate factors and returns "no reliable pattern detected" as a typed positive output when nothing crosses threshold
 - [x] **REV-08**: Review output tone passes a banned-word CI lint (no coach-y / hype / moralizing language) and renders actions as verb-first single sentences
 
 ### Decision Ledger
@@ -61,7 +61,7 @@ Requirements for the initial release. Each maps to roadmap phases.
 - [x] **DEC-01**: `recovery-ledger decision add` accepts category, decision, rationale, confidence, expected effect, and follow-up date (ULID id, smart defaults for date and follow-up window) with a one-line happy path
 - [x] **DEC-02**: Decisions persist with `status` (open / followed_up / abandoned) and `outcome_notes`
 - [x] **DEC-03**: `recovery-ledger decision review` lists open decisions with elapsed time vs. expected effect window and prompts for outcome capture
-- [ ] **DEC-04**: Weekly review prompts for at least one new decision when none has been recorded in the prior week
+- [x] **DEC-04**: Weekly review prompts for at least one new decision when none has been recorded in the prior week
 
 ### MCP Surface
 
@@ -151,18 +151,18 @@ Explicitly excluded. Gated behind the hard scope guardrail in PROJECT.md (≥ 12
 | SYNC-05 | Phase 3 | Complete (Plan 03-08, 2026-05-16) |
 | SYNC-06 | Phase 3 | Complete (Plan 03-05, 2026-05-16) |
 | SYNC-07 | Phase 3 | Complete (Plan 03-07, 2026-05-16) |
-| REV-01 | Phase 4 | Pending |
-| REV-02 | Phase 4 | Pending |
-| REV-03 | Phase 4 | Pending |
-| REV-04 | Phase 4 | Pending |
-| REV-05 | Phase 4 | Pending |
-| REV-06 | Phase 4 | Pending |
-| REV-07 | Phase 4 | Pending |
+| REV-01 | Phase 4 | Complete |
+| REV-02 | Phase 4 | Complete |
+| REV-03 | Phase 4 | Complete |
+| REV-04 | Phase 4 | Complete |
+| REV-05 | Phase 4 | Complete |
+| REV-06 | Phase 4 | Complete |
+| REV-07 | Phase 4 | Complete |
 | REV-08 | Phase 4 | Complete |
 | DEC-01 | Phase 4 | Complete |
 | DEC-02 | Phase 4 | Complete |
 | DEC-03 | Phase 4 | Complete |
-| DEC-04 | Phase 4 | Pending |
+| DEC-04 | Phase 4 | Complete |
 | MCP-01 | Phase 4 | Complete |
 | MCP-02 | Phase 4 | Complete |
 | MCP-03 | Phase 4 | Complete |

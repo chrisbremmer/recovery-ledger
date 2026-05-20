@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-current_plan: 7
+current_plan: 8
 status: executing
-last_updated: "2026-05-20T18:34:08.377Z"
+last_updated: "2026-05-20T18:53:03.843Z"
 progress:
   total_phases: 5
   completed_phases: 3
   total_plans: 39
-  completed_plans: 33
-  percent: 85
+  completed_plans: 34
+  percent: 87
 ---
 
 # State: Recovery Ledger
@@ -26,16 +26,16 @@ progress:
 
 ## Current Position
 
-**Current Plan:** 7
+**Current Plan:** 8
 **Total Plans in Phase:** 12
 Phase: 04-domain-math-reviews-decision-ledger-mcp-surface — IN PROGRESS (5 of 12 plans complete)
-Plan: 7 of 12
+Plan: 8 of 12
 
 - **Milestone:** v1
 - **Phase:** 4
 - **Plan:** Plans 04-01 (wave-0 infrastructure: deps + Gate H/I/J wiring) + 04-02 (wave-0 cross-cutting type contracts) + 04-03 (wave-1 stats primitives) complete. Next move: `/gsd-execute-phase 4` to run Plan 04-04 (baselines + confidence-tier gating — first composition of `median` + `robustSigma` against the trailing-30-day SCORED-only window per metric). Phase 4 covers REV-01..08 + DEC-01..04 + MCP-01..06 (18 REQ-IDs): baseline calculator, confidence-tier gating, FDR-corrected weekly patterns, daily + weekly reviews, decision ledger, 8 MCP tools + 6 resources + 4 prompts, banned-word tone lint. Depends on Phase 3 (reviews are pure functions over the cached entities; baseline math hinges on the score_state-disciplined, DST-flagged data Phase 3 produces).
 - **Status:** Ready to execute
-- **Progress:** [█████████░] 85%
+- **Progress:** [█████████░] 87%
 
 ```
 [█████████████░░░░░░░] 3 / 5 phases complete + 5 / 12 plans in Phase 4 (6 / 6 in Phase 1; 8 / 8 in Phase 2; 13 / 13 in Phase 3)
@@ -79,6 +79,7 @@ Plan: 7 of 12
 | Phase 04 P04 | 5min 47s | 9 tasks | 8 files |
 | Phase 04 P05 | 9min 12s | 9 tasks | 10 files |
 | Phase 04 P06 | 4min 12s | 3 tasks | 8 files |
+| Phase 04 P07 | 13 | - tasks | - files |
 
 ### Plan Execution History
 
@@ -268,6 +269,9 @@ Plan: 7 of 12
 - [Phase ?]: Plan 04-06 — service-layer ULID generation: ulid() runs inside addDecision BEFORE repo.insert (D-19). The repo trusts the caller; id allocation lives with smart-defaults policy.
 - [Phase ?]: Plan 04-06 — updateOutcome silent-no-op on missing id: repo returns 0 rows changed without throwing; service surfaces 'decision not found' via follow-up byId. Fail-loud at the policy boundary, not the persistence boundary.
 - [Phase ?]: Plan 04-06 — Object.freeze + readonly + literal-false type lock immutability at three layers for API_GAP_ENTRIES; Phase 5 markdown gen reads this same module (single source of truth).
+- [Phase ?]: Inline UTC date helpers (diffDaysUtc, subDaysIso) instead of adding date-fns runtime dep — @date-fns/tz remains for tz-aware ops only
+- [Phase ?]: Missing-resources heuristic in buildDataStatus uses trailing-7 for entity resources and presence-only for profile + body_measurements (WHOOP A4)
+- [Phase ?]: D-10 atomic insufficient path: all four typed-positive-output fields (anomalies/actions/patterns empty + insufficient_reason populated) set at a single early-return site in getDailyReview
 
 ### Open Todos
 
