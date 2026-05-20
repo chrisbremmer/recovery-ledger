@@ -42,6 +42,7 @@
 // helper from Plan 03-07 directly — they bypass `bootstrap()` and
 // construct deps inline.
 
+import { existsSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type Database from 'better-sqlite3';
@@ -176,15 +177,33 @@ export interface BootstrapOptions {
  * register a process-level cleanup hook (the CLI shim wires that at the
  * SIGINT boundary, Plan 03-12).
  */
+// Phase 4 Plan 04-10: probe both candidate locations for the migrations
+// payload. The built `dist/mcp.mjs` carries migrations at
+// `dist/infrastructure/db/migrations` (tsup onSuccess copy); the dev
+// `src/services/bootstrap.ts` resolves to `src/infrastructure/db/migrations`
+// via the one-`..` pop. Probing avoids a brittle branch on `import.meta.url`
+// containing `dist`.
+function resolveMigrationsDir(here: string): string {
+  const built = resolve(here, 'infrastructure', 'db', 'migrations');
+  if (existsSync(resolve(built, 'meta', '_journal.json'))) return built;
+  return resolve(here, '..', 'infrastructure', 'db', 'migrations');
+}
+
 export function bootstrap(opts: BootstrapOptions = {}): Bootstrapped {
   const dbFile = opts.dbFile ?? paths.dbFile;
-  // Resolve migrations dir from import.meta.url so dev (tsx, src/) and
-  // built (tsup, dist/) both find the directory next to the source file.
-  // `src/services/bootstrap.ts` → `src/infrastructure/db/migrations`
-  // (two ../ pops + infrastructure/db/migrations).
+  // Resolve migrations dir from import.meta.url. The directory lives at
+  // two locations depending on path shape:
+  //   - DEV (tsx, src/): `src/services/bootstrap.ts` →
+  //     `../infrastructure/db/migrations` (one `..` pop + the dir).
+  //   - BUILT (tsup, dist/): `dist/mcp.mjs` (bundled bootstrap) →
+  //     `./infrastructure/db/migrations` (no `..` — the migrations
+  //     payload is copied next to the bundle via tsup's onSuccess
+  //     hook in `tsup.config.ts`).
+  // We probe the built location first (no `..`), then fall back to the
+  // dev location (one `..`). The migrationsDir option remains the
+  // explicit override.
   const HERE = dirname(fileURLToPath(import.meta.url));
-  const migrationsDir =
-    opts.migrationsDir ?? resolve(HERE, '..', 'infrastructure', 'db', 'migrations');
+  const migrationsDir = opts.migrationsDir ?? resolveMigrationsDir(HERE);
   const log = opts.logger ?? logger;
 
   const { db, sqlite } = openDb(dbFile);

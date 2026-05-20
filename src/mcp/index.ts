@@ -37,7 +37,13 @@ import { registerWhoopSync } from './tools/whoop-sync.js';
 import { registerWhoopWeeklyReview } from './tools/whoop-weekly-review.js';
 
 const server = new McpServer({ name: 'recovery-ledger', version: '0.1.0' });
-const app = bootstrap();
+// Phase 4 Plan 04-10: support a `MCP_DB_FILE` env override so the
+// stdout-purity dist roundtrip test (and any future smoke harness) can
+// route bootstrap at a `:memory:` DB without touching the user's
+// ~/.recovery-ledger directory. Production callers leave the env unset
+// and pay the normal paths.dbFile resolution.
+const dbFileOverride = process.env.MCP_DB_FILE;
+const app = bootstrap(dbFileOverride === undefined ? {} : { dbFile: dbFileOverride });
 
 // 8 tools (MCP-01 + D-29)
 registerWhoopDoctor(server, app.services);

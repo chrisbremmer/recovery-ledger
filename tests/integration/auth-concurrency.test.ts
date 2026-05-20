@@ -587,18 +587,23 @@ describe('auth concurrency (cross-process AUTH-05 + AUTH-06)', () => {
       // The MCP child should exit cleanly after we close stdin.
       expect(result.exitCode).toBeLessThanOrEqual(0);
 
-      // Find the tools/list response (id=2) and assert it contains EXACTLY
-      // one tool — `whoop_doctor`. This is the D-17 runtime attestation:
-      // Phase 2 ships ZERO new MCP tools; the only registered tool is the
-      // Phase 1 `whoop_doctor`.
+      // Find the tools/list response (id=2) and assert the tools list
+      // matches the Phase 4 D-29 attestation: 8 tools total, with
+      // whoop_doctor still present. Phase 1 → Phase 4: this test was
+      // born as the D-17 attestation for "ZERO new MCP tools in Phase 2",
+      // and Plan 04-10 transitioned the tool count from 1 → 8 (D-29).
+      // The load-bearing assertion for THIS test (auth concurrency) is
+      // that whoop_doctor SURFACES the auth-error state without leaking
+      // token material — the tool count is incidental here, asserted to
+      // pin the runtime evidence in lockstep with the D-29 transition.
       const toolsListResponse = result.frames.find((f) => f.id === 2);
       expect(toolsListResponse, 'no tools/list response in MCP stream').toBeDefined();
       const toolsListResult = toolsListResponse?.result as
         | { tools?: Array<{ name?: string }> }
         | undefined;
       expect(toolsListResult?.tools).toBeDefined();
-      expect(toolsListResult?.tools).toHaveLength(1);
-      expect(toolsListResult?.tools?.[0]?.name).toBe('whoop_doctor');
+      expect(toolsListResult?.tools).toHaveLength(8);
+      expect(toolsListResult?.tools?.map((t) => t.name)).toContain('whoop_doctor');
 
       // Find the tools/call response (id=3) and assert it carries a result
       // (the doctor surface should produce structured output even with

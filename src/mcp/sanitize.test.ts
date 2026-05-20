@@ -632,3 +632,60 @@ describe('N — Negative cases (Phase 2 Plan 02-07: no false positives)', () => 
     expect(sanitize(input)).not.toContain('<redacted>');
   });
 });
+
+// ---------------------------------------------------------------------------
+// Phase 4 Plan 04-10 / VALIDATION.md MCP-06 — extend the sanitize.test.ts
+// suite with Phase 4 tool error fixtures. These tests verify the
+// EXISTING sanitizer covers the new tool error surfaces (whoop_sync's
+// 401 retry trail, whoop_review_decisions' DB constraint error,
+// whoop_add_decision's missing-field error). No production code change
+// — D-30 attestation preserves sanitize.ts + register.ts UNMODIFIED
+// across Phase 1+2+3+4.
+// ---------------------------------------------------------------------------
+
+describe('Phase 4 tool error sanitization fixtures (Plan 04-10 MCP-06)', () => {
+  // Fixture 1 — whoop_sync's underlying refresh-orchestrator can throw
+  // an Error whose cause chain includes a 401 body excerpt with a
+  // bearer token. Pattern 1 (Authorization) + Pattern 4 (bare Bearer)
+  // cover this; we serialize through serializeError to walk the chain.
+  test('whoop_sync 401 retry surface: Bearer in cause-chain redacted', () => {
+    const inner = new Error('upstream 401: Authorization: Bearer leaked_token_xxxxxxxxxx');
+    const outer = new Error('runSync failed after refresh retry');
+    (outer as Error & { cause: unknown }).cause = inner;
+    const out = sanitize(serializeError(outer));
+    expect(out).toContain('runSync failed');
+    expect(out).toContain('<redacted>');
+    expect(out).not.toContain('leaked_token_xxxxxxxxxx');
+  });
+
+  // Fixture 2 — whoop_review_decisions update-mode could throw a
+  // DB constraint error (e.g., bad status enum). The error message
+  // doesn't carry secrets but the test asserts it round-trips
+  // unchanged (no false-positive redaction of benign messages).
+  test('whoop_review_decisions DB constraint error: no false-positive redaction', () => {
+    const err = new Error(
+      "CHECK constraint failed: status must be one of 'open' | 'followed_up' | 'abandoned'",
+    );
+    const out = sanitize(serializeError(err));
+    expect(out).toContain('CHECK constraint failed');
+    expect(out).not.toContain('<redacted>');
+  });
+
+  // Fixture 3 — whoop_add_decision missing-field error: Zod surfaces a
+  // ZodError shape with paths but no secrets. The "decision" path field
+  // and the "received":"undefined" pair must round-trip clean. NOTE:
+  // SECRET_KEY_NAMES includes "code" (OAuth auth-code grant); the
+  // sanitizer redacts JSON `"code":"<value>"` pairs as a precaution
+  // (Pattern 2). That's intentional: it costs a clean error message but
+  // closes a leak surface. The Zod error's value here is benign but
+  // matches the redaction shape — accepted trade-off.
+  test('whoop_add_decision Zod validation error: path/decision fields preserved', () => {
+    const zodLike =
+      '{"code":"invalid_type","expected":"string","received":"undefined","path":["decision"]}';
+    const out = sanitize(zodLike);
+    expect(out).toContain('"decision"');
+    expect(out).toContain('"expected":"string"');
+    // The `code` value is redacted by pattern 2 (acceptable false-positive).
+    expect(out).toContain('"code":"<redacted>"');
+  });
+});
