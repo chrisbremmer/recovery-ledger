@@ -10,7 +10,7 @@
 - [x] **Phase 1: Foundation & Stdout-Pure MCP Bootstrap** - Bootstrapped TypeScript repo, empty CLI + MCP stdio shells, stderr-only logging, MCP error-sanitizer contract, native-module load verification
 - [x] **Phase 2: OAuth, Token Store & Single-Flight Refresh** - WHOOP OAuth flow, keychain-backed token store with chmod 600 fallback, in-process + cross-process single-flight refresh, MCP error sanitizer wired through
 - [x] **Phase 3: Data Model, DB Layer & Sync Loop** - Three-layer types with discriminated-union Score, Drizzle schema + atomic migrator with pre-migration backup, WHOOP HTTP client with rate limiting + pagination, idempotent sync with DST/tz flagging and partial-failure reporting
-- [ ] **Phase 4: Domain Math, Reviews, Decision Ledger & MCP Surface** - Median+MAD baselines, confidence-tier gating, FDR-corrected weekly patterns, daily + weekly reviews, decision ledger, 8 MCP tools + 6 resources + 4 prompts, banned-word tone lint
+- [x] **Phase 4: Domain Math, Reviews, Decision Ledger & MCP Surface** — completed 2026-05-20 - Median+MAD baselines, confidence-tier gating, FDR-corrected weekly patterns, daily + weekly reviews, decision ledger, 8 MCP tools + 6 resources + 4 prompts, banned-word tone lint
 - [ ] **Phase 5: Doctor Polish, Install Guide & <20-Minute Setup Validation** - Full doctor checks, per-client install guides, API-gap docs, launchd template, CI stopwatch test asserting clean-clone-to-first-review under 20 minutes
 
 ## Phase Details
@@ -102,7 +102,7 @@
 - [x] 04-09-PLAN.md — Formatters + D-26 tone contract test (REV-03, REV-04, REV-08, DEC-03, MCP-04)
 - [x] 04-10-PLAN.md — MCP surface (8 tools + 6 resources + 4 prompts + D-29 attestation) (MCP-01..06)
 - [x] 04-11-PLAN.md — CLI commands (7 new subcommands) (REV-03, REV-04, REV-08, DEC-01..03)
-- [ ] 04-12-PLAN.md — Phase close (full-suite green + 10 gates + REQ flips + STATE/ROADMAP/VALIDATION close) (all 18 REQ-IDs)
+- [x] 04-12-PLAN.md — Phase close (full-suite green + 10 gates + REQ flips + STATE/ROADMAP/VALIDATION close) (all 18 REQ-IDs) — completed 2026-05-20
 **UI hint**: no
 
 ### Phase 5: Doctor Polish, Install Guide & <20-Minute Setup Validation
@@ -124,14 +124,15 @@
 | 1. Foundation & Stdout-Pure MCP Bootstrap | 6/6 | Complete | 2026-05-12 |
 | 2. OAuth, Token Store & Single-Flight Refresh | 8/8 | Complete | 2026-05-12 |
 | 3. Data Model, DB Layer & Sync Loop | 13/13 | Complete | 2026-05-16 |
-| 4. Domain Math, Reviews, Decision Ledger & MCP Surface | 9/12 | In Progress|  |
+| 4. Domain Math, Reviews, Decision Ledger & MCP Surface | 12/12 | Complete | 2026-05-20 |
 | 5. Doctor Polish, Install Guide & <20-Minute Setup Validation | 0/? | Not started | - |
 
 ## Coverage
 
-- **v1 requirements:** 49 total
-- **Mapped to phases:** 49
+- **v1 requirements:** 50 total (FND=7, AUTH=6, DATA=6, SYNC=7, REV=8, DEC=4, MCP=6, DOC=6)
+- **Mapped to phases:** 50
 - **Unmapped:** 0
+- **Complete:** 44 / 50 (Phases 1+2+3+4 closed; DOC-01..06 deferred to Phase 5)
 
 ## Cross-Cutting Concerns (Test Origin Map)
 
@@ -150,4 +151,4 @@ Concerns originate in the phase where the first vulnerable code is introduced; t
 
 ---
 *Roadmap created: 2026-05-11*
-*Last updated: 2026-05-20 — Phase 4 Wave 0 (plans 04-01 + 04-02) + Wave 1 stats (plan 04-03) + Wave 1 baselines/anomalies/confidence (plan 04-04) + Wave 1 patterns/actions (plan 04-05) complete. 32 / 39 plans complete across Phases 1 + 2 + 3 + 4 (formula-based; Phase 4 has 12 plans total, 5 complete).*
+*Last updated: 2026-05-20 — Phase 4 closed (Plan 04-12). 39 / 39 plans complete across Phases 1 + 2 + 3 + 4 (6 + 8 + 13 + 12). 44 / 50 v1 requirements complete; remaining 6 (DOC-01..06) → Phase 5.*

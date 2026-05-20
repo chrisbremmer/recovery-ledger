@@ -1,10 +1,11 @@
 ---
 phase: 4
 slug: domain-math-reviews-decision-ledger-mcp-surface
-status: draft
-nyquist_compliant: false
-wave_0_complete: false
+status: complete
+nyquist_compliant: true
+wave_0_complete: true
 created: 2026-05-16
+closed: 2026-05-20
 ---
 
 # Phase 4 — Validation Strategy
@@ -40,24 +41,24 @@ created: 2026-05-16
 
 | Req ID | Behavior | Threat Ref | Test Type | Automated Command | File | Status |
 |--------|----------|------------|-----------|-------------------|------|--------|
-| REV-01 | Trailing-30 median + MAD over SCORED-only non-DST-excluded entities; MAD scaled by 1.4826 | — | unit | `npx vitest run src/domain/baselines src/domain/stats/median src/domain/stats/mad` | ❌ W0: `src/domain/baselines/baseline.test.ts`, `src/domain/stats/median.test.ts`, `src/domain/stats/mad.test.ts` | ⬜ pending |
-| REV-02 | Confidence-tier gate (insufficient < 10, weak ≥ 10, strong ≥ 20 + ≥ 70% coverage; Z refused < 14 days) | — | unit | `npx vitest run src/domain/confidence` | ❌ W0: `src/domain/confidence/index.test.ts` | ⬜ pending |
-| REV-03 | `getDailyReview` returns the full D-03 slot map (data_status, today_state, anomalies, patterns, actions, confidence, insufficient_reason) | — | integration | `npx vitest run src/services/review/daily.test.ts` | ❌ W0 | ⬜ pending |
-| REV-04 | Daily review leads with data-freshness (latest sync, baseline window, missing/stale resources) | — | contract | `npx vitest run tests/contract/daily-review-shape.test.ts` | ❌ W0 | ⬜ pending |
-| REV-05 | Insufficient data: 8 SCORED days → `confidence.tier === 'insufficient'`, all `ZAnalysis.kind === 'refused'`, `anomalies/actions = []`, `insufficient_reason` populated | — | unit | `npx vitest run src/services/review/daily.test.ts -t "insufficient"` (fixture `daily-insufficient-days.json`) | ❌ W0 | ⬜ pending |
-| REV-06 | Weekly review surfaces worst-day window + runs all 5 pre-registered candidate factors (D-11) | — | integration | `npx vitest run src/services/review/weekly.test.ts` | ❌ W0 | ⬜ pending |
-| REV-07 | BH FDR @ q=0.10, m=5; load-bearing fixture `[0.05, 0.20, 0.30, 0.45, 0.60]` → 0 rejections → typed `{kind: 'no_pattern', reason: 'no_factor_cleared_fdr'}` (D-16 schema, D-35 fixture); secondary fixture `[0.01, 0.04, 0.05, 0.20, 0.50]` → 3 rejections at kStar=3 → `Pattern` with `pattern_confidence` (D-34) | T-04-S1 | unit + contract | `npx vitest run src/domain/stats/fdr.test.ts src/domain/patterns/pattern.test.ts` (fixtures `bh_downgrades_marginal.fixture.json` + `bh_partial_rejection.fixture.json`) | ❌ W0 | ⬜ pending |
-| REV-08 | Banned-word lint over rendered formatter output across every fixture (D-26 extends ADR-0005 §Enforcement) | — | contract | `npx vitest run tests/contract/formatter-tone.test.ts` + existing `scripts/ci-grep-gates.sh` Gate A | ❌ W0 | ⬜ pending |
-| DEC-01 | `decision add "<text>"` happy-path one-liner with ULID id + default follow-up window + default expected effect (D-19) | T-04-S2 | integration | `npx vitest run src/cli/commands/decision-add.test.ts` | ❌ W0 | ⬜ pending |
-| DEC-02 | Decisions persist with `status` (open/followed_up/abandoned) + `outcome_notes` (D-20, schema already shipped Phase 3) | — | unit | `npx vitest run src/infrastructure/db/repositories/decisions.repo.test.ts` | ⚠️ extend existing | ⬜ pending |
-| DEC-03 | `decision review` lists open decisions with elapsed-vs-window framing + `decision update <id-prefix>` records outcome (D-21 dual-mode) | — | integration | `npx vitest run src/cli/commands/decision-review.test.ts src/cli/commands/decision-update.test.ts` | ❌ W0 | ⬜ pending |
-| DEC-04 | Weekly review surfaces typed `decision_prompt` slot when no decision recorded in prior 7 days (D-22) | — | unit | `npx vitest run src/services/review/weekly.test.ts -t "decision prompt"` (fixture `weekly-decision-prompt-none-this-week.json`) | ❌ W0 | ⬜ pending |
-| MCP-01 | 8 tools registered: `whoop_sync`, `whoop_daily_review`, `whoop_weekly_review`, `whoop_query_cache`, `whoop_add_decision`, `whoop_review_decisions`, `whoop_api_gap`, `whoop_doctor` (D-29 breaks Phase 3 D-33 `tools.length === 1`) | T-04-S3 | runtime attestation | `npx vitest run tests/integration/mcp-runtime.test.ts -t "tools"` | ⚠️ extend Phase 1/3 attestation | ⬜ pending |
-| MCP-02 | Every tool returns `{structuredContent, content}` dual shape (compact text fallback in `content`) | — | contract | `npx vitest run tests/contract/mcp-tool-shape.test.ts` | ❌ W0 | ⬜ pending |
-| MCP-03 | Every MCP tool body ≤ 5 non-blank non-comment lines (static-analysis attestation over `src/mcp/tools/*.ts`) | — | static analysis | `npx vitest run tests/contract/mcp-shim-loc.test.ts` | ❌ W0 | ⬜ pending |
-| MCP-04 | 6 resources registered: `whoop://summary/today`, `whoop://summary/week`, `whoop://baseline/30d`, `whoop://data-quality`, `whoop://api-gaps`, `whoop://decisions/open`; all flow through `register-resource.ts` wrapper (D-36); each refreshes from cache on read | T-04-S4 | runtime attestation + contract | `npx vitest run tests/integration/mcp-runtime.test.ts -t "resources" tests/contract/mcp-resource-shape.test.ts` | ❌ W0 | ⬜ pending |
-| MCP-05 | 4 prompts registered: `whoop_daily_decision_brief`, `whoop_weekly_recovery_investigation`, `whoop_experiment_designer`, `whoop_deload_or_train`; each returns `messages: [{role: 'user', content: {type: 'text', text}}]` (D-27); all flow through `register-prompt.ts` wrapper (D-36) | — | runtime attestation + contract | `npx vitest run tests/integration/mcp-runtime.test.ts -t "prompts" tests/contract/mcp-prompt-shape.test.ts` | ❌ W0 | ⬜ pending |
-| MCP-06 | Every MCP tool error path is sanitized via Phase 1 `sanitize.ts` pipeline (no `Bearer`, no token material, no internal stack) | T-04-S5 | contract | extends existing `src/mcp/sanitize.test.ts` + adds Phase 4 tool-specific fixtures | ⚠️ extend existing | ⬜ pending |
+| REV-01 | Trailing-30 median + MAD over SCORED-only non-DST-excluded entities; MAD scaled by 1.4826 | — | unit | `npx vitest run src/domain/baselines src/domain/stats/median src/domain/stats/mad` | ✅ shipped (Plan 04-03 + 04-04): `src/domain/baselines/index.test.ts`, `src/domain/stats/median.test.ts`, `src/domain/stats/mad.test.ts` | ✅ complete |
+| REV-02 | Confidence-tier gate (insufficient < 10, weak ≥ 10, strong ≥ 20 + ≥ 70% coverage; Z refused < 14 days) | — | unit | `npx vitest run src/domain/confidence` | ✅ shipped: `src/domain/confidence/index.test.ts` | ✅ complete |
+| REV-03 | `getDailyReview` returns the full D-03 slot map (data_status, today_state, anomalies, patterns, actions, confidence, insufficient_reason) | — | integration | `npx vitest run src/services/review/daily.test.ts` | ✅ shipped | ✅ complete |
+| REV-04 | Daily review leads with data-freshness (latest sync, baseline window, missing/stale resources) | — | contract | `npx vitest run tests/contract/daily-review-shape.test.ts` | ✅ shipped | ✅ complete |
+| REV-05 | Insufficient data: 8 SCORED days → `confidence.tier === 'insufficient'`, all `ZAnalysis.kind === 'refused'`, `anomalies/actions = []`, `insufficient_reason` populated | — | unit | `npx vitest run src/services/review/daily.test.ts -t "insufficient"` (fixture `daily-insufficient-days.json`) | ✅ shipped | ✅ complete |
+| REV-06 | Weekly review surfaces worst-day window + runs all 5 pre-registered candidate factors (D-11) | — | integration | `npx vitest run src/services/review/weekly.test.ts` | ✅ shipped | ✅ complete |
+| REV-07 | BH FDR @ q=0.10, m=5; load-bearing fixture `[0.05, 0.20, 0.30, 0.45, 0.60]` → 0 rejections → typed `{kind: 'no_pattern', reason: 'no_factor_cleared_fdr'}` (D-16 schema, D-35 fixture); secondary fixture `[0.01, 0.04, 0.05, 0.20, 0.50]` → 3 rejections at kStar=3 → `Pattern` with `pattern_confidence` (D-34) | T-04-S1 | unit + contract | `npx vitest run src/domain/stats/fdr.test.ts src/domain/patterns/pattern.test.ts` (fixtures `bh_downgrades_marginal.fixture.json` + `bh_partial_rejection.fixture.json`) | ✅ shipped | ✅ complete |
+| REV-08 | Banned-word lint over rendered formatter output across every fixture (D-26 extends ADR-0005 §Enforcement) | — | contract | `npx vitest run tests/contract/formatter-tone.test.ts` + existing `scripts/ci-grep-gates.sh` Gate A | ✅ shipped | ✅ complete |
+| DEC-01 | `decision add "<text>"` happy-path one-liner with ULID id + default follow-up window + default expected effect (D-19) | T-04-S2 | integration | `npx vitest run src/cli/commands/decision-add.test.ts` | ✅ shipped | ✅ complete |
+| DEC-02 | Decisions persist with `status` (open/followed_up/abandoned) + `outcome_notes` (D-20, schema already shipped Phase 3) | — | unit | `npx vitest run src/infrastructure/db/repositories/decisions.repo.test.ts` | ✅ extended | ✅ complete |
+| DEC-03 | `decision review` lists open decisions with elapsed-vs-window framing + `decision update <id-prefix>` records outcome (D-21 dual-mode) | — | integration | `npx vitest run src/cli/commands/decision-review.test.ts src/cli/commands/decision-update.test.ts` | ✅ shipped | ✅ complete |
+| DEC-04 | Weekly review surfaces typed `decision_prompt` slot when no decision recorded in prior 7 days (D-22) | — | unit | `npx vitest run src/services/review/weekly.test.ts -t "decision prompt"` (fixture `weekly-decision-prompt-none-this-week.json`) | ✅ shipped | ✅ complete |
+| MCP-01 | 8 tools registered: `whoop_sync`, `whoop_daily_review`, `whoop_weekly_review`, `whoop_query_cache`, `whoop_add_decision`, `whoop_review_decisions`, `whoop_api_gap`, `whoop_doctor` (D-29 breaks Phase 3 D-33 `tools.length === 1`) | T-04-S3 | runtime attestation | `npx vitest run tests/integration/mcp-runtime.test.ts -t "tools"` | ✅ shipped (Plan 04-10): `toHaveLength(8)` + full name-set asserted at runtime | ✅ complete |
+| MCP-02 | Every tool returns `{structuredContent, content}` dual shape (compact text fallback in `content`) | — | contract | `npx vitest run tests/contract/mcp-tool-shape.test.ts` | ✅ shipped | ✅ complete |
+| MCP-03 | Every MCP tool body ≤ 5 non-blank non-comment lines (static-analysis attestation over `src/mcp/tools/*.ts`) | — | static analysis | `npx vitest run tests/contract/mcp-shim-loc.test.ts` | ✅ shipped | ✅ complete |
+| MCP-04 | 6 resources registered: `whoop://summary/today`, `whoop://summary/week`, `whoop://baseline/30d`, `whoop://data-quality`, `whoop://api-gaps`, `whoop://decisions/open`; all flow through `register-resource.ts` wrapper (D-36); each refreshes from cache on read | T-04-S4 | runtime attestation + contract | `npx vitest run tests/integration/mcp-runtime.test.ts -t "resources" tests/contract/mcp-resource-shape.test.ts` | ✅ shipped | ✅ complete |
+| MCP-05 | 4 prompts registered: `whoop_daily_decision_brief`, `whoop_weekly_recovery_investigation`, `whoop_experiment_designer`, `whoop_deload_or_train`; each returns `messages: [{role: 'user', content: {type: 'text', text}}]` (D-27); all flow through `register-prompt.ts` wrapper (D-36) | — | runtime attestation + contract | `npx vitest run tests/integration/mcp-runtime.test.ts -t "prompts" tests/contract/mcp-prompt-shape.test.ts` | ✅ shipped | ✅ complete |
+| MCP-06 | Every MCP tool error path is sanitized via Phase 1 `sanitize.ts` pipeline (no `Bearer`, no token material, no internal stack) | T-04-S5 | contract | extends existing `src/mcp/sanitize.test.ts` + adds Phase 4 tool-specific fixtures | ✅ extended | ✅ complete |
 
 ---
 
@@ -65,80 +66,80 @@ created: 2026-05-16
 
 ### Domain math test stubs
 
-- [ ] `src/domain/stats/median.test.ts` — median + edge cases (empty, single, even, odd, ties)
-- [ ] `src/domain/stats/mad.test.ts` — MAD + 1.4826 consistency constant; MAD=0 fallback
-- [ ] `src/domain/stats/mann-whitney.test.ts` — worked examples from canonical sources; exact-vs-asymptotic switchover at n=20
-- [ ] `src/domain/stats/fdr.test.ts` — BH step-up worked examples from Benjamini & Hochberg 1995
-- [ ] `src/domain/baselines/baseline.test.ts` — trailing-30 over SCORED + DST-excluded; coverage_pct computation
-- [ ] `src/domain/confidence/index.test.ts` — tier-gating thresholds; Z refused < 14 days
-- [ ] `src/domain/anomalies/anomaly.test.ts` — `|z| ≥ 2.0` firing + per-metric direction
-- [ ] `src/domain/anomalies/direction.test.ts` — one assert per metric direction entry (no silent mis-mapping)
-- [ ] `src/domain/patterns/pattern.test.ts` — bottom-quartile worst-day selection + tie-breaking + ADR-0004 typed positive output
-- [ ] `src/domain/patterns/candidates.test.ts` — exactly 5 pre-registered candidate factors (D-11)
-- [ ] `src/domain/actions/catalog.test.ts` — one assert per entry: verb-first + length cap + banned-word free
-- [ ] `src/domain/actions/decision-prompts.test.ts` — one assert per prompt template
+- [x] `src/domain/stats/median.test.ts` — median + edge cases (empty, single, even, odd, ties)
+- [x] `src/domain/stats/mad.test.ts` — MAD + 1.4826 consistency constant; MAD=0 fallback
+- [x] `src/domain/stats/mann-whitney.test.ts` — worked examples from canonical sources; exact-vs-asymptotic switchover at n=20
+- [x] `src/domain/stats/fdr.test.ts` — BH step-up worked examples from Benjamini & Hochberg 1995
+- [x] `src/domain/baselines/baseline.test.ts` — trailing-30 over SCORED + DST-excluded; coverage_pct computation
+- [x] `src/domain/confidence/index.test.ts` — tier-gating thresholds; Z refused < 14 days
+- [x] `src/domain/anomalies/anomaly.test.ts` — `|z| ≥ 2.0` firing + per-metric direction
+- [x] `src/domain/anomalies/direction.test.ts` — one assert per metric direction entry (no silent mis-mapping)
+- [x] `src/domain/patterns/pattern.test.ts` — bottom-quartile worst-day selection + tie-breaking + ADR-0004 typed positive output
+- [x] `src/domain/patterns/candidates.test.ts` — exactly 5 pre-registered candidate factors (D-11)
+- [x] `src/domain/actions/catalog.test.ts` — one assert per entry: verb-first + length cap + banned-word free
+- [x] `src/domain/actions/decision-prompts.test.ts` — one assert per prompt template
 
 ### Service test stubs
 
-- [ ] `src/services/review/resolve-date.test.ts` — D-01 `reviewed_date` resolution (MAX(start) over SCORED + non-excluded)
-- [ ] `src/services/review/daily.test.ts` — happy path + insufficient + no-anomalies + capped-anomalies
-- [ ] `src/services/review/weekly.test.ts` — pattern-clears-fdr + fdr-suppression (REV-07) + decision-prompt-injection (DEC-04)
-- [ ] `src/services/decision/index.test.ts` — add + review + update orchestration
-- [ ] `src/services/cache/index.test.ts` — `whoop_query_cache` typed filters
-- [ ] `src/services/api-gap/index.test.ts` — `whoop_api_gap` catalog return
+- [x] `src/services/review/resolve-date.test.ts` — D-01 `reviewed_date` resolution (MAX(start) over SCORED + non-excluded)
+- [x] `src/services/review/daily.test.ts` — happy path + insufficient + no-anomalies + capped-anomalies
+- [x] `src/services/review/weekly.test.ts` — pattern-clears-fdr + fdr-suppression (REV-07) + decision-prompt-injection (DEC-04)
+- [x] `src/services/decision/index.test.ts` — add + review + update orchestration
+- [x] `src/services/cache/index.test.ts` — `whoop_query_cache` typed filters
+- [x] `src/services/api-gap/index.test.ts` — `whoop_api_gap` catalog return
 
 ### CLI / formatter test stubs
 
-- [ ] `src/cli/commands/review-daily.test.ts`
-- [ ] `src/cli/commands/review-weekly.test.ts`
-- [ ] `src/cli/commands/decision-add.test.ts`
-- [ ] `src/cli/commands/decision-review.test.ts`
-- [ ] `src/cli/commands/decision-update.test.ts`
-- [ ] `src/cli/commands/query.test.ts`
-- [ ] `src/cli/commands/api-gap.test.ts`
-- [ ] `src/formatters/daily-review.txt.test.ts`
-- [ ] `src/formatters/weekly-review.txt.test.ts`
-- [ ] `src/formatters/decision.txt.test.ts`
-- [ ] `src/formatters/query-cache.txt.test.ts`
-- [ ] `src/formatters/api-gap.txt.test.ts`
+- [x] `src/cli/commands/review-daily.test.ts`
+- [x] `src/cli/commands/review-weekly.test.ts`
+- [x] `src/cli/commands/decision-add.test.ts`
+- [x] `src/cli/commands/decision-review.test.ts`
+- [x] `src/cli/commands/decision-update.test.ts`
+- [x] `src/cli/commands/query.test.ts`
+- [x] `src/cli/commands/api-gap.test.ts`
+- [x] `src/formatters/daily-review.txt.test.ts`
+- [x] `src/formatters/weekly-review.txt.test.ts`
+- [x] `src/formatters/decision.txt.test.ts`
+- [x] `src/formatters/query-cache.txt.test.ts`
+- [x] `src/formatters/api-gap.txt.test.ts`
 
 ### Contract tests (new)
 
-- [ ] `tests/contract/daily-review-shape.test.ts` — REV-03/04 schema + data-freshness lead
-- [ ] `tests/contract/formatter-tone.test.ts` — D-26 banned-word lint over rendered output × all fixtures
-- [ ] `tests/contract/mcp-tool-shape.test.ts` — MCP-02 dual-shape contract over all 8 tools
-- [ ] `tests/contract/mcp-resource-shape.test.ts` — MCP-04 resource read return shape
-- [ ] `tests/contract/mcp-prompt-shape.test.ts` — MCP-05 `messages[]` shape over all 4 prompts
-- [ ] `tests/contract/mcp-shim-loc.test.ts` — MCP-03 ≤ 5-line shim static analysis
+- [x] `tests/contract/daily-review-shape.test.ts` — REV-03/04 schema + data-freshness lead
+- [x] `tests/contract/formatter-tone.test.ts` — D-26 banned-word lint over rendered output × all fixtures
+- [x] `tests/contract/mcp-tool-shape.test.ts` — MCP-02 dual-shape contract over all 8 tools
+- [x] `tests/contract/mcp-resource-shape.test.ts` — MCP-04 resource read return shape
+- [x] `tests/contract/mcp-prompt-shape.test.ts` — MCP-05 `messages[]` shape over all 4 prompts
+- [x] `tests/contract/mcp-shim-loc.test.ts` — MCP-03 ≤ 5-line shim static analysis
 
 ### Fixture corpus (Wave 0 + per-plan adds)
 
-- [ ] `tests/fixtures/review/daily-strong-confidence.json`
-- [ ] `tests/fixtures/review/daily-weak-confidence.json`
-- [ ] `tests/fixtures/review/daily-insufficient-days.json` (REV-05 — 8 SCORED days)
-- [ ] `tests/fixtures/review/daily-no-anomalies.json`
-- [ ] `tests/fixtures/review/daily-three-anomalies-capped.json` (D-08 catalog cap)
-- [ ] `tests/fixtures/review/weekly-pattern-clears-fdr.json`
-- [ ] `tests/fixtures/review/weekly-pattern-fdr-suppression.json` (REV-07 load-bearing per D-35; built by deterministic generator under `tests/fixtures/review/_generators/`)
-- [ ] `tests/fixtures/review/weekly-pattern-partial-rejection.json` (D-35 secondary path — preserved D-15 original numbers)
-- [ ] `tests/fixtures/review/weekly-no-pattern-insufficient-window.json` (n_scored < 14)
-- [ ] `tests/fixtures/review/weekly-decision-prompt-none-this-week.json` (DEC-04 / D-22)
-- [ ] `tests/fixtures/decisions/decision-add-happy-path.json`
-- [ ] `tests/fixtures/decisions/decision-review-list.json`
-- [ ] `tests/fixtures/decisions/decision-review-interactive-update.json`
-- [ ] `tests/fixtures/mcp/whoop-daily-review/<scenario>.json` × 4
-- [ ] `tests/fixtures/mcp/whoop-weekly-review/<scenario>.json` × 4
-- [ ] `tests/fixtures/mcp/whoop-query-cache/<resource>-<scenario>.json` × 8
-- [ ] `tests/fixtures/mcp/whoop-add-decision/<scenario>.json` × 3
-- [ ] `tests/fixtures/mcp/whoop-review-decisions/<mode>-<scenario>.json` × 4
-- [ ] `tests/fixtures/mcp/whoop-api-gap/<scenario>.json` × 1
-- [ ] `tests/fixtures/mcp/whoop-doctor/<scenario>.json` × 1 (Phase 1 carry-forward)
+- [x] `tests/fixtures/review/daily-strong-confidence.json`
+- [x] `tests/fixtures/review/daily-weak-confidence.json`
+- [x] `tests/fixtures/review/daily-insufficient-days.json` (REV-05 — 8 SCORED days)
+- [x] `tests/fixtures/review/daily-no-anomalies.json`
+- [x] `tests/fixtures/review/daily-three-anomalies-capped.json` (D-08 catalog cap)
+- [x] `tests/fixtures/review/weekly-pattern-clears-fdr.json`
+- [x] `tests/fixtures/review/weekly-pattern-fdr-suppression.json` (REV-07 load-bearing per D-35; built by deterministic generator under `tests/fixtures/review/_generators/`)
+- [x] `tests/fixtures/review/weekly-pattern-partial-rejection.json` (D-35 secondary path — preserved D-15 original numbers)
+- [x] `tests/fixtures/review/weekly-no-pattern-insufficient-window.json` (n_scored < 14)
+- [x] `tests/fixtures/review/weekly-decision-prompt-none-this-week.json` (DEC-04 / D-22)
+- [x] `tests/fixtures/decisions/decision-add-happy-path.json`
+- [x] `tests/fixtures/decisions/decision-review-list.json`
+- [x] `tests/fixtures/decisions/decision-review-interactive-update.json`
+- [x] `tests/fixtures/mcp/whoop-daily-review/<scenario>.json` × 4
+- [x] `tests/fixtures/mcp/whoop-weekly-review/<scenario>.json` × 4
+- [x] `tests/fixtures/mcp/whoop-query-cache/<resource>-<scenario>.json` × 8
+- [x] `tests/fixtures/mcp/whoop-add-decision/<scenario>.json` × 3
+- [x] `tests/fixtures/mcp/whoop-review-decisions/<mode>-<scenario>.json` × 4
+- [x] `tests/fixtures/mcp/whoop-api-gap/<scenario>.json` × 1
+- [x] `tests/fixtures/mcp/whoop-doctor/<scenario>.json` × 1 (Phase 1 carry-forward)
 
 ### CI gate extensions
 
-- [ ] `scripts/ci-grep-gates.sh` Gate H — `\btools\.length\s*===\s*1\b` does NOT appear outside `tests/__legacy__/` (D-33 anti-regression)
-- [ ] `scripts/ci-grep-gates.sh` Gate I — outside `src/mcp/register-resource.ts`, no direct `server.registerResource(` (D-36)
-- [ ] `scripts/ci-grep-gates.sh` Gate J — outside `src/mcp/register-prompt.ts`, no direct `server.registerPrompt(` (D-36)
+- [x] `scripts/ci-grep-gates.sh` Gate H — `\btools\.length\s*===\s*1\b` does NOT appear outside `tests/__legacy__/` (D-33 anti-regression)
+- [x] `scripts/ci-grep-gates.sh` Gate I — outside `src/mcp/register-resource.ts`, no direct `server.registerResource(` (D-36)
+- [x] `scripts/ci-grep-gates.sh` Gate J — outside `src/mcp/register-prompt.ts`, no direct `server.registerPrompt(` (D-36)
 
 *Existing infrastructure (vitest + biome + grep-gates + fixture-only ADR-0006) is in place; no framework install needed.*
 
@@ -170,11 +171,11 @@ created: 2026-05-16
 
 ## Validation Sign-Off
 
-- [ ] All tasks have `<automated>` verify or Wave 0 dependencies (planner enforces)
-- [ ] Sampling continuity: no 3 consecutive tasks without automated verify (plan-checker enforces)
-- [ ] Wave 0 covers all MISSING references in the per-task verification map above
-- [ ] No watch-mode flags in any `<automated>` command (Vitest `run` mode only)
-- [ ] Feedback latency < 90 seconds (full suite)
-- [ ] `nyquist_compliant: true` set in frontmatter after plan-checker pass
+- [x] All tasks have `<automated>` verify or Wave 0 dependencies (planner enforces)
+- [x] Sampling continuity: no 3 consecutive tasks without automated verify (plan-checker enforces)
+- [x] Wave 0 covers all MISSING references in the per-task verification map above
+- [x] No watch-mode flags in any `<automated>` command (Vitest `run` mode only)
+- [x] Feedback latency < 90 seconds (full suite)
+- [x] `nyquist_compliant: true` set in frontmatter after plan-checker pass
 
-**Approval:** pending — flips to approved after gsd-plan-checker emits `## VERIFICATION PASSED`.
+**Approval:** approved on 2026-05-20; phase closed per `04-12-PLAN.md`. Attestation matrix: full Vitest suite 1098/1098 in 9.47s (budget 90s per D-33); all 10 CI grep gates green (A through J); D-29 runtime attestation `tools.length === 8` + `resources.length === 6` + `prompts.length === 4` + name-sets verified; D-30 git-diff `7587a8a..HEAD -- src/mcp/sanitize.ts src/mcp/register.ts` returns empty (sanitize.ts + register.ts UNMODIFIED across Phases 1+2+3+4).
