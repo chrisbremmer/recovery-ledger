@@ -151,24 +151,24 @@ Explicitly excluded. Gated behind the hard scope guardrail in PROJECT.md (≥ 12
 | SYNC-05 | Phase 3 | Complete (Plan 03-08, 2026-05-16) |
 | SYNC-06 | Phase 3 | Complete (Plan 03-05, 2026-05-16) |
 | SYNC-07 | Phase 3 | Complete (Plan 03-07, 2026-05-16) |
-| REV-01 | Phase 4 | Complete |
-| REV-02 | Phase 4 | Complete |
-| REV-03 | Phase 4 | Complete |
-| REV-04 | Phase 4 | Complete |
-| REV-05 | Phase 4 | Complete |
-| REV-06 | Phase 4 | Complete |
-| REV-07 | Phase 4 | Complete |
-| REV-08 | Phase 4 | Complete |
-| DEC-01 | Phase 4 | Complete |
-| DEC-02 | Phase 4 | Complete |
-| DEC-03 | Phase 4 | Complete |
-| DEC-04 | Phase 4 | Complete |
-| MCP-01 | Phase 4 | Complete |
-| MCP-02 | Phase 4 | Complete |
-| MCP-03 | Phase 4 | Complete |
-| MCP-04 | Phase 4 | Complete |
-| MCP-05 | Phase 4 | Complete |
-| MCP-06 | Phase 4 | Complete |
+| REV-01 | Phase 4 | Complete (Plans 04-03 + 04-04, 2026-05-20 — Verified by `src/domain/stats/median.test.ts`, `src/domain/stats/mad.test.ts`, `src/domain/baselines/index.test.ts`) |
+| REV-02 | Phase 4 | Complete (Plan 04-04, 2026-05-20 — Verified by `src/domain/confidence/index.test.ts`) |
+| REV-03 | Phase 4 | Complete (Plan 04-07, 2026-05-20 — Verified by `src/services/review/daily.test.ts`, `tests/contract/daily-review-shape.test.ts`) |
+| REV-04 | Phase 4 | Complete (Plans 04-07 + 04-09, 2026-05-20 — Verified by `tests/contract/daily-review-shape.test.ts`, `src/formatters/daily-review.txt.test.ts`) |
+| REV-05 | Phase 4 | Complete (Plan 04-07, 2026-05-20 — Verified by `src/services/review/daily.test.ts` against fixture `daily-insufficient-days.json`) |
+| REV-06 | Phase 4 | Complete (Plans 04-05 + 04-07, 2026-05-20 — Verified by `src/services/review/weekly.test.ts`, `src/domain/patterns/pattern.test.ts`) |
+| REV-07 | Phase 4 | Complete (Plans 04-03 + 04-05 + 04-07, 2026-05-20 — Verified by `src/domain/stats/fdr.test.ts`, `src/domain/patterns/pattern.test.ts`, `src/services/review/weekly.test.ts` against fixtures `bh_downgrades_marginal.fixture.json` + `weekly-pattern-fdr-suppression.json`) |
+| REV-08 | Phase 4 | Complete (Plans 04-01 + 04-09, 2026-05-20 — Verified by `tests/contract/formatter-tone.test.ts` + `scripts/ci-grep-gates.sh` Gate A) |
+| DEC-01 | Phase 4 | Complete (Plans 04-06 + 04-11, 2026-05-20 — Verified by `src/cli/commands/decision-add.test.ts`, `src/services/decision/index.test.ts`) |
+| DEC-02 | Phase 4 | Complete (Plan 04-06, 2026-05-20 — Verified by `src/infrastructure/db/repositories/decisions.repo.test.ts`) |
+| DEC-03 | Phase 4 | Complete (Plan 04-11, 2026-05-20 — Verified by `src/cli/commands/decision-review.test.ts`, `src/cli/commands/decision-update.test.ts`) |
+| DEC-04 | Phase 4 | Complete (Plans 04-05 + 04-07, 2026-05-20 — Verified by `src/services/review/weekly.test.ts` against fixture `weekly-decision-prompt-none-this-week.json`) |
+| MCP-01 | Phase 4 | Complete (Plan 04-10, 2026-05-20 — Verified by `tests/integration/mcp-runtime.test.ts` (tools.length === 8, D-29 attestation)) |
+| MCP-02 | Phase 4 | Complete (Plans 04-01 + 04-10, 2026-05-20 — Verified by `tests/contract/mcp-tool-shape.test.ts`) |
+| MCP-03 | Phase 4 | Complete (Plans 04-01 + 04-10, 2026-05-20 — Verified by `tests/contract/mcp-shim-loc.test.ts`) |
+| MCP-04 | Phase 4 | Complete (Plans 04-01 + 04-10, 2026-05-20 — Verified by `tests/integration/mcp-runtime.test.ts` (resources.length === 6), `tests/contract/mcp-resource-shape.test.ts`) |
+| MCP-05 | Phase 4 | Complete (Plans 04-01 + 04-10, 2026-05-20 — Verified by `tests/integration/mcp-runtime.test.ts` (prompts.length === 4), `tests/contract/mcp-prompt-shape.test.ts`) |
+| MCP-06 | Phase 4 | Complete (Plans 04-01 + 04-10, 2026-05-20 — Verified by `src/mcp/sanitize.test.ts` (extended Plan 04-10 Task 4 with Phase 4 fixtures)) |
 | DOC-01 | Phase 5 | Pending |
 | DOC-02 | Phase 5 | Pending |
 | DOC-03 | Phase 5 | Pending |
@@ -177,11 +177,14 @@ Explicitly excluded. Gated behind the hard scope guardrail in PROJECT.md (≥ 12
 | DOC-06 | Phase 5 | Pending |
 
 **Coverage:**
-- v1 requirements: 49 total
-- Mapped to phases: 49
+- v1 requirements: 50 total (FND=7, AUTH=6, DATA=6, SYNC=7, REV=8, DEC=4, MCP=6, DOC=6)
+- Mapped to phases: 50
 - Unmapped: 0 ✓
-- Complete: 26 / 49 (7 FND + 6 AUTH + 13 DATA/SYNC; Phases 1 + 2 + 3 closed)
+- Complete: 44 / 50 (7 FND + 6 AUTH + 13 DATA/SYNC + 18 REV/DEC/MCP; Phases 1 + 2 + 3 + 4 closed)
+- Remaining: 6 / 50 (DOC-01..06 → Phase 5)
+
+> *Note:* prior coverage lines read "26/49" / "44/49"; the actual prefix-by-prefix sum is 50 (FND=7+AUTH=6+DATA=6+SYNC=7+REV=8+DEC=4+MCP=6+DOC=6). Corrected during Phase 4 close (Plan 04-12).
 
 ---
 *Requirements defined: 2026-05-11*
-*Last updated: 2026-05-16 — Phase 3 closed (13 REQ-IDs flipped to Complete: DATA-01..06 + SYNC-01..07); 26 / 49 requirements done*
+*Last updated: 2026-05-20 — Phase 4 closed (18 REQ-IDs flipped to Complete: REV-01..08 + DEC-01..04 + MCP-01..06); 44 / 50 requirements done*
