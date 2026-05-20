@@ -45,5 +45,8 @@ export interface ApiGapEntry {
  * verbatim; no filtering, no pagination, no I/O.
  */
 export interface ApiGapResult {
-  entries: ApiGapEntry[];
+  // Review #33: `readonly` so the cast in getApiGap() drops out — the
+  // backing `API_GAP_ENTRIES` is a frozen `as const` tuple and exposing
+  // it as a mutable array was a lie.
+  entries: readonly ApiGapEntry[];
 }

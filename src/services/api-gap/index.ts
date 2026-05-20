@@ -13,5 +13,5 @@ import { API_GAP_ENTRIES } from './data.js';
 import type { ApiGapResult } from './types.js';
 
 export async function getApiGap(): Promise<ApiGapResult> {
-  return { entries: API_GAP_ENTRIES as ApiGapResult['entries'] };
+  return { entries: API_GAP_ENTRIES };
 }
