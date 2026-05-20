@@ -192,9 +192,21 @@ describe('getWeeklyReview — D-35 partial-rejection path (D-18 multi-detection 
     expect(result.pattern.kind).toBe('detected');
     if (result.pattern.kind !== 'detected') throw new Error('narrow');
     expect(result.pattern.pattern_confidence).toBe('strong');
-    // The winner is the candidate with smallest p_adjusted among cleared.
-    // Verify at least 1 candidate cleared:
-    expect(result.candidate_results.filter((c) => c.cleared).length).toBeGreaterThanOrEqual(1);
+    // Review #16: tighten the cleared-count assertion. The fixture
+    // engineers two candidates (sleep_duration_short, strain_high_prior_day)
+    // with strong signal, so the partial-rejection BH path must yield at
+    // least 2 cleared candidates — not the previous bare `>= 1`.
+    const cleared = result.candidate_results.filter((c) => c.cleared);
+    expect(cleared.length).toBeGreaterThanOrEqual(2);
+    // D-18 multi-detection: the reported pattern factor must equal the
+    // cleared candidate with the smallest p_adjusted.
+    const winner = cleared.reduce((min, c) =>
+      (c.p_adjusted ?? Number.POSITIVE_INFINITY) <
+      (min.p_adjusted ?? Number.POSITIVE_INFINITY)
+        ? c
+        : min,
+    );
+    expect(result.pattern.factor).toBe(winner.factor);
   });
 });
 
