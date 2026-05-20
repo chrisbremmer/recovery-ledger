@@ -180,6 +180,49 @@ _(empty)_
 - **Recurrences before pinning:** 1.
 - **Status:** active.
 
+### L0005 — Comment phrasing must not collide with grep gates (2026-05-20)
+
+- **Symptom:** a doc-comment that explained why a grep gate exists used
+  the literal grep target as part of its prose (e.g., `// ADR-0001 (MCP
+  stdout purity): no console.*; no process.stdout.write.` in the same
+  file where Gate B forbids `console.*` and Gate C forbids
+  `process.stdout.write`). The grep gates are word-boundary literal
+  checks with no comment-awareness, so the well-intentioned comment
+  tripped CI at commit time across Phases 1, 2, 3, and 4.
+- **Root cause:** the grep gates are intentionally not comment-aware —
+  comment-stripping would silently exempt real violations hidden in
+  block-comment strings. The cost is that comments referencing the
+  enforced literal must use semantic phrasing instead.
+- **Rule:** when writing a doc-comment that REFERENCES a grep-gate
+  target, never inline the literal grep target. Use semantic phrasing
+  per the substitution table:
+
+  | Gate target | Semantic phrasing |
+  |---|---|
+  | `console.*` (Gate B) | "direct stdout writes" / "the console API" |
+  | `process.stdout.write` (Gate C) | "stdout output" / "the write API" |
+  | `server.registerTool(` (Gate D) | "the tool-registration boundary" / "the wrapper" |
+  | `server.registerResource(` (Gate I) | "the resource-registration wrapper" |
+  | `server.registerPrompt(` (Gate J) | "the prompt-registration wrapper" |
+  | `drizzle-orm` (Gate G) | "the ORM" |
+  | `fetch(` (Gate F) | "HTTP requests" / "the network boundary" |
+  | OAuth-token URLs outside `token-store.ts` (Gate E) | "the refresh endpoint" |
+  | `tools.length === 1` (Gate H) | "the legacy single-tool attestation" |
+
+  This convention preserves explainability in comments without
+  breaking CI.
+- **Where the rule lives:**
+  [`agent_docs/conventions.md`](./conventions.md) §Comments
+  (added Phase 4 close); this learning is the canonical reference
+  for why the rule exists.
+- **Triggered by:** Plan 04-12 phase-close review — 5th-time-in-a-row
+  occurrence across Phases 1+2+3+4 prompted codification per Phase 4
+  CONTEXT.md §deferred / §learnings.md entry recommendation.
+- **Recurrences before pinning:** 5 (one per phase: Plans 01-04, 02-08,
+  03-09, 03-11, and the running observation captured in Phase 4
+  CONTEXT before pinning here).
+- **Status:** active.
+
 ### Category: Documentation / process
 
 _(empty)_
