@@ -14,7 +14,7 @@
 // it, two concurrent syncs could both observe an unchanged latest row,
 // both decide "insert", and end up with duplicate history entries.
 
-import { desc, eq } from 'drizzle-orm';
+import { and, desc, eq, gte, lte } from 'drizzle-orm';
 import type { drizzle } from 'drizzle-orm/better-sqlite3';
 import type { BodyMeasurement } from '../../../domain/types/entities.js';
 import { body_measurements as bodyMeasurementsTable } from '../schema.js';
@@ -36,6 +36,13 @@ export interface BodyMeasurementsRepo {
   ): { inserted: boolean };
   /** History sorted by captured_at DESC (newest first). */
   listAll(): BodyMeasurement[];
+  /** Plan 04-08 D-24 `whoop_query_cache` body_measurements arm: rows
+   *  whose `captured_at` falls within the inclusive ISO range. Both
+   *  bounds are optional; omitted bounds expand to open-ended in that
+   *  direction. SQLite lexicographic compares on ISO-8601 give correct
+   *  chronological order. Results newest-first (`captured_at DESC`) to
+   *  match `listAll()`. */
+  byRange(since: string | undefined, until: string | undefined): BodyMeasurement[];
   /** Most recent measurement or null if the table is empty. */
   latest(): BodyMeasurement | null;
   /** D-29 diagnostic seam — synthetic-id lookup. */
@@ -88,6 +95,21 @@ export function createBodyMeasurementsRepo(db: ReturnType<typeof drizzle>): Body
         .from(bodyMeasurementsTable)
         .orderBy(desc(bodyMeasurementsTable.captured_at))
         .all();
+      return rows.map(rowToBodyMeasurement);
+    },
+
+    byRange(since, until): BodyMeasurement[] {
+      const conditions = [];
+      if (since !== undefined) conditions.push(gte(bodyMeasurementsTable.captured_at, since));
+      if (until !== undefined) conditions.push(lte(bodyMeasurementsTable.captured_at, until));
+      const query = db.select().from(bodyMeasurementsTable);
+      const rows =
+        conditions.length === 0
+          ? query.orderBy(desc(bodyMeasurementsTable.captured_at)).all()
+          : query
+              .where(and(...conditions))
+              .orderBy(desc(bodyMeasurementsTable.captured_at))
+              .all();
       return rows.map(rowToBodyMeasurement);
     },
 

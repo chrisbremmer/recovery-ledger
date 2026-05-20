@@ -277,12 +277,10 @@ describe('services/cache — recoveries arm', () => {
 
   it('Test 6: min/maxRecoveryScore filter is applied after the repo read', async () => {
     // Recoveries FK onto cycles — insert cycles first.
-    const cycles: Cycle[] = [
-      makeCycle({ start: '2026-04-10T08:00:00.000Z' }),
-      makeCycle({ start: '2026-04-11T08:00:00.000Z' }),
-      makeCycle({ start: '2026-04-12T08:00:00.000Z' }),
-    ];
-    h.deps.repos.cycles.upsertBatch(cycles);
+    const cycle0 = makeCycle({ start: '2026-04-10T08:00:00.000Z' });
+    const cycle1 = makeCycle({ start: '2026-04-11T08:00:00.000Z' });
+    const cycle2 = makeCycle({ start: '2026-04-12T08:00:00.000Z' });
+    h.deps.repos.cycles.upsertBatch([cycle0, cycle1, cycle2]);
 
     // Sleeps share the foreign-key surface via sleep_id.
     const sleeps: Sleep[] = [
@@ -294,19 +292,19 @@ describe('services/cache — recoveries arm', () => {
 
     h.deps.repos.recoveries.upsertBatch([
       makeRecovery({
-        cycleId: cycles[0].id,
+        cycleId: cycle0.id,
         sleepId: 's-1',
         createdAt: '2026-04-10T08:30:00.000Z',
         recoveryScore: 45,
       }),
       makeRecovery({
-        cycleId: cycles[1].id,
+        cycleId: cycle1.id,
         sleepId: 's-2',
         createdAt: '2026-04-11T08:30:00.000Z',
         recoveryScore: 65,
       }),
       makeRecovery({
-        cycleId: cycles[2].id,
+        cycleId: cycle2.id,
         sleepId: 's-3',
         createdAt: '2026-04-12T08:30:00.000Z',
         recoveryScore: 80,
@@ -587,11 +585,10 @@ describe('services/cache — limit clamp + truncation semantics (D-24)', () => {
 
   it('Test 17: logger receives query_cache event with resource + count + truncated only (no PII)', async () => {
     const infoSpy = vi.fn();
-    const stubbed = {
+    const stubbed: QueryCacheDeps = {
       ...h.deps,
       logger: { ...makeStubLogger(), info: infoSpy } as unknown as Logger,
     };
-    stubbed.deps;
     h.deps.repos.decisions.insert({
       id: '01HK0000000000000000000099',
       createdAt: '2026-04-10T08:00:00.000Z',

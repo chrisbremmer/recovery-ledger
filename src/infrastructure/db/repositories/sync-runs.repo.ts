@@ -18,7 +18,7 @@
 // transaction so two concurrent resource-finish events cannot drop one
 // of their outcome entries.
 
-import { desc, eq, ne } from 'drizzle-orm';
+import { and, desc, eq, gte, ne } from 'drizzle-orm';
 import type { drizzle } from 'drizzle-orm/better-sqlite3';
 import { z } from 'zod';
 import { ResourceSyncOutcomeSchema } from '../../../domain/schemas/entities.js';
@@ -63,6 +63,17 @@ export interface SyncRunsRepo {
    *  running rows. Returns `null` when the table has no finished rows
    *  (empty DB OR every existing row is mid-flight). */
   latestFinished(): { finished_at: string; status: 'ok' | 'partial' | 'failed' } | null;
+  /** Plan 04-08 D-24 `whoop_query_cache` sync_runs arm. Returns rows
+   *  whose `status` matches the filter (when supplied) and whose
+   *  `started_at >= since` (when supplied). Newest-first. The optional
+   *  filters are combined with AND; both undefined returns every row up
+   *  to `limit`. SQLite lexicographic compare on ISO-8601 timestamps
+   *  gives correct chronology. */
+  byStatus(
+    status: 'ok' | 'partial' | 'failed' | 'running' | undefined,
+    since: string | undefined,
+    limit: number,
+  ): SyncRun[];
 }
 
 type SyncRunRow = typeof syncRunsTable.$inferSelect;
@@ -142,6 +153,25 @@ export function createSyncRunsRepo(db: ReturnType<typeof drizzle>): SyncRunsRepo
         .orderBy(desc(syncRunsTable.started_at), desc(syncRunsTable.id))
         .limit(limit)
         .all();
+      return rows.map(rowToSyncRun);
+    },
+
+    byStatus(status, since, limit): SyncRun[] {
+      const conditions = [];
+      if (status !== undefined) conditions.push(eq(syncRunsTable.status, status));
+      if (since !== undefined) conditions.push(gte(syncRunsTable.started_at, since));
+      const base = db.select().from(syncRunsTable);
+      const rows =
+        conditions.length === 0
+          ? base
+              .orderBy(desc(syncRunsTable.started_at), desc(syncRunsTable.id))
+              .limit(limit)
+              .all()
+          : base
+              .where(and(...conditions))
+              .orderBy(desc(syncRunsTable.started_at), desc(syncRunsTable.id))
+              .limit(limit)
+              .all();
       return rows.map(rowToSyncRun);
     },
 
