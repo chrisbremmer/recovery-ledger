@@ -1,0 +1,48 @@
+{
+  "_comment": "DEC-04 fixture. 22 SCORED cycles + ZERO decisions in last 7 days → decision_prompt.kind='none_this_week'. Pattern detection has plenty of cycles but the engineered metrics produce no FDR-cleared candidate → suggested_text from DECISION_PROMPT_CATALOG's no_pattern generic entry.",
+  "kind": "weekly",
+  "name": "weekly-decision-prompt-none-this-week",
+  "reviewed_date": "2026-03-15",
+  "userId": 99,
+  "iana_zone": "America/Los_Angeles",
+  "scored_cycle_dates": [
+    "2026-02-15",
+    "2026-02-16",
+    "2026-02-17",
+    "2026-02-18",
+    "2026-02-19",
+    "2026-02-20",
+    "2026-02-22",
+    "2026-02-23",
+    "2026-02-24",
+    "2026-02-26",
+    "2026-02-27",
+    "2026-03-01",
+    "2026-03-02",
+    "2026-03-04",
+    "2026-03-06",
+    "2026-03-07",
+    "2026-03-09",
+    "2026-03-10",
+    "2026-03-12",
+    "2026-03-13",
+    "2026-03-14",
+    "2026-03-15"
+  ],
+  "defaults": {
+    "recovery_score": 70,
+    "hrv": 45,
+    "rhr": 55,
+    "strain": 12,
+    "sleep_in_bed_min": 480,
+    "sleep_awake_min": 30,
+    "respiratory_rate": 14.5
+  },
+  "expected": {
+    "pattern_kind": "no_pattern",
+    "pattern_reason": "no_factor_cleared_fdr",
+    "decision_prompt_kind": "none_this_week",
+    "confidence_tier": "strong",
+    "candidate_results_length": 5
+  }
+}

@@ -1,0 +1,53 @@
+{
+  "_comment": "REV-07 LOAD-BEARING fixture (D-35). 20 SCORED cycles in trailing-28 with engineered subtle separation on sleep_duration_prior_night: 5 worst-recovery days have sleep ~370 min vs others at ~450 min. The separation is large enough to produce p_raw ~ 0.05 for sleep_duration but other 4 candidates have no engineered signal → p_raw ~ 0.3-0.6. BH @ q=0.10 / m=5 step-up thresholds are [0.02, 0.04, 0.06, 0.08, 0.10] — smallest p_raw=0.05 needs to satisfy p_(k) <= (k/m)*q at some k. At k=3 the threshold is 0.06; if smallest sleep p=0.05 ≤ 0.06 it WOULD reject. To engineer a TRUE suppression, the worst-day sleep separation must be even subtler — use 410 min vs 450 min so p_raw is closer to 0.10-0.15, falling between thresholds. Sample-size considerations: worst n=5, other n=15.",
+  "kind": "weekly",
+  "name": "weekly-pattern-fdr-suppression",
+  "reviewed_date": "2026-03-15",
+  "userId": 99,
+  "iana_zone": "America/Los_Angeles",
+  "scored_cycle_dates": [
+    "2026-02-16",
+    "2026-02-17",
+    "2026-02-18",
+    "2026-02-19",
+    "2026-02-20",
+    "2026-02-22",
+    "2026-02-23",
+    "2026-02-25",
+    "2026-02-27",
+    "2026-02-28",
+    "2026-03-02",
+    "2026-03-04",
+    "2026-03-06",
+    "2026-03-08",
+    "2026-03-09",
+    "2026-03-11",
+    "2026-03-12",
+    "2026-03-13",
+    "2026-03-14",
+    "2026-03-15"
+  ],
+  "defaults": {
+    "recovery_score": 75,
+    "hrv": 50,
+    "rhr": 55,
+    "strain": 12,
+    "sleep_in_bed_min": 450,
+    "sleep_awake_min": 30,
+    "respiratory_rate": 14.5
+  },
+  "day_overrides": [
+    {"date": "2026-02-16", "recovery_score": 50, "sleep_duration_min": 410},
+    {"date": "2026-02-20", "recovery_score": 52, "sleep_duration_min": 420},
+    {"date": "2026-02-25", "recovery_score": 54, "sleep_duration_min": 415},
+    {"date": "2026-03-04", "recovery_score": 56, "sleep_duration_min": 405},
+    {"date": "2026-03-11", "recovery_score": 58, "sleep_duration_min": 425}
+  ],
+  "expected": {
+    "pattern_kind": "no_pattern",
+    "pattern_reason": "no_factor_cleared_fdr",
+    "decision_prompt_kind": "none_this_week",
+    "confidence_tier": "strong",
+    "candidate_results_length": 5
+  }
+}

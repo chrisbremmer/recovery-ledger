@@ -1,0 +1,56 @@
+{
+  "_comment": "REV-06 detected-pattern fixture. 22 SCORED cycles in trailing-28 → nWorst = floor(22/4) = 5. The 5 lowest recovery days (engineered to be the bottom quartile) carry sleep_duration ~ 240 min on the prior night, while the other 17 days carry the default 450 min. Such a large median separation (240 vs 450) yields Mann-Whitney p_raw very close to 0 for sleep_duration_prior_night; the other 4 candidates have no engineered signal so their p_raw values sit near 0.5. BH at q=0.10 / m=5 rejects only the smallest p (the sleep one) → pattern.kind='detected', factor='sleep_duration_prior_night', pattern_confidence='strong' (N=22 ≥ 20).",
+  "kind": "weekly",
+  "name": "weekly-pattern-clears-fdr",
+  "reviewed_date": "2026-03-15",
+  "userId": 99,
+  "iana_zone": "America/Los_Angeles",
+  "scored_cycle_dates": [
+    "2026-02-15",
+    "2026-02-16",
+    "2026-02-17",
+    "2026-02-18",
+    "2026-02-19",
+    "2026-02-20",
+    "2026-02-22",
+    "2026-02-23",
+    "2026-02-24",
+    "2026-02-26",
+    "2026-02-27",
+    "2026-03-01",
+    "2026-03-02",
+    "2026-03-04",
+    "2026-03-06",
+    "2026-03-07",
+    "2026-03-09",
+    "2026-03-10",
+    "2026-03-12",
+    "2026-03-13",
+    "2026-03-14",
+    "2026-03-15"
+  ],
+  "defaults": {
+    "recovery_score": 75,
+    "hrv": 50,
+    "rhr": 55,
+    "strain": 12,
+    "sleep_in_bed_min": 450,
+    "sleep_awake_min": 30,
+    "respiratory_rate": 14.5
+  },
+  "day_overrides": [
+    {"date": "2026-02-15", "recovery_score": 25, "sleep_duration_min": 240},
+    {"date": "2026-02-19", "recovery_score": 28, "sleep_duration_min": 260},
+    {"date": "2026-02-23", "recovery_score": 30, "sleep_duration_min": 250},
+    {"date": "2026-03-02", "recovery_score": 32, "sleep_duration_min": 270},
+    {"date": "2026-03-10", "recovery_score": 35, "sleep_duration_min": 245}
+  ],
+  "expected": {
+    "pattern_kind": "detected",
+    "pattern_factor": "sleep_duration_prior_night",
+    "pattern_confidence": "strong",
+    "decision_prompt_kind": "none_this_week",
+    "confidence_tier": "strong",
+    "candidate_results_length": 5
+  }
+}
