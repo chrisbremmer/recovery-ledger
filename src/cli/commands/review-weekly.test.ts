@@ -16,18 +16,16 @@ function makeWeekly(overrides: Partial<WeeklyReviewResult> = {}): WeeklyReviewRe
   return {
     data_status: {
       reviewed_date: '2026-03-15',
-      sources_freshness: {
-        cycles: 'fresh',
-        recoveries: 'fresh',
-        sleeps: 'fresh',
-        workouts: 'fresh',
+      latest_sync_at: '2026-03-15T14:00:00.000Z',
+      latest_sync_status: 'ok',
+      staleness_days: 0,
+      baseline_window: {
+        start: '2026-02-16',
+        end: '2026-03-15',
+        scored_day_count: 28,
+        coverage_pct: 0.93,
       },
-      sources_completeness: {
-        cycles: 'complete',
-        recoveries: 'complete',
-        sleeps: 'complete',
-        workouts: 'complete',
-      },
+      missing_resources: [],
       week_start: '2026-03-09',
       week_end: '2026-03-15',
       pattern_test_window: {
@@ -35,7 +33,7 @@ function makeWeekly(overrides: Partial<WeeklyReviewResult> = {}): WeeklyReviewRe
         end: '2026-03-15',
         scored_day_count: 28,
       },
-    } as unknown as WeeklyReviewResult['data_status'],
+    },
     week_summary: {
       scored_day_count: 7,
       worst_days: [],
@@ -45,8 +43,8 @@ function makeWeekly(overrides: Partial<WeeklyReviewResult> = {}): WeeklyReviewRe
     },
     pattern: {
       kind: 'no_pattern',
-      reason: 'insufficient_signal',
-    } as unknown as WeeklyReviewResult['pattern'],
+      reason: 'no_factor_cleared_fdr',
+    },
     candidate_results: [],
     decision_prompt: { kind: 'silent' },
     confidence: { tier: 'normal', sample_size: 28 } as unknown as WeeklyReviewResult['confidence'],
