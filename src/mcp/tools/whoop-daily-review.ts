@@ -10,12 +10,9 @@
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import { renderDailyReview } from '../../formatters/daily-review.txt.js';
-import type { DailyReviewResult, Services } from '../../services/index.js';
+import type { Services } from '../../services/index.js';
 import { register } from '../register.js';
-
-function toStructuredContent(r: DailyReviewResult): { [k: string]: unknown } {
-  return JSON.parse(JSON.stringify(r)) as { [k: string]: unknown };
-}
+import { toStructuredContent } from './utils.js';
 
 const TOOL_DESCRIPTION =
   'Today vs trailing-30 baseline. Returns anomalies, suggested actions, confidence tier, and data-freshness lead.';

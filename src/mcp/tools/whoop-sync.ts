@@ -18,12 +18,9 @@
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import { formatSyncResult } from '../../formatters/sync.txt.js';
-import type { RunSyncResult, Services } from '../../services/index.js';
+import type { Services } from '../../services/index.js';
 import { register } from '../register.js';
-
-function toStructuredContent(r: RunSyncResult): { [k: string]: unknown } {
-  return JSON.parse(JSON.stringify(r)) as { [k: string]: unknown };
-}
+import { toStructuredContent } from './utils.js';
 
 const TOOL_DESCRIPTION =
   'Sync WHOOP API v2 into the local cache. Returns per-resource outcomes (success / partial / failed) and the sync run id.';

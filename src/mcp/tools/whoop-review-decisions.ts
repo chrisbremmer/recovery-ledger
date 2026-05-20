@@ -21,10 +21,7 @@ import type {
   Services,
 } from '../../services/index.js';
 import { register } from '../register.js';
-
-function toStructuredContent(r: ReviewDecisionsResult): { [k: string]: unknown } {
-  return JSON.parse(JSON.stringify(r)) as { [k: string]: unknown };
-}
+import { toStructuredContent } from './utils.js';
 
 function renderResult(r: ReviewDecisionsResult): string {
   return r.mode === 'list'

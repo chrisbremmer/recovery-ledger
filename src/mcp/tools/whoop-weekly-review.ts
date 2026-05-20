@@ -11,12 +11,9 @@
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import { renderWeeklyReview } from '../../formatters/weekly-review.txt.js';
-import type { Services, WeeklyReviewResult } from '../../services/index.js';
+import type { Services } from '../../services/index.js';
 import { register } from '../register.js';
-
-function toStructuredContent(r: WeeklyReviewResult): { [k: string]: unknown } {
-  return JSON.parse(JSON.stringify(r)) as { [k: string]: unknown };
-}
+import { toStructuredContent } from './utils.js';
 
 const TOOL_DESCRIPTION =
   'Weekly story: trailing-7 narrative (best/worst day, avg strain, total sleep) plus trailing-28 pattern detection with FDR-controlled candidates.';

@@ -15,12 +15,9 @@
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import { renderQueryCache } from '../../formatters/query-cache.txt.js';
-import type { QueryCacheInput, QueryCacheResult, Services } from '../../services/index.js';
+import type { QueryCacheInput, Services } from '../../services/index.js';
 import { register } from '../register.js';
-
-function toStructuredContent(r: QueryCacheResult): { [k: string]: unknown } {
-  return JSON.parse(JSON.stringify(r)) as { [k: string]: unknown };
-}
+import { toStructuredContent } from './utils.js';
 
 // Per-arm union of resource discriminators + per-arm filter sets carrying
 // the D-24 escape hatches (includeUnscored / includeExcluded) and

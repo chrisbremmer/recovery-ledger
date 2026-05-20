@@ -110,6 +110,9 @@ describe('Phase 4 MCP tool shim LOC contract — MCP-03 (handler body has 5 or f
   });
 
   for (const file of toolFiles) {
+    // utils.ts is a shared helper module (Review #45 — toStructuredContent
+    // extraction) and has no register() call to inspect.
+    if (file === 'utils.ts') continue;
     it(`${file} register() handler body has 5 or fewer statements`, () => {
       const source = readFileSync(resolve(TOOLS_DIR, file), 'utf-8');
       const body = findHandlerBody(source, 'register');

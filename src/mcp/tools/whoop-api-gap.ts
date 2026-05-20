@@ -7,12 +7,9 @@
 
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { renderApiGap } from '../../formatters/api-gap.txt.js';
-import type { ApiGapResult, Services } from '../../services/index.js';
+import type { Services } from '../../services/index.js';
 import { register } from '../register.js';
-
-function toStructuredContent(r: ApiGapResult): { [k: string]: unknown } {
-  return JSON.parse(JSON.stringify(r)) as { [k: string]: unknown };
-}
+import { toStructuredContent } from './utils.js';
 
 const TOOL_DESCRIPTION =
   'List WHOOP consumer-app features that are NOT exposed via the public v2 API, with the closest v2 alternative when one exists.';

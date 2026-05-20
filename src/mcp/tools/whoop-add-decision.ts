@@ -8,14 +8,10 @@
 
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
-import type { Decision } from '../../domain/types/entities.js';
 import { renderDecisionDetail } from '../../formatters/decision.txt.js';
 import type { Services } from '../../services/index.js';
 import { register } from '../register.js';
-
-function toStructuredContent(d: Decision): { [k: string]: unknown } {
-  return JSON.parse(JSON.stringify(d)) as { [k: string]: unknown };
-}
+import { toStructuredContent } from './utils.js';
 
 const TOOL_DESCRIPTION =
   'Record a decision in the decision ledger. Required: decision text. Optional: category, rationale, confidence (low/medium/high), expectedEffect, followUpDate (ISO yyyy-mm-dd).';
@@ -27,11 +23,13 @@ export function registerWhoopAddDecision(server: McpServer, services: Services):
     {
       description: TOOL_DESCRIPTION,
       inputSchema: {
-        decision: z.string(),
-        category: z.string().optional(),
-        rationale: z.string().nullable().optional(),
+        // Review #48: cap free-text fields so an over-large agent payload
+        // is rejected at the boundary instead of pushed to the DB.
+        decision: z.string().max(500),
+        category: z.string().max(100).optional(),
+        rationale: z.string().max(2000).nullable().optional(),
         confidence: z.enum(['low', 'medium', 'high']).nullable().optional(),
-        expectedEffect: z.string().nullable().optional(),
+        expectedEffect: z.string().max(500).nullable().optional(),
         followUpDate: z.string().optional(),
       },
     },
