@@ -16,7 +16,10 @@
 
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
+import { isMigrationError } from '../infrastructure/db/migrate.js';
+import { logger } from '../infrastructure/config/logger.js';
 import { bootstrap } from '../services/index.js';
+import { serializeError } from './sanitize.js';
 import { registerDailyDecisionBrief } from './prompts/daily-decision-brief.js';
 import { registerDeloadOrTrain } from './prompts/deload-or-train.js';
 import { registerExperimentDesigner } from './prompts/experiment-designer.js';
@@ -43,7 +46,33 @@ const server = new McpServer({ name: 'recovery-ledger', version: '0.1.0' });
 // ~/.recovery-ledger directory. Production callers leave the env unset
 // and pay the normal paths.dbFile resolution.
 const dbFileOverride = process.env.MCP_DB_FILE;
-const app = bootstrap(dbFileOverride === undefined ? {} : { dbFile: dbFileOverride });
+// Review #20: bootstrap can throw MigrationError (corrupt DB, missing
+// migration dir, schema-version skew). An unhandled throw at this
+// top-level site exits the process with a stack trace on stderr that
+// agents see as a generic "MCP startup failed" with no remediation hint.
+// Surface a structured log with backupPath when present, then exit 1.
+let app: ReturnType<typeof bootstrap>;
+try {
+  app = bootstrap(dbFileOverride === undefined ? {} : { dbFile: dbFileOverride });
+} catch (err) {
+  if (isMigrationError(err)) {
+    logger.fatal(
+      {
+        event: 'bootstrap_failed',
+        kind: err.kind,
+        backupPath: err.backupPath,
+        err: serializeError(err),
+      },
+      'MCP startup failed (migration error); pre-migration backup at the path above. Run `recovery-ledger doctor` for diagnostics.',
+    );
+  } else {
+    logger.fatal(
+      { event: 'bootstrap_failed', err: serializeError(err) },
+      'MCP startup failed; run `recovery-ledger doctor` for diagnostics.',
+    );
+  }
+  process.exit(1);
+}
 
 // 8 tools (MCP-01 + D-29)
 registerWhoopDoctor(server, app.services);

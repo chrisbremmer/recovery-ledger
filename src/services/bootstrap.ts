@@ -207,11 +207,16 @@ export function bootstrap(opts: BootstrapOptions = {}): Bootstrapped {
   const log = opts.logger ?? logger;
 
   const { db, sqlite } = openDb(dbFile);
+  // Review #21: surface migration start/finish so a slow first-run migration
+  // (large WAL replay, large pre-migration backup) is not silently waiting.
+  // Observability only; no behavior change.
+  log.info({ event: 'migration_started', migrationsDir });
   migrate(sqlite, {
     migrationsDir,
     backupsDir: paths.backupsDir,
     dbFile,
   });
+  log.info({ event: 'migration_finished' });
 
   const repos = {
     cycles: createCyclesRepo(db),
