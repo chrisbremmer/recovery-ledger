@@ -11,11 +11,12 @@
 //   invalid_input    = 1   unknown resource OR flag/resource mismatch
 //   bootstrap_failed = 1
 
+import { logger } from '../../infrastructure/config/logger.js';
 import { renderQueryCache } from '../../formatters/query-cache.txt.js';
 import { formatBootstrapError } from '../../formatters/sync.txt.js';
 import { paths } from '../../infrastructure/config/paths.js';
 import { isMigrationError } from '../../infrastructure/db/migrate.js';
-import { sanitize } from '../../mcp/sanitize.js';
+import { sanitize, serializeError } from '../../mcp/sanitize.js';
 import type { QueryCacheInput } from '../../services/cache/types.js';
 import { type Bootstrapped, bootstrap } from '../../services/index.js';
 
@@ -23,6 +24,7 @@ export const QUERY_EXIT_CODES: Readonly<Record<string, number>> = Object.freeze(
   ok: 0,
   invalid_input: 1,
   bootstrap_failed: 1,
+  service_error: 1,
 });
 
 /** Closed tuple of valid resource names — adding a 9th arm to
@@ -299,11 +301,21 @@ export async function runQueryCommand(resource: string, opts: RunQueryCommandOpt
     return;
   }
 
-  // 4 & 5. Service + render.
-  const result = await app.services.queryCache(built.value);
-  const body = renderQueryCache(result);
-  process.stdout.write(`${body}\n`, () => {
+  // 4 & 5. Service + render. Review #40: wrap in try/catch so a repo or
+  // formatter failure surfaces a structured log on stderr and a non-zero
+  // exit, instead of throwing an unhandled rejection.
+  try {
+    const result = await app.services.queryCache(built.value);
+    const body = renderQueryCache(result);
+    process.stdout.write(`${body}\n`, () => {
+      app.close();
+      process.exit(QUERY_EXIT_CODES.ok);
+    });
+  } catch (err) {
+    logger.error({ event: 'query_command_failed', err: serializeError(err) });
     app.close();
-    process.exit(QUERY_EXIT_CODES.ok);
-  });
+    process.stdout.write(`Query failed: ${sanitize(String(err))}\n`, () => {
+      process.exit(QUERY_EXIT_CODES.service_error ?? 1);
+    });
+  }
 }
