@@ -21,6 +21,11 @@ export interface DailySummariesRepo {
   /** Idempotent per-day upsert. PK is `date`. Phase 4 baseline service
    *  is the sole caller. */
   upsertOneDay(summary: DailySummary): void;
+  /** Batched per-day upsert wrapping one BEGIN IMMEDIATE transaction
+   *  around N rows. Matches the `upsertBatch` pattern used by
+   *  cycles/recovery/sleep/workouts repos and avoids 30 sequential
+   *  lock+fsync round-trips on cold review (Review #3). */
+  upsertManyDays(summaries: ReadonlyArray<DailySummary>): void;
   /** Range query inclusive on both ends. */
   byDateRange(start: string, end: string): DailySummary[];
   /** Max computed_at across the table; null when empty. Phase 5 doctor
@@ -61,6 +66,43 @@ export function createDailySummariesRepo(db: ReturnType<typeof drizzle>): DailyS
               },
             })
             .run();
+        },
+        { behavior: 'immediate' },
+      );
+    },
+
+    upsertManyDays(summaries): void {
+      if (summaries.length === 0) return;
+      db.transaction(
+        (tx) => {
+          for (const summary of summaries) {
+            tx.insert(dailySummariesTable)
+              .values({
+                date: summary.date,
+                user_id: summary.userId,
+                recovery_score: summary.recoveryScore,
+                sleep_efficiency_percentage: summary.sleepEfficiencyPercentage,
+                day_strain: summary.dayStrain,
+                respiratory_rate: summary.respiratoryRate,
+                hrv_rmssd_milli: summary.hrvRmssdMilli,
+                resting_heart_rate: summary.restingHeartRate,
+                computed_at: summary.computedAt,
+              })
+              .onConflictDoUpdate({
+                target: dailySummariesTable.date,
+                set: {
+                  user_id: sql`excluded.user_id`,
+                  recovery_score: sql`excluded.recovery_score`,
+                  sleep_efficiency_percentage: sql`excluded.sleep_efficiency_percentage`,
+                  day_strain: sql`excluded.day_strain`,
+                  respiratory_rate: sql`excluded.respiratory_rate`,
+                  hrv_rmssd_milli: sql`excluded.hrv_rmssd_milli`,
+                  resting_heart_rate: sql`excluded.resting_heart_rate`,
+                  computed_at: sql`excluded.computed_at`,
+                },
+              })
+              .run();
+          }
         },
         { behavior: 'immediate' },
       );

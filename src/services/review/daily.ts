@@ -164,12 +164,14 @@ export async function getDailyReview(
 
   // Step 14: daily_summaries memoization. One row per cycle in window — gives
   // Phase 5 doctor a precomputed surface for data-quality counts.
+  // Use a single BEGIN IMMEDIATE transaction (Review #3) instead of 30
+  // sequential lock+fsync round-trips on cold review.
   const computedAt = deps.clock().toISOString();
-  for (const cycle of cyclesWindow) {
+  const summariesToUpsert = cyclesWindow.map((cycle) => {
     const cycleDate = cycle.start.slice(0, 10);
     const recovery = findRecoveryForCycle(recoveriesWindow, cycle.id);
     const sleep = findSleepEndingOn(sleepsWindow, cycleDate);
-    deps.repos.dailySummaries.upsertOneDay({
+    return {
       date: cycleDate,
       userId: cycle.userId,
       recoveryScore: recovery?.scoreState === 'SCORED' ? recovery.recoveryScore : null,
@@ -180,8 +182,9 @@ export async function getDailyReview(
       hrvRmssdMilli: recovery?.scoreState === 'SCORED' ? recovery.hrvRmssdMilli : null,
       restingHeartRate: recovery?.scoreState === 'SCORED' ? recovery.restingHeartRate : null,
       computedAt,
-    });
-  }
+    };
+  });
+  deps.repos.dailySummaries.upsertManyDays(summariesToUpsert);
 
   // Step 15: typed result. D-07 patterns:[] (always-empty v1 slot).
   const patterns: Pattern[] = [];
