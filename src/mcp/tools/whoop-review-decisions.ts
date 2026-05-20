@@ -80,7 +80,9 @@ export function registerWhoopReviewDecisions(server: McpServer, services: Servic
     'whoop_review_decisions',
     { description: TOOL_DESCRIPTION, inputSchema: REVIEW_DECISIONS_SHAPE },
     async (input) => {
-      const result = await services.reviewDecisions(normalizeInput(input as ReviewDecisionsRawInput));
+      const result = await services.reviewDecisions(
+        normalizeInput(input as ReviewDecisionsRawInput),
+      );
       return {
         content: [{ type: 'text', text: renderResult(result) }],
         structuredContent: toStructuredContent(result),

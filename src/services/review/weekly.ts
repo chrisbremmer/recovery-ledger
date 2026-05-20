@@ -240,9 +240,15 @@ function buildWeekSummary(
   // ADR-0003: narrowed on scoreState === 'SCORED' so the TS narrower yields
   // CycleScored / RecoveryScored / SleepScored where the optional metric
   // fields are required `number`. No casts.
-  const scoredCycles = cycles.filter((c): c is Cycle & { scoreState: 'SCORED' } => c.scoreState === 'SCORED');
-  const scoredRecoveries = recoveries.filter((r): r is Recovery & { scoreState: 'SCORED' } => r.scoreState === 'SCORED');
-  const scoredSleeps = sleeps.filter((s): s is Sleep & { scoreState: 'SCORED' } => s.scoreState === 'SCORED');
+  const scoredCycles = cycles.filter(
+    (c): c is Cycle & { scoreState: 'SCORED' } => c.scoreState === 'SCORED',
+  );
+  const scoredRecoveries = recoveries.filter(
+    (r): r is Recovery & { scoreState: 'SCORED' } => r.scoreState === 'SCORED',
+  );
+  const scoredSleeps = sleeps.filter(
+    (s): s is Sleep & { scoreState: 'SCORED' } => s.scoreState === 'SCORED',
+  );
 
   let bestDay: WeekSummary['best_day'] = null;
   for (const cycle of scoredCycles) {

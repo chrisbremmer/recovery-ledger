@@ -16,10 +16,9 @@
 
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
-import { isMigrationError } from '../infrastructure/db/migrate.js';
 import { logger } from '../infrastructure/config/logger.js';
+import { isMigrationError } from '../infrastructure/db/migrate.js';
 import { bootstrap } from '../services/index.js';
-import { serializeError } from './sanitize.js';
 import { registerDailyDecisionBrief } from './prompts/daily-decision-brief.js';
 import { registerDeloadOrTrain } from './prompts/deload-or-train.js';
 import { registerExperimentDesigner } from './prompts/experiment-designer.js';
@@ -30,6 +29,7 @@ import { registerDataQuality } from './resources/data-quality.js';
 import { registerDecisionsOpen } from './resources/decisions-open.js';
 import { registerSummaryToday } from './resources/summary-today.js';
 import { registerSummaryWeek } from './resources/summary-week.js';
+import { serializeError } from './sanitize.js';
 import { registerWhoopAddDecision } from './tools/whoop-add-decision.js';
 import { registerWhoopApiGap } from './tools/whoop-api-gap.js';
 import { registerWhoopDailyReview } from './tools/whoop-daily-review.js';

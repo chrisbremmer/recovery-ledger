@@ -18,11 +18,7 @@ import type { Logger } from 'pino';
 import { ulid } from 'ulid';
 import type { Decision } from '../../domain/types/entities.js';
 import type { DecisionsRepo } from '../../infrastructure/db/repositories/decisions.repo.js';
-import type {
-  AddDecisionInput,
-  ReviewDecisionsInput,
-  ReviewDecisionsResult,
-} from './types.js';
+import type { AddDecisionInput, ReviewDecisionsInput, ReviewDecisionsResult } from './types.js';
 
 // ----------------------------------------------------------------------------
 // Dependency-injection surfaces. Each service function takes the narrowest
@@ -114,4 +110,3 @@ export async function reviewDecisions(
   deps.logger.info({ event: 'decision_updated', id: input.id, status: input.status });
   return { mode: 'update', decision };
 }
-

@@ -433,7 +433,13 @@ describe('services/cache — body_measurements arm', () => {
     for (let i = 0; i < 25; i += 1) {
       const day = String(i + 1).padStart(2, '0');
       h.deps.repos.bodyMeasurements.upsertOnChange(
-        { userId: 1001, heightMeter: 1.8, weightKilogram: 70 + i, maxHeartRate: 190, rawJson: '{}' },
+        {
+          userId: 1001,
+          heightMeter: 1.8,
+          weightKilogram: 70 + i,
+          maxHeartRate: 190,
+          rawJson: '{}',
+        },
         { clock: new Date(`2026-04-${day}T08:00:00.000Z`) },
       );
     }
