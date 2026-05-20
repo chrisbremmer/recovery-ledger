@@ -4,13 +4,13 @@ milestone: v1.0
 milestone_name: milestone
 current_plan: 12
 status: verifying
-last_updated: "2026-05-20T20:30:47.458Z"
+last_updated: "2026-05-20T20:37:29.834Z"
 progress:
   total_phases: 5
-  completed_phases: 3
+  completed_phases: 4
   total_plans: 39
-  completed_plans: 38
-  percent: 97
+  completed_plans: 39
+  percent: 100
 ---
 
 # State: Recovery Ledger
@@ -35,7 +35,7 @@ Plan: 12 of 12 — Phase 4 ready for verification + PR
 - **Phase:** 4 — CLOSED 2026-05-20
 - **Plan:** All 12 Phase 4 plans complete (Waves 0-5 closed): 04-01 Wave 0 infra + D-36 wrappers + Gates H/I/J + 6 contract scaffolds; 04-02 cross-cutting type contracts; 04-03 stats primitives (median + MAD + Mann-Whitney + BH-FDR + D-35 fixtures); 04-04 baselines + anomalies + confidence pure-domain layer; 04-05 patterns + action/decision-prompt catalogs; 04-06 decisions repo extension + decision service + api-gap data; 04-07 review services (daily + weekly orchestrators); 04-08 queryCache + bootstrap composition-root extension; 04-09 formatters + D-26 banned-word contract test; 04-10 MCP surface (8 tools + 6 resources + 4 prompts + D-29 attestation); 04-11 CLI commands (7 new subcommands); 04-12 phase close (full-suite green + 10 gates + 18 REQ flips + STATE/ROADMAP/VALIDATION close). All 18 REQ-IDs (REV-01..08 + DEC-01..04 + MCP-01..06) Complete with VALIDATION test-file references. Next move: user review + PR to main; Phase 5 (DOC-01..06: doctor polish, install guide, <20-minute setup CI stopwatch) follows.
 - **Status:** Phase complete — ready for verification + PR
-- **Progress:** [████████████████░░░░] 80% (39 / 39 plans across 4 / 5 phases; Phase 5 unplanned)
+- **Progress:** [██████████] 100%
 
 ```
 [████████████████░░░░] 4 / 5 phases complete; 39 / 39 plans done so far (6 / 6 in Phase 1; 8 / 8 in Phase 2; 13 / 13 in Phase 3; 12 / 12 in Phase 4)
