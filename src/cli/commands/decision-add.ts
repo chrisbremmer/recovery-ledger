@@ -111,7 +111,17 @@ export function parseFollowUp(
       message: `Invalid --follow-up: ${sanitize(raw)} is not a valid date.`,
     };
   }
-  return { ok: true, value: parsed.toISOString().slice(0, 10) };
+  // Reject calendar rollover ("2026-02-30" → "2026-03-02", "2026-04-31" →
+  // "2026-05-01"). JS Date's automatic month overflow makes the
+  // Number.isNaN guard above accept these silently.
+  const roundTrip = parsed.toISOString().slice(0, 10);
+  if (roundTrip !== raw) {
+    return {
+      ok: false,
+      message: `Invalid --follow-up: ${sanitize(raw)} is not a valid calendar date.`,
+    };
+  }
+  return { ok: true, value: roundTrip };
 }
 
 /**
