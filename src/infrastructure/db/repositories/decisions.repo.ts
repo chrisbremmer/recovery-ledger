@@ -137,6 +137,7 @@ export function createDecisionsRepo(db: ReturnType<typeof drizzle>): DecisionsRe
         .select()
         .from(decisionsTable)
         .where(sql`${decisionsTable.id} LIKE ${normalized} ESCAPE '\\'`)
+        .orderBy(desc(decisionsTable.created_at))
         .all();
       return rows.map(rowToDecision);
     },
