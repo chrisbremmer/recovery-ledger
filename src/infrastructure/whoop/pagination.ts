@@ -117,7 +117,11 @@ export async function paginateAll<T>(
         });
       }
     }
-    nextToken = page.next_token;
+    // Normalize empty-string next_token to null (treat as end-of-stream).
+    // WHOOP's documented sentinel is `null`, but an empty string is a
+    // plausible defensive alternative — treating it as end-of-stream avoids
+    // one extra fetch round-trip before cycle detection would catch it.
+    nextToken = page.next_token === '' ? null : page.next_token;
     // Defense-in-depth: detect a next_token cycle (WHOOP returning the same
     // token twice would otherwise loop forever). Throw loudly so the failure
     // is visible rather than an infinite-pagination hang.
