@@ -22,10 +22,9 @@ import { sanitize, serializeError } from './sanitize.js';
 export interface PromptConfig {
   title?: string;
   description: string;
-  // The SDK accepts an optional `argsSchema` Zod schema; we type-erase to
+  // The SDK accepts an optional `argsSchema` Zod shape; we type-erase to
   // `unknown` here so callers can pass any Zod shape without leaking the
-  // SDK's internal generic across the wrapper. Phase 4 prompts ship
-  // without input args (D-27) so the field is unused at this stage.
+  // SDK's internal generic across the wrapper.
   argsSchema?: unknown;
 }
 
@@ -88,23 +87,18 @@ export function registerPrompt(
       };
     }
   };
-  // The SDK's PromptCallback union splits on whether argsSchema is
-  // provided; without an argsSchema (Phase 4 D-27 — all 4 prompts ship
-  // arg-less), the callback signature is `(extra) => ...`. We type-erase
-  // the handler at the wrapper boundary; the success-path return is
-  // structurally identical to GetPromptResult so the SDK accepts it.
-  // The config also passes through `unknown` because the SDK's expected
-  // shape uses `argsSchema?: ZodRawShapeCompat` (not the broader `unknown`
-  // surface our PromptConfig declares), and TS's exactOptionalPropertyTypes
-  // refuses the implicit-widening that would otherwise let `unknown` flow
-  // into the SDK's narrower optional slot.
   // The SDK's PromptCallback union splits on whether `argsSchema` is
-  // provided; without one (Phase 4 D-27 — all 4 prompts ship arg-less),
-  // the callback signature is `(extra) => ...`. We narrow the cast to the
-  // SDK's own parameter types (Review #10) instead of `as never` so the
-  // SDK overload still gets parameter-count + structural-shape checks,
-  // and a future SDK bump that adds/removes a parameter fails here at
-  // compile time rather than silently accepting the call.
+  // provided. The callback signature is `(args, extra) => ...` when an
+  // argsSchema is present and `(extra) => ...` when it is not. We narrow
+  // the cast to the SDK's own parameter types instead of `as never` so the
+  // SDK overload still gets parameter-count + structural-shape checks, and
+  // a future SDK bump that adds or removes a parameter fails here at
+  // compile time rather than silently accepting the call. The config also
+  // passes through `unknown` because the SDK's expected shape uses
+  // `argsSchema?: ZodRawShapeCompat` (not the broader `unknown` surface
+  // our PromptConfig declares), and TS's exactOptionalPropertyTypes refuses
+  // the implicit-widening that would otherwise let `unknown` flow into the
+  // SDK's narrower optional slot.
   server.registerPrompt(
     name,
     config as Parameters<typeof server.registerPrompt>[1],

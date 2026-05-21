@@ -41,7 +41,7 @@ export interface ApiGapEntry {
 
 /**
  * `whoop_api_gap` result shape. Single field — the catalog array.
- * Plan 04-10 `services.getApiGaps()` returns the in-source constant
+ * Plan 04-10 `services.getApiGap()` returns the in-source constant
  * verbatim; no filtering, no pagination, no I/O.
  */
 export interface ApiGapResult {
