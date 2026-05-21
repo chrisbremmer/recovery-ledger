@@ -253,7 +253,7 @@ function buildWeekSummary(
   let bestDay: WeekSummary['best_day'] = null;
   for (const cycle of scoredCycles) {
     const recovery = scoredRecoveries.find((r) => r.cycleId === cycle.id);
-    if (recovery === undefined || recovery.recoveryScore === undefined) continue;
+    if (recovery === undefined) continue;
     const score = recovery.recoveryScore;
     if (bestDay === null || score > bestDay.recovery_score) {
       bestDay = { date: cycle.start.slice(0, 10), recovery_score: score };
@@ -262,7 +262,7 @@ function buildWeekSummary(
 
   const strains: number[] = [];
   for (const c of scoredCycles) {
-    if (c.strain !== undefined && Number.isFinite(c.strain)) strains.push(c.strain);
+    if (Number.isFinite(c.strain)) strains.push(c.strain);
   }
   const avgStrain =
     strains.length === 0 ? null : strains.reduce((a, b) => a + b, 0) / strains.length;
@@ -270,7 +270,6 @@ function buildWeekSummary(
   let totalSleepMinutes = 0;
   let sleepCount = 0;
   for (const s of scoredSleeps) {
-    if (s.totalInBedTimeMilli === undefined || s.totalAwakeTimeMilli === undefined) continue;
     const duration = (s.totalInBedTimeMilli - s.totalAwakeTimeMilli) / 60_000;
     if (Number.isFinite(duration)) {
       totalSleepMinutes += duration;
