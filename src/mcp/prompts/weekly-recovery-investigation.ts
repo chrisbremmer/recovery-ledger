@@ -21,13 +21,11 @@ export function registerWeeklyRecoveryInvestigation(server: McpServer, services:
     'whoop_weekly_recovery_investigation',
     {
       description: 'Renders the weekly review and asks for a pattern investigation.',
-      argsSchema: { weekEnding: z.string().optional() },
+      argsSchema: { date: z.string().optional() },
     },
     async (args) => {
-      const a = (args ?? {}) as { weekEnding?: string };
-      const result = await services.getWeeklyReview(
-        a.weekEnding === undefined ? {} : { date: a.weekEnding },
-      );
+      const a = (args ?? {}) as { date?: string };
+      const result = await services.getWeeklyReview(a.date === undefined ? {} : { date: a.date });
       const text = `${renderWeeklyReview(result)}\n\nInstruction: ${WEEKLY_RECOVERY_INVESTIGATION_INSTRUCTION}`;
       return buildPromptMessage(text);
     },
