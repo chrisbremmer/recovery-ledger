@@ -33,7 +33,15 @@ export function registerWhoopSync(server: McpServer, services: Services): void {
       description: TOOL_DESCRIPTION,
       inputSchema: {
         days: z.number().int().positive().max(365).optional(),
-        since: z.string().optional(),
+        // Defense-in-depth shape check: the CLI validates `since` via
+        // parseSinceFlag, but the MCP tool was accepting any string. Limit to
+        // ISO date (yyyy-mm-dd) or full ISO timestamp prefix so callers cannot
+        // smuggle through arbitrary text. The service layer still owns
+        // calendar-validity verification.
+        since: z
+          .string()
+          .regex(/^\d{4}-\d{2}-\d{2}(T\d{2}:\d{2}:\d{2}(\.\d{1,3})?(Z|[+-]\d{2}:\d{2})?)?$/)
+          .optional(),
         resources: z
           .array(
             z.enum(['cycles', 'recoveries', 'sleeps', 'workouts', 'profile', 'body_measurements']),

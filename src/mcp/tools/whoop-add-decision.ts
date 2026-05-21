@@ -21,7 +21,7 @@ const TOOL_DESCRIPTION =
 // so an over-large agent payload is rejected at the boundary instead of
 // pushed to the DB.
 const ADD_DECISION_SHAPE = {
-  decision: z.string().max(500),
+  decision: z.string().min(1).max(500),
   category: z.string().max(100).optional(),
   rationale: z.string().max(2000).nullable().optional(),
   confidence: z.enum(['low', 'medium', 'high']).nullable().optional(),

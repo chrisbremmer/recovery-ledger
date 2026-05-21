@@ -39,7 +39,11 @@ function renderResult(r: ReviewDecisionsResult): string {
 // flat fields without `superRefine` machinery.
 const REVIEW_DECISIONS_SHAPE = {
   mode: z.enum(['list', 'update']).optional(),
-  id: z.string().optional(),
+  // ULIDs are exactly 26 characters (Crockford Base32). Tightening at the
+  // schema rejects empty / truncated ids before they reach the repo's blind
+  // WHERE id=<input> path, where they would surface as a misleading
+  // "decision not found after update" rather than a clear validation error.
+  id: z.string().length(26).optional(),
   status: z.enum(['open', 'followed_up', 'abandoned']).optional(),
   notes: z.string().nullable().optional(),
   includeAll: z.boolean().optional(),
