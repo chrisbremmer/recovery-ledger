@@ -40,6 +40,13 @@ import { AuthError } from './errors.js';
  *  refresh request time to complete before any caller would see a 401. */
 export const REFRESH_BUFFER_MS = 5 * 60 * 1000;
 
+/** Cap on a single token-endpoint POST. A stalled WHOOP token endpoint
+ *  would otherwise hold the in-process single-flight `inFlightRefresh`
+ *  promise indefinitely, blocking every concurrent WHOOP call until OS TCP
+ *  timeout. Mirrors `HTTP_REQUEST_TIMEOUT_MS` in `client.ts` for the API
+ *  fetch path. */
+export const TOKEN_REQUEST_TIMEOUT_MS = 30_000;
+
 /** WHOOP token-endpoint URL. Read once at module load from
  *  `process.env.WHOOP_TOKEN_URL` (the test-only override used by Plan 02-08's
  *  cross-process integration test); production never sets the env var. */
@@ -322,9 +329,11 @@ export function createTokenStore(opts: TokenStoreOptions = {}): TokenStore {
       try {
         fresh = await read();
       } catch (readErr) {
-        logger.warn({ event: 'tokens_reread_failed_inside_lock' });
+        logger.warn({
+          event: 'tokens_reread_failed_inside_lock',
+          error: readErr instanceof Error ? readErr.message : String(readErr),
+        });
         fresh = null;
-        void readErr;
       }
       if (fresh !== null && fresh.expiresAt > now() + REFRESH_BUFFER_MS) {
         logger.debug({ event: 'refresh_skipped_sibling' });
@@ -370,11 +379,32 @@ export function createTokenStore(opts: TokenStoreOptions = {}): TokenStore {
     // Capture obtainedAt BEFORE the fetch so a slow network does not push
     // expiresAt past the actual token lifetime (Anti-Patterns line 524).
     const obtainedAt = now();
-    const res = await fetchFn(WHOOP_TOKEN_URL, {
-      method: 'POST',
-      headers: { 'content-type': 'application/x-www-form-urlencoded' },
-      body,
-    });
+    // AbortController guard against a stalled token endpoint. Without this,
+    // the in-process `inFlightRefresh` promise would hold indefinitely and
+    // block every concurrent WHOOP call until OS TCP timeout.
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), TOKEN_REQUEST_TIMEOUT_MS);
+    let res: Response;
+    try {
+      res = await fetchFn(WHOOP_TOKEN_URL, {
+        method: 'POST',
+        headers: { 'content-type': 'application/x-www-form-urlencoded' },
+        body,
+        signal: controller.signal,
+      });
+    } catch (err) {
+      if (controller.signal.aborted) {
+        logger.warn({ event: 'refresh_timeout', timeoutMs: TOKEN_REQUEST_TIMEOUT_MS });
+        throw new AuthError({
+          kind: 'refresh_failed',
+          detail: `token endpoint timeout after ${TOKEN_REQUEST_TIMEOUT_MS}ms`,
+          cause: err,
+        });
+      }
+      throw err;
+    } finally {
+      clearTimeout(timeoutId);
+    }
     if (!res.ok) {
       // Status only — never inline body text (Pitfall C defense-in-depth;
       // the sanitizer covers the cause chain but we do not help leakers).

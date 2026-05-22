@@ -253,8 +253,19 @@ describe('pruneBackups — retention of 3 most-recent .sqlite files', () => {
   });
 
   it('Test 7: 5 backups → pruneBackups(dir, 3) deletes the 2 oldest plus their -wal / -shm companions', () => {
-    // Create 5 backup triples with staggered mtimes (older → newer).
-    const names = ['b1', 'b2', 'b3', 'b4', 'b5'];
+    // Create 5 backup triples with staggered mtimes (older → newer). Use
+    // ISO-timestamp filenames that match what `takeBackup` actually produces;
+    // the sort key in `pruneBackups` is mtime, but the test names should
+    // mirror real-world shape rather than alpha-sortable shorthand so a
+    // future change to a name-based sort (or a name-collision fix) is
+    // exercised against the actual filename pattern.
+    const names = [
+      '2026-05-20T10-00-00Z',
+      '2026-05-20T11-00-00Z',
+      '2026-05-20T12-00-00Z',
+      '2026-05-20T13-00-00Z',
+      '2026-05-20T14-00-00Z',
+    ];
     for (let i = 0; i < names.length; i += 1) {
       const name = names[i];
       if (name === undefined) continue;
@@ -275,12 +286,19 @@ describe('pruneBackups — retention of 3 most-recent .sqlite files', () => {
 
     const remaining = readdirSync(backupsDir).filter((n) => n.endsWith('.sqlite'));
     expect(remaining).toHaveLength(3);
-    // Specifically: b3, b4, b5 survive; b1 and b2 (plus companions) are gone.
-    expect(remaining.sort()).toEqual(['b3.sqlite', 'b4.sqlite', 'b5.sqlite']);
-    expect(existsSync(path.join(backupsDir, 'b1.sqlite'))).toBe(false);
-    expect(existsSync(path.join(backupsDir, 'b1.sqlite-wal'))).toBe(false);
-    expect(existsSync(path.join(backupsDir, 'b1.sqlite-shm'))).toBe(false);
-    expect(existsSync(path.join(backupsDir, 'b2.sqlite-wal'))).toBe(false);
+    // The three newest survive; the two oldest (plus companions) are gone.
+    const survivors = [`${names[2]}.sqlite`, `${names[3]}.sqlite`, `${names[4]}.sqlite`];
+    expect(remaining.sort()).toEqual(survivors.sort());
+    const evictedBase = names[0];
+    if (evictedBase !== undefined) {
+      expect(existsSync(path.join(backupsDir, `${evictedBase}.sqlite`))).toBe(false);
+      expect(existsSync(path.join(backupsDir, `${evictedBase}.sqlite-wal`))).toBe(false);
+      expect(existsSync(path.join(backupsDir, `${evictedBase}.sqlite-shm`))).toBe(false);
+    }
+    const secondEvictedBase = names[1];
+    if (secondEvictedBase !== undefined) {
+      expect(existsSync(path.join(backupsDir, `${secondEvictedBase}.sqlite-wal`))).toBe(false);
+    }
   });
 });
 

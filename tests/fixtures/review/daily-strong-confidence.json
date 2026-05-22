@@ -1,0 +1,49 @@
+{
+  "_comment": "REV-04 happy-path fixture. 22 SCORED cycles + paired recoveries + sleeps over 30 days (coverage ~73%, scored_day_count=22 → tier='strong'). Today's HRV (45ms) sits at the baseline median → no anomaly fires. Generated procedurally by the test runner via fixture-loader helper; this JSON is the canonical input shape (count + spec) that the loader expands into entity arrays. See tests/fixtures/review/_generators/daily.ts for the expansion logic.",
+  "kind": "daily",
+  "name": "daily-strong-confidence",
+  "reviewed_date": "2026-03-15",
+  "userId": 99,
+  "scored_cycle_dates": [
+    "2026-02-15",
+    "2026-02-16",
+    "2026-02-17",
+    "2026-02-18",
+    "2026-02-19",
+    "2026-02-21",
+    "2026-02-22",
+    "2026-02-23",
+    "2026-02-24",
+    "2026-02-25",
+    "2026-02-27",
+    "2026-02-28",
+    "2026-03-01",
+    "2026-03-02",
+    "2026-03-03",
+    "2026-03-05",
+    "2026-03-06",
+    "2026-03-08",
+    "2026-03-10",
+    "2026-03-12",
+    "2026-03-14",
+    "2026-03-15"
+  ],
+  "metric_overrides": {
+    "default_recovery_score": 70,
+    "default_hrv": 45,
+    "default_rhr": 55,
+    "default_strain": 12,
+    "default_sleep_in_bed_min": 480,
+    "default_sleep_awake_min": 30,
+    "default_sleep_efficiency": 90,
+    "default_respiratory_rate": 14.5
+  },
+  "expected": {
+    "confidence_tier": "strong",
+    "scored_day_count": 22,
+    "anomalies_length": 0,
+    "actions_length": 0,
+    "patterns_length": 0,
+    "insufficient_reason_null": true
+  }
+}

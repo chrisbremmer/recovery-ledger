@@ -47,30 +47,30 @@ Requirements for the initial release. Each maps to roadmap phases.
 
 ### Review
 
-- [ ] **REV-01**: Baseline calculator computes trailing-30-day weighted baselines for HRV (median + MAD), RHR (median + MAD), sleep duration, sleep efficiency, day strain, and respiratory rate from `SCORED` entities only, excluding DST/tz-flagged cycles
-- [ ] **REV-02**: Confidence-tier gating — `insufficient` when < 10 SCORED days, `weak` ≥ 10, `strong` ≥ 20 with ≥ 70% baseline-window coverage; Z-score refused when < 14 days available
-- [ ] **REV-03**: `recovery-ledger review daily` returns the documented daily-review schema (data_status, today_state, anomalies, patterns, actions ≤ 3) with text-fallback rendering
-- [ ] **REV-04**: Daily review surfaces data freshness (latest sync, baseline window, missing/stale resources) at the top of every brief
-- [ ] **REV-05**: When data is insufficient, the daily review states what is missing and declines to make confident recommendations
-- [ ] **REV-06**: `recovery-ledger review weekly` identifies the lowest-recovery days of the week and runs pattern checks on preceding sleep duration / sleep debt / strain / workout timing / HRV delta / RHR delta / respiratory-rate anomaly
-- [ ] **REV-07**: Weekly review applies Benjamini-Hochberg FDR correction at q = 0.10 across ≤ 5 pre-registered candidate factors and returns "no reliable pattern detected" as a typed positive output when nothing crosses threshold
-- [ ] **REV-08**: Review output tone passes a banned-word CI lint (no coach-y / hype / moralizing language) and renders actions as verb-first single sentences
+- [x] **REV-01**: Baseline calculator computes trailing-30-day weighted baselines for HRV (median + MAD), RHR (median + MAD), sleep duration, sleep efficiency, day strain, and respiratory rate from `SCORED` entities only, excluding DST/tz-flagged cycles
+- [x] **REV-02**: Confidence-tier gating — `insufficient` when < 10 SCORED days, `weak` ≥ 10, `strong` ≥ 20 with ≥ 70% baseline-window coverage; Z-score refused when < 14 days available
+- [x] **REV-03**: `recovery-ledger review daily` returns the documented daily-review schema (data_status, today_state, anomalies, patterns, actions ≤ 3) with text-fallback rendering
+- [x] **REV-04**: Daily review surfaces data freshness (latest sync, baseline window, missing/stale resources) at the top of every brief
+- [x] **REV-05**: When data is insufficient, the daily review states what is missing and declines to make confident recommendations
+- [x] **REV-06**: `recovery-ledger review weekly` identifies the lowest-recovery days of the week and runs pattern checks on preceding sleep duration / sleep debt / strain / workout timing / HRV delta / RHR delta / respiratory-rate anomaly
+- [x] **REV-07**: Weekly review applies Benjamini-Hochberg FDR correction at q = 0.10 across ≤ 5 pre-registered candidate factors and returns "no reliable pattern detected" as a typed positive output when nothing crosses threshold
+- [x] **REV-08**: Review output tone passes a banned-word CI lint (no coach-y / hype / moralizing language) and renders actions as verb-first single sentences
 
 ### Decision Ledger
 
-- [ ] **DEC-01**: `recovery-ledger decision add` accepts category, decision, rationale, confidence, expected effect, and follow-up date (ULID id, smart defaults for date and follow-up window) with a one-line happy path
-- [ ] **DEC-02**: Decisions persist with `status` (open / followed_up / abandoned) and `outcome_notes`
-- [ ] **DEC-03**: `recovery-ledger decision review` lists open decisions with elapsed time vs. expected effect window and prompts for outcome capture
-- [ ] **DEC-04**: Weekly review prompts for at least one new decision when none has been recorded in the prior week
+- [x] **DEC-01**: `recovery-ledger decision add` accepts category, decision, rationale, confidence, expected effect, and follow-up date (ULID id, smart defaults for date and follow-up window) with a one-line happy path
+- [x] **DEC-02**: Decisions persist with `status` (open / followed_up / abandoned) and `outcome_notes`
+- [x] **DEC-03**: `recovery-ledger decision review` lists open decisions with elapsed time vs. expected effect window and prompts for outcome capture
+- [x] **DEC-04**: Weekly review prompts for at least one new decision when none has been recorded in the prior week
 
 ### MCP Surface
 
-- [ ] **MCP-01**: MCP server exposes tools `whoop_sync`, `whoop_daily_review`, `whoop_weekly_review`, `whoop_query_cache` (typed per-resource filters, not free-form SQL), `whoop_add_decision`, `whoop_review_decisions`, `whoop_api_gap`, `whoop_doctor`
-- [ ] **MCP-02**: Every tool returns structured JSON (`structuredContent`) plus compact text (`content`) so weaker clients still work
-- [ ] **MCP-03**: All MCP tools are ≤ 5-line shims over services — zero business logic in `src/mcp/`; identical behavior to the CLI equivalents
-- [ ] **MCP-04**: MCP resources `whoop://summary/today`, `whoop://summary/week`, `whoop://baseline/30d`, `whoop://data-quality`, `whoop://api-gaps`, `whoop://decisions/open` are exposed and refresh from the cache
-- [ ] **MCP-05**: MCP prompts `whoop_daily_decision_brief`, `whoop_weekly_recovery_investigation`, `whoop_experiment_designer`, `whoop_deload_or_train` are registered with documented inputs
-- [ ] **MCP-06**: MCP tool error returns are sanitized via the FND-06 contract — no token material, no internal stack traces
+- [x] **MCP-01**: MCP server exposes tools `whoop_sync`, `whoop_daily_review`, `whoop_weekly_review`, `whoop_query_cache` (typed per-resource filters, not free-form SQL), `whoop_add_decision`, `whoop_review_decisions`, `whoop_api_gap`, `whoop_doctor`
+- [x] **MCP-02**: Every tool returns structured JSON (`structuredContent`) plus compact text (`content`) so weaker clients still work
+- [x] **MCP-03**: All MCP tools are ≤ 5-line shims over services — zero business logic in `src/mcp/`; identical behavior to the CLI equivalents
+- [x] **MCP-04**: MCP resources `whoop://summary/today`, `whoop://summary/week`, `whoop://baseline/30d`, `whoop://data-quality`, `whoop://api-gaps`, `whoop://decisions/open` are exposed and refresh from the cache
+- [x] **MCP-05**: MCP prompts `whoop_daily_decision_brief`, `whoop_weekly_recovery_investigation`, `whoop_experiment_designer`, `whoop_deload_or_train` are registered with documented inputs
+- [x] **MCP-06**: MCP tool error returns are sanitized via the FND-06 contract — no token material, no internal stack traces
 
 ### Diagnostics & Setup
 
@@ -151,24 +151,24 @@ Explicitly excluded. Gated behind the hard scope guardrail in PROJECT.md (≥ 12
 | SYNC-05 | Phase 3 | Complete (Plan 03-08, 2026-05-16) |
 | SYNC-06 | Phase 3 | Complete (Plan 03-05, 2026-05-16) |
 | SYNC-07 | Phase 3 | Complete (Plan 03-07, 2026-05-16) |
-| REV-01 | Phase 4 | Pending |
-| REV-02 | Phase 4 | Pending |
-| REV-03 | Phase 4 | Pending |
-| REV-04 | Phase 4 | Pending |
-| REV-05 | Phase 4 | Pending |
-| REV-06 | Phase 4 | Pending |
-| REV-07 | Phase 4 | Pending |
-| REV-08 | Phase 4 | Pending |
-| DEC-01 | Phase 4 | Pending |
-| DEC-02 | Phase 4 | Pending |
-| DEC-03 | Phase 4 | Pending |
-| DEC-04 | Phase 4 | Pending |
-| MCP-01 | Phase 4 | Pending |
-| MCP-02 | Phase 4 | Pending |
-| MCP-03 | Phase 4 | Pending |
-| MCP-04 | Phase 4 | Pending |
-| MCP-05 | Phase 4 | Pending |
-| MCP-06 | Phase 4 | Pending |
+| REV-01 | Phase 4 | Complete (Plans 04-03 + 04-04, 2026-05-20 — Verified by `src/domain/stats/median.test.ts`, `src/domain/stats/mad.test.ts`, `src/domain/baselines/index.test.ts`) |
+| REV-02 | Phase 4 | Complete (Plan 04-04, 2026-05-20 — Verified by `src/domain/confidence/index.test.ts`) |
+| REV-03 | Phase 4 | Complete (Plan 04-07, 2026-05-20 — Verified by `src/services/review/daily.test.ts`, `tests/contract/daily-review-shape.test.ts`) |
+| REV-04 | Phase 4 | Complete (Plans 04-07 + 04-09, 2026-05-20 — Verified by `tests/contract/daily-review-shape.test.ts`, `src/formatters/daily-review.txt.test.ts`) |
+| REV-05 | Phase 4 | Complete (Plan 04-07, 2026-05-20 — Verified by `src/services/review/daily.test.ts` against fixture `daily-insufficient-days.json`) |
+| REV-06 | Phase 4 | Complete (Plans 04-05 + 04-07, 2026-05-20 — Verified by `src/services/review/weekly.test.ts`, `src/domain/patterns/pattern.test.ts`) |
+| REV-07 | Phase 4 | Complete (Plans 04-03 + 04-05 + 04-07, 2026-05-20 — Verified by `src/domain/stats/fdr.test.ts`, `src/domain/patterns/pattern.test.ts`, `src/services/review/weekly.test.ts` against fixtures `bh_downgrades_marginal.fixture.json` + `weekly-pattern-fdr-suppression.json`) |
+| REV-08 | Phase 4 | Complete (Plans 04-01 + 04-09, 2026-05-20 — Verified by `tests/contract/formatter-tone.test.ts` + `scripts/ci-grep-gates.sh` Gate A) |
+| DEC-01 | Phase 4 | Complete (Plans 04-06 + 04-11, 2026-05-20 — Verified by `src/cli/commands/decision-add.test.ts`, `src/services/decision/index.test.ts`) |
+| DEC-02 | Phase 4 | Complete (Plan 04-06, 2026-05-20 — Verified by `src/infrastructure/db/repositories/decisions.repo.test.ts`) |
+| DEC-03 | Phase 4 | Complete (Plan 04-11, 2026-05-20 — Verified by `src/cli/commands/decision-review.test.ts`, `src/cli/commands/decision-update.test.ts`) |
+| DEC-04 | Phase 4 | Complete (Plans 04-05 + 04-07, 2026-05-20 — Verified by `src/services/review/weekly.test.ts` against fixture `weekly-decision-prompt-none-this-week.json`) |
+| MCP-01 | Phase 4 | Complete (Plan 04-10, 2026-05-20 — Verified by `tests/integration/mcp-runtime.test.ts` (tools.length === 8, D-29 attestation)) |
+| MCP-02 | Phase 4 | Complete (Plans 04-01 + 04-10, 2026-05-20 — Verified by `tests/contract/mcp-tool-shape.test.ts`) |
+| MCP-03 | Phase 4 | Complete (Plans 04-01 + 04-10, 2026-05-20 — Verified by `tests/contract/mcp-shim-loc.test.ts`) |
+| MCP-04 | Phase 4 | Complete (Plans 04-01 + 04-10, 2026-05-20 — Verified by `tests/integration/mcp-runtime.test.ts` (resources.length === 6), `tests/contract/mcp-resource-shape.test.ts`) |
+| MCP-05 | Phase 4 | Complete (Plans 04-01 + 04-10, 2026-05-20 — Verified by `tests/integration/mcp-runtime.test.ts` (prompts.length === 4), `tests/contract/mcp-prompt-shape.test.ts`) |
+| MCP-06 | Phase 4 | Complete (Plans 04-01 + 04-10, 2026-05-20 — Verified by `src/mcp/sanitize.test.ts` (extended Plan 04-10 Task 4 with Phase 4 fixtures)) |
 | DOC-01 | Phase 5 | Pending |
 | DOC-02 | Phase 5 | Pending |
 | DOC-03 | Phase 5 | Pending |
@@ -177,11 +177,14 @@ Explicitly excluded. Gated behind the hard scope guardrail in PROJECT.md (≥ 12
 | DOC-06 | Phase 5 | Pending |
 
 **Coverage:**
-- v1 requirements: 49 total
-- Mapped to phases: 49
+- v1 requirements: 50 total (FND=7, AUTH=6, DATA=6, SYNC=7, REV=8, DEC=4, MCP=6, DOC=6)
+- Mapped to phases: 50
 - Unmapped: 0 ✓
-- Complete: 26 / 49 (7 FND + 6 AUTH + 13 DATA/SYNC; Phases 1 + 2 + 3 closed)
+- Complete: 44 / 50 (7 FND + 6 AUTH + 13 DATA/SYNC + 18 REV/DEC/MCP; Phases 1 + 2 + 3 + 4 closed)
+- Remaining: 6 / 50 (DOC-01..06 → Phase 5)
+
+> *Note:* prior coverage lines read "26/49" / "44/49"; the actual prefix-by-prefix sum is 50 (FND=7+AUTH=6+DATA=6+SYNC=7+REV=8+DEC=4+MCP=6+DOC=6). Corrected during Phase 4 close (Plan 04-12).
 
 ---
 *Requirements defined: 2026-05-11*
-*Last updated: 2026-05-16 — Phase 3 closed (13 REQ-IDs flipped to Complete: DATA-01..06 + SYNC-01..07); 26 / 49 requirements done*
+*Last updated: 2026-05-20 — Phase 4 closed (18 REQ-IDs flipped to Complete: REV-01..08 + DEC-01..04 + MCP-01..06); 44 / 50 requirements done*

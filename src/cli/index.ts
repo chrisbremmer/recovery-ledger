@@ -21,9 +21,22 @@
 
 import { pathToFileURL } from 'node:url';
 import { Command, InvalidArgumentError } from 'commander';
+import { API_GAP_EXIT_CODES, runApiGapCommand } from './commands/api-gap.js';
 import { runAuthCommand } from './commands/auth.js';
+import { DECISION_ADD_EXIT_CODES, runDecisionAddCommand } from './commands/decision-add.js';
+import {
+  DECISION_REVIEW_EXIT_CODES,
+  runDecisionReviewCommand,
+} from './commands/decision-review.js';
+import {
+  DECISION_UPDATE_EXIT_CODES,
+  runDecisionUpdateCommand,
+} from './commands/decision-update.js';
 import { runDoctorCommand } from './commands/doctor.js';
 import { runInitCommand } from './commands/init.js';
+import { QUERY_EXIT_CODES, runQueryCommand } from './commands/query.js';
+import { REVIEW_EXIT_CODES, runReviewDailyCommand } from './commands/review-daily.js';
+import { REVIEW_WEEKLY_EXIT_CODES, runReviewWeeklyCommand } from './commands/review-weekly.js';
 import { runSyncCommand } from './commands/sync.js';
 
 /**
@@ -156,6 +169,156 @@ export function buildProgram(): Command {
       ].join('\n'),
     )
     .action(runSyncCommand);
+
+  // Plan 04-11 Wave 4 subcommand wirings. Every `addHelpText('after', ...)`
+  // block references the imported EXIT_CODES constant via the verbatim
+  // arm names — adding an arm to a *_EXIT_CODES constant in the command
+  // file does NOT automatically update the help block; the help text is
+  // the user-facing documentation contract per D-32.
+
+  // `review` parent + 2 subcommands (REV-03 + REV-04).
+  const reviewCmd = program.command('review').description('Run a daily or weekly review');
+
+  reviewCmd
+    .command('daily')
+    .description('Daily review (today vs trailing-30 baseline)')
+    .option('--date <iso>', 'override reviewed_date (defaults to latest SCORED day in cache)')
+    .addHelpText(
+      'after',
+      [
+        '',
+        `Exit codes (REVIEW_EXIT_CODES):`,
+        `  ${REVIEW_EXIT_CODES.ok}  ok               — daily review rendered`,
+        `  ${REVIEW_EXIT_CODES.failed}  failed           — getDailyReview threw after bootstrap succeeded`,
+        `  ${REVIEW_EXIT_CODES.bootstrap_failed}  bootstrap_failed — openDb / migrate failed before service ran`,
+      ].join('\n'),
+    )
+    .action(runReviewDailyCommand);
+
+  reviewCmd
+    .command('weekly')
+    .description('Weekly review (trailing-7 narrative + 28d pattern test)')
+    .option('--date <iso>', 'override reviewed_date')
+    .addHelpText(
+      'after',
+      [
+        '',
+        `Exit codes (REVIEW_WEEKLY_EXIT_CODES):`,
+        `  ${REVIEW_WEEKLY_EXIT_CODES.ok}  ok               — weekly review rendered`,
+        `  ${REVIEW_WEEKLY_EXIT_CODES.failed}  failed           — getWeeklyReview threw after bootstrap`,
+        `  ${REVIEW_WEEKLY_EXIT_CODES.bootstrap_failed}  bootstrap_failed — openDb / migrate failed`,
+      ].join('\n'),
+    )
+    .action(runReviewWeeklyCommand);
+
+  // `decision` parent + 3 subcommands (DEC-01 + DEC-02 + DEC-03).
+  const decisionCmd = program.command('decision').description('Manage the decision ledger');
+
+  decisionCmd
+    .command('add <text>')
+    .description('Record a new decision in the ledger')
+    .option('--category <c>', 'category name', 'general')
+    .option('--rationale <r>', 'why this decision')
+    .option('--confidence <level>', 'low | medium | high')
+    .option('--expected-effect <text>', 'what we expect to see')
+    .option('--follow-up <date>', 'ISO yyyy-mm-dd or "in Nd" (default: now + 7d)')
+    .addHelpText(
+      'after',
+      [
+        '',
+        `Exit codes (DECISION_ADD_EXIT_CODES):`,
+        `  ${DECISION_ADD_EXIT_CODES.ok}  ok               — decision written + readback rendered`,
+        `  ${DECISION_ADD_EXIT_CODES.invalid_input}  invalid_input    — --confidence or --follow-up rejected`,
+        `  ${DECISION_ADD_EXIT_CODES.bootstrap_failed}  bootstrap_failed — openDb / migrate failed`,
+        `  ${DECISION_ADD_EXIT_CODES.db_write_failed}  db_write_failed  — addDecision threw during the repo insert`,
+        '',
+        'Examples:',
+        '  recovery-ledger decision add "go to bed 30 min earlier"',
+        '  recovery-ledger decision add "rest day" --category training --confidence high --follow-up "in 14d"',
+      ].join('\n'),
+    )
+    .action(runDecisionAddCommand);
+
+  decisionCmd
+    .command('review')
+    .description('List open decisions; --interactive prompts past-window outcomes')
+    .option('--all', 'include followed_up + abandoned')
+    .option('--interactive', 'prompt for outcome on past-window open decisions')
+    .addHelpText(
+      'after',
+      [
+        '',
+        `Exit codes (DECISION_REVIEW_EXIT_CODES):`,
+        `  ${DECISION_REVIEW_EXIT_CODES.ok}  ok               — list rendered (also clean exit on ^C mid-prompt)`,
+        `  ${DECISION_REVIEW_EXIT_CODES.bootstrap_failed}  bootstrap_failed — openDb / migrate failed`,
+      ].join('\n'),
+    )
+    .action(runDecisionReviewCommand);
+
+  decisionCmd
+    .command('update <id-or-prefix>')
+    .description('Record outcome for a decision (by full ULID or unambiguous prefix)')
+    .requiredOption('--status <s>', 'open | followed_up | abandoned')
+    .option('--notes <text>', 'outcome notes')
+    .addHelpText(
+      'after',
+      [
+        '',
+        `Exit codes (DECISION_UPDATE_EXIT_CODES):`,
+        `  ${DECISION_UPDATE_EXIT_CODES.ok}  ok               — decision updated`,
+        `  ${DECISION_UPDATE_EXIT_CODES.ambiguous_prefix}  ambiguous_prefix — prefix matched multiple decisions`,
+        `  ${DECISION_UPDATE_EXIT_CODES.no_match}  no_match         — no decision matched the prefix`,
+        `  ${DECISION_UPDATE_EXIT_CODES.invalid_input}  invalid_input    — --status rejected`,
+        `  ${DECISION_UPDATE_EXIT_CODES.bootstrap_failed}  bootstrap_failed — openDb / migrate failed`,
+      ].join('\n'),
+    )
+    .action(runDecisionUpdateCommand);
+
+  // `query <resource>` (D-24 8-arm dispatch).
+  program
+    .command('query <resource>')
+    .description(
+      'Read typed slice of the local cache (cycles|recoveries|sleeps|workouts|profile|body_measurements|sync_runs|decisions)',
+    )
+    .option('--since <iso>', 'lower bound')
+    .option('--until <iso>', 'upper bound')
+    .option('--limit <n>', 'cap rows (default 100, max 500)', parseIntStrict)
+    .option(
+      '--include-unscored',
+      'opt out of SCORED-only filter (cycles/recoveries/sleeps/workouts only)',
+    )
+    .option('--include-excluded', 'opt out of baseline-excluded filter (cycles only)')
+    .option('--status <s>', '(sync_runs | decisions) status filter')
+    .option('--category <c>', '(decisions) category filter')
+    .option('--sport-id <n>', '(workouts) sport id filter', parseIntStrict)
+    .option('--min-recovery-score <n>', '(recoveries) lower bound', parseIntStrict)
+    .option('--max-recovery-score <n>', '(recoveries) upper bound', parseIntStrict)
+    .addHelpText(
+      'after',
+      [
+        '',
+        `Exit codes (QUERY_EXIT_CODES):`,
+        `  ${QUERY_EXIT_CODES.ok}  ok               — query rendered`,
+        `  ${QUERY_EXIT_CODES.invalid_input}  invalid_input    — unknown resource or flag/resource mismatch`,
+        `  ${QUERY_EXIT_CODES.bootstrap_failed}  bootstrap_failed — openDb / migrate failed`,
+      ].join('\n'),
+    )
+    .action(runQueryCommand);
+
+  // `api-gap` (D-28).
+  program
+    .command('api-gap')
+    .description('List WHOOP consumer-app features unavailable via v2 API')
+    .addHelpText(
+      'after',
+      [
+        '',
+        `Exit codes (API_GAP_EXIT_CODES):`,
+        `  ${API_GAP_EXIT_CODES.ok}  ok               — catalog rendered`,
+        `  ${API_GAP_EXIT_CODES.bootstrap_failed}  bootstrap_failed — openDb / migrate failed`,
+      ].join('\n'),
+    )
+    .action(runApiGapCommand);
 
   return program;
 }

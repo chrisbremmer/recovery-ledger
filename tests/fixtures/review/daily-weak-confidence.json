@@ -1,0 +1,42 @@
+{
+  "_comment": "REV-02 weak-tier fixture. 15 SCORED cycles over 30 days (coverage = 50% → tier='weak' per D-13). Today's HRV at baseline median → no anomaly. Anchors the 10 ≤ scoredDays < 20 confidence tier path.",
+  "kind": "daily",
+  "name": "daily-weak-confidence",
+  "reviewed_date": "2026-03-15",
+  "userId": 99,
+  "scored_cycle_dates": [
+    "2026-02-16",
+    "2026-02-18",
+    "2026-02-20",
+    "2026-02-22",
+    "2026-02-24",
+    "2026-02-26",
+    "2026-02-28",
+    "2026-03-01",
+    "2026-03-03",
+    "2026-03-05",
+    "2026-03-07",
+    "2026-03-09",
+    "2026-03-11",
+    "2026-03-13",
+    "2026-03-15"
+  ],
+  "metric_overrides": {
+    "default_recovery_score": 70,
+    "default_hrv": 45,
+    "default_rhr": 55,
+    "default_strain": 12,
+    "default_sleep_in_bed_min": 480,
+    "default_sleep_awake_min": 30,
+    "default_sleep_efficiency": 90,
+    "default_respiratory_rate": 14.5
+  },
+  "expected": {
+    "confidence_tier": "weak",
+    "scored_day_count": 15,
+    "anomalies_length": 0,
+    "actions_length": 0,
+    "patterns_length": 0,
+    "insufficient_reason_null": true
+  }
+}

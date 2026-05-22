@@ -1,0 +1,36 @@
+{
+  "_comment": "Insufficient pattern-test window fixture. Only 10 SCORED cycles in the trailing-28 window → detectWeeklyPattern guards at < 14 (N_WEAK_FLOOR) and returns pattern.kind='no_pattern', reason='insufficient_window_days'. Confidence tier is 'weak' over the trailing-28 window (10 < 20 with coverage 35.7%; 10 ≥ 10 minRequired → not insufficient at the daily/confidence layer because confidenceFromCounts(10, 28) gives weak — but pattern.ts has its own 14-day floor that's stricter). candidate_results=[] because detection short-circuits before per-candidate loop runs.",
+  "kind": "weekly",
+  "name": "weekly-no-pattern-insufficient-window",
+  "reviewed_date": "2026-03-15",
+  "userId": 99,
+  "iana_zone": "America/Los_Angeles",
+  "scored_cycle_dates": [
+    "2026-02-20",
+    "2026-02-23",
+    "2026-02-26",
+    "2026-03-01",
+    "2026-03-04",
+    "2026-03-07",
+    "2026-03-09",
+    "2026-03-11",
+    "2026-03-13",
+    "2026-03-15"
+  ],
+  "defaults": {
+    "recovery_score": 70,
+    "hrv": 45,
+    "rhr": 55,
+    "strain": 12,
+    "sleep_in_bed_min": 480,
+    "sleep_awake_min": 30,
+    "respiratory_rate": 14.5
+  },
+  "expected": {
+    "pattern_kind": "no_pattern",
+    "pattern_reason": "insufficient_window_days",
+    "decision_prompt_kind": "none_this_week",
+    "confidence_tier": "weak",
+    "candidate_results_length": 0
+  }
+}

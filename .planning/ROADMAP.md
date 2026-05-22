@@ -10,7 +10,7 @@
 - [x] **Phase 1: Foundation & Stdout-Pure MCP Bootstrap** - Bootstrapped TypeScript repo, empty CLI + MCP stdio shells, stderr-only logging, MCP error-sanitizer contract, native-module load verification
 - [x] **Phase 2: OAuth, Token Store & Single-Flight Refresh** - WHOOP OAuth flow, keychain-backed token store with chmod 600 fallback, in-process + cross-process single-flight refresh, MCP error sanitizer wired through
 - [x] **Phase 3: Data Model, DB Layer & Sync Loop** - Three-layer types with discriminated-union Score, Drizzle schema + atomic migrator with pre-migration backup, WHOOP HTTP client with rate limiting + pagination, idempotent sync with DST/tz flagging and partial-failure reporting
-- [ ] **Phase 4: Domain Math, Reviews, Decision Ledger & MCP Surface** - Median+MAD baselines, confidence-tier gating, FDR-corrected weekly patterns, daily + weekly reviews, decision ledger, 8 MCP tools + 6 resources + 4 prompts, banned-word tone lint
+- [x] **Phase 4: Domain Math, Reviews, Decision Ledger & MCP Surface** — completed 2026-05-20 - Median+MAD baselines, confidence-tier gating, FDR-corrected weekly patterns, daily + weekly reviews, decision ledger, 8 MCP tools + 6 resources + 4 prompts, banned-word tone lint
 - [ ] **Phase 5: Doctor Polish, Install Guide & <20-Minute Setup Validation** - Full doctor checks, per-client install guides, API-gap docs, launchd template, CI stopwatch test asserting clean-clone-to-first-review under 20 minutes
 
 ## Phase Details
@@ -90,7 +90,19 @@
   3. `recovery-ledger review daily` and `review weekly` lead with data freshness (latest sync, baseline window, missing/stale resources), render actions as verb-first single sentences, and a CI lint on every formatter output fails the build on any banned tone word (`optimize`, `wellness`, `honor`, `journey`, `crush`, `nail`, `dial in`, `tune`, `vibe`, `unlock`, emoji).
   4. `recovery-ledger decision add` accepts a happy-path one-liner with smart defaults (ULID id, default follow-up window, default expected effect) and persists with `status` (open / followed_up / abandoned) + `outcome_notes`; `decision review` lists open decisions with elapsed time vs. expected effect window; the weekly review prompts for at least one new decision when none has been recorded in the prior week.
   5. The MCP server exposes all 8 tools (`whoop_sync`, `whoop_daily_review`, `whoop_weekly_review`, `whoop_query_cache`, `whoop_add_decision`, `whoop_review_decisions`, `whoop_api_gap`, `whoop_doctor`), all 6 resources (`whoop://summary/today`, `whoop://summary/week`, `whoop://baseline/30d`, `whoop://data-quality`, `whoop://api-gaps`, `whoop://decisions/open`), and all 4 prompts (`whoop_daily_decision_brief`, `whoop_weekly_recovery_investigation`, `whoop_experiment_designer`, `whoop_deload_or_train`); every tool returns both `structuredContent` and a compact `content` text fallback; every MCP tool body is ≤ 5 lines of shim over a service function — zero business logic lives in `src/mcp/`.
-**Plans**: TBD
+**Plans**: 12 plans
+- [x] 04-01-PLAN.md — Wave 0 deps install + D-36 wrappers + Gates H/I/J + 6 contract scaffolds (REV-08, MCP-02/03/04/05/06)
+- [x] 04-02-PLAN.md — Type contracts (8 type files + 4 narrowing tests) (REV-01/02/03/06/07, DEC-01/02/03)
+- [x] 04-03-PLAN.md — Stats primitives (median + MAD + Mann-Whitney + BH-FDR + REV-07 fixtures) (REV-01, REV-07) — completed 2026-05-19
+- [x] 04-04-PLAN.md — Baseline + anomaly + confidence pure-domain layer (REV-01, REV-02, REV-05)
+- [x] 04-05-PLAN.md — Patterns + action/decision-prompt catalogs + select (REV-06, REV-07, REV-08, DEC-04)
+- [x] 04-06-PLAN.md — Decisions repo extension + decision service + api-gap data (DEC-01, DEC-02, DEC-03, MCP-01)
+- [x] 04-07-PLAN.md — Review services (daily + weekly orchestrators) + 10 fixtures (REV-01..07, DEC-04)
+- [x] 04-08-PLAN.md — queryCache + bootstrap composition root extension (DEC-01..04, REV-01..07, MCP-01)
+- [x] 04-09-PLAN.md — Formatters + D-26 tone contract test (REV-03, REV-04, REV-08, DEC-03, MCP-04)
+- [x] 04-10-PLAN.md — MCP surface (8 tools + 6 resources + 4 prompts + D-29 attestation) (MCP-01..06)
+- [x] 04-11-PLAN.md — CLI commands (7 new subcommands) (REV-03, REV-04, REV-08, DEC-01..03)
+- [x] 04-12-PLAN.md — Phase close (full-suite green + 10 gates + REQ flips + STATE/ROADMAP/VALIDATION close) (all 18 REQ-IDs) — completed 2026-05-20
 **UI hint**: no
 
 ### Phase 5: Doctor Polish, Install Guide & <20-Minute Setup Validation
@@ -112,14 +124,15 @@
 | 1. Foundation & Stdout-Pure MCP Bootstrap | 6/6 | Complete | 2026-05-12 |
 | 2. OAuth, Token Store & Single-Flight Refresh | 8/8 | Complete | 2026-05-12 |
 | 3. Data Model, DB Layer & Sync Loop | 13/13 | Complete | 2026-05-16 |
-| 4. Domain Math, Reviews, Decision Ledger & MCP Surface | 0/? | Not started | - |
+| 4. Domain Math, Reviews, Decision Ledger & MCP Surface | 12/12 | Complete | 2026-05-20 |
 | 5. Doctor Polish, Install Guide & <20-Minute Setup Validation | 0/? | Not started | - |
 
 ## Coverage
 
-- **v1 requirements:** 49 total
-- **Mapped to phases:** 49
+- **v1 requirements:** 50 total (FND=7, AUTH=6, DATA=6, SYNC=7, REV=8, DEC=4, MCP=6, DOC=6)
+- **Mapped to phases:** 50
 - **Unmapped:** 0
+- **Complete:** 44 / 50 (Phases 1+2+3+4 closed; DOC-01..06 deferred to Phase 5)
 
 ## Cross-Cutting Concerns (Test Origin Map)
 
@@ -138,4 +151,4 @@ Concerns originate in the phase where the first vulnerable code is introduced; t
 
 ---
 *Roadmap created: 2026-05-11*
-*Last updated: 2026-05-16 — Phase 3 (data-model-db-layer-sync-loop) complete. 27 / 27 plans complete across Phases 1 + 2 + 3 (formula-based; Phase 4 plan count TBD).*
+*Last updated: 2026-05-20 — Phase 4 closed (Plan 04-12). 39 / 39 plans complete across Phases 1 + 2 + 3 + 4 (6 + 8 + 13 + 12). 44 / 50 v1 requirements complete; remaining 6 (DOC-01..06) → Phase 5.*

@@ -86,6 +86,10 @@ recovery-ledger decision review       # check outcomes of prior decisions
 
 Every tool returns structured JSON plus a compact text fallback for clients with weaker structured-output support.
 
+### Environment
+
+- `MCP_DB_FILE` — optional override for the SQLite path used by the MCP stdio server (defaults to the resolved `paths.dbFile` in `~/.recovery-ledger/`). Intended as a testability knob for smoke harnesses and CI; pass `:memory:` to route bootstrap at an in-memory DB. **Trust model:** the local process owner already has filesystem read/write to the data dir, so this variable does not weaken the security posture — it just lets test harnesses target a scratch DB without touching production state.
+
 ## Scope guardrail
 
 Web dashboard, BLE companion, hosted service, mobile app, and cross-source integrations stay out of scope until all of these are true:

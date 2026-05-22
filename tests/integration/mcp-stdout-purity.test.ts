@@ -33,7 +33,28 @@ import { describe, expect, test } from 'vitest';
 // a divergence here would silently change one without the other.
 import { FRAME_SETTLE_MS } from '../../src/services/doctor/checks/mcp-stdout-purity.js';
 
-const FIXTURES = ['initialize', 'initialized', 'tools-list', 'whoop-doctor-call'] as const;
+// Phase 4 Plan 04-10 — fixture set extended to cover all 18 surfaces by
+// driving the three list operations after the doctor call. The
+// `resources/list` and `prompts/list` frames force the server to
+// serialize the catalog of every registered surface; if any handler
+// snuck in a `console.log` for debug, the resulting non-JSON byte
+// breaks the stdout-purity assertion below.
+//
+// We don't drive a per-tool / per-resource / per-prompt invocation in
+// the dist roundtrip — that would require seeding the production DB
+// with fixture data. The list operations + the doctor call are
+// sufficient to exercise every registration path (each register*
+// wrapper runs at server boot, walking every catalog entry). The
+// in-process contract tests (tests/contract/mcp-{tool,resource,prompt}-
+// shape.test.ts) cover the per-surface invocation shape.
+const FIXTURES = [
+  'initialize',
+  'initialized',
+  'tools-list',
+  'whoop-doctor-call',
+  'resources-list',
+  'prompts-list',
+] as const;
 // MR-33: resolve dist/mcp.mjs and the fixtures relative to this test file's
 // URL instead of process.cwd(). The doctor probe (CR-02) already uses
 // import.meta.url + fileURLToPath for the same reason: a test or probe that
@@ -73,9 +94,23 @@ describe('MCP stdout purity (dist smoke)', () => {
     const watchedSources = [
       path.resolve(REPO_ROOT, 'src', 'mcp', 'index.ts'),
       path.resolve(REPO_ROOT, 'src', 'mcp', 'register.ts'),
+      path.resolve(REPO_ROOT, 'src', 'mcp', 'register-resource.ts'),
+      path.resolve(REPO_ROOT, 'src', 'mcp', 'register-prompt.ts'),
       path.resolve(REPO_ROOT, 'src', 'mcp', 'sanitize.ts'),
       path.resolve(REPO_ROOT, 'src', 'mcp', 'tools', 'whoop-doctor.ts'),
       path.resolve(REPO_ROOT, 'src', 'services', 'doctor', 'index.ts'),
+      path.resolve(REPO_ROOT, 'src', 'services', 'bootstrap.ts'),
+      // Review #42: Phase 4 added 7 new tool files. A stale dist that
+      // does not yet reflect changes to any of these would silently mask
+      // the change under test. Watch the whole set so the stale-dist
+      // warning fires for any tool-level edit.
+      path.resolve(REPO_ROOT, 'src', 'mcp', 'tools', 'whoop-sync.ts'),
+      path.resolve(REPO_ROOT, 'src', 'mcp', 'tools', 'whoop-daily-review.ts'),
+      path.resolve(REPO_ROOT, 'src', 'mcp', 'tools', 'whoop-weekly-review.ts'),
+      path.resolve(REPO_ROOT, 'src', 'mcp', 'tools', 'whoop-query-cache.ts'),
+      path.resolve(REPO_ROOT, 'src', 'mcp', 'tools', 'whoop-add-decision.ts'),
+      path.resolve(REPO_ROOT, 'src', 'mcp', 'tools', 'whoop-review-decisions.ts'),
+      path.resolve(REPO_ROOT, 'src', 'mcp', 'tools', 'whoop-api-gap.ts'),
     ];
     for (const src of watchedSources) {
       const srcMtime = (await stat(src)).mtimeMs;
@@ -88,7 +123,12 @@ describe('MCP stdout purity (dist smoke)', () => {
 
     const child = spawn(process.execPath, [DIST_MCP], {
       stdio: ['pipe', 'pipe', 'pipe'],
-      env: { ...process.env, NODE_ENV: 'production' },
+      // Phase 4 Plan 04-10: route bootstrap at `:memory:` so the dist
+      // roundtrip does not touch the user's `~/.recovery-ledger`
+      // directory. The MCP entry honors `MCP_DB_FILE` per its Phase 4
+      // env-knob (test-and-smoke-only override; production callers
+      // leave it unset).
+      env: { ...process.env, NODE_ENV: 'production', MCP_DB_FILE: ':memory:' },
     });
 
     const stdoutChunks: Buffer[] = [];
@@ -105,9 +145,12 @@ describe('MCP stdout purity (dist smoke)', () => {
     // before the resolve." A theoretical late stray byte after id=3 but
     // before SIGTERM would still be caught by the post-close assertions.
     const idsSeen = new Set<unknown>();
-    let toolsCallResolve: (() => void) | null = null;
-    const toolsCallSeen = new Promise<void>((resolve) => {
-      toolsCallResolve = resolve;
+    let finalResolve: (() => void) | null = null;
+    // Phase 4 Plan 04-10: the final fixture frame is id=5 (prompts/list);
+    // resolve when it arrives so the assertion path covers the full
+    // 18-surface session, not just the doctor call.
+    const finalSeen = new Promise<void>((resolve) => {
+      finalResolve = resolve;
     });
     child.stdout.on('data', (b: Buffer) => {
       stdoutChunks.push(b);
@@ -124,9 +167,9 @@ describe('MCP stdout purity (dist smoke)', () => {
           // Defer reporting to the post-loop assertion path.
         }
       }
-      if (idsSeen.has(3) && toolsCallResolve) {
-        toolsCallResolve();
-        toolsCallResolve = null;
+      if (idsSeen.has(5) && finalResolve) {
+        finalResolve();
+        finalResolve = null;
       }
     });
     child.stderr.on('data', (b: Buffer) => stderrChunks.push(b));
@@ -158,13 +201,13 @@ describe('MCP stdout purity (dist smoke)', () => {
     let killTimer: NodeJS.Timeout | null = null;
     try {
       await Promise.race([
-        toolsCallSeen,
+        finalSeen,
         new Promise<void>((_, reject) =>
           setTimeout(
             () =>
               reject(
                 new Error(
-                  `tools/call (id=3) response timed out after ${TOOLS_CALL_TIMEOUT_MS}ms — observed ids: [${[...idsSeen].join(', ')}]`,
+                  `final response (id=5, prompts/list) timed out after ${TOOLS_CALL_TIMEOUT_MS}ms — observed ids: [${[...idsSeen].join(', ')}]`,
                 ),
               ),
             TOOLS_CALL_TIMEOUT_MS,
@@ -252,6 +295,25 @@ describe('MCP stdout purity (dist smoke)', () => {
     expect(toolCallResponse?.result).not.toBeNull();
     expect(toolCallResponse?.result).toHaveProperty('content');
     expect(toolCallResponse).not.toHaveProperty('error');
+
+    // Phase 4 Plan 04-10 — assert the 18-surface session produced clean
+    // list responses for resources + prompts. The list responses are
+    // arrays (resources for id=4; prompts for id=5); the dist server
+    // MUST return both NON-NULL with the corresponding catalog array.
+    const resourcesListResponse = frames.find((f) => f.id === 4);
+    expect(
+      resourcesListResponse,
+      'no JSON-RPC frame with id=4 (resources/list) found',
+    ).toBeDefined();
+    expect(resourcesListResponse?.result).toBeDefined();
+    expect(resourcesListResponse?.result).toHaveProperty('resources');
+    expect(resourcesListResponse).not.toHaveProperty('error');
+
+    const promptsListResponse = frames.find((f) => f.id === 5);
+    expect(promptsListResponse, 'no JSON-RPC frame with id=5 (prompts/list) found').toBeDefined();
+    expect(promptsListResponse?.result).toBeDefined();
+    expect(promptsListResponse?.result).toHaveProperty('prompts');
+    expect(promptsListResponse).not.toHaveProperty('error');
 
     // ASSERTION 4 — graceful close (clean exit or SIGTERM-on-stdin-close).
     expect(exitCode).toBeLessThanOrEqual(0);

@@ -183,3 +183,42 @@ describe('paginateAll (compound keyFn — recovery shape, Plan 03-09 contract)',
     expect((captured as WhoopApiError).detail).toContain('1:a');
   });
 });
+
+describe('paginateAll (Review #6 safety caps)', () => {
+  test('P-10: throws when pages exceed maxPages with a next_token still pending', async () => {
+    // Each page returns a single unique row and a non-null next_token; the
+    // 4th iteration trips the cap.
+    let i = 0;
+    const fetcher = async (_t: string | null): Promise<WhoopPage<{ id: number }>> => {
+      i += 1;
+      return { records: [{ id: i }], next_token: `t${i}` };
+    };
+    let captured: unknown;
+    try {
+      await paginateAll(fetcher, undefined, { maxPages: 3 });
+    } catch (err) {
+      captured = err;
+    }
+    expect(captured).toBeInstanceOf(WhoopApiError);
+    expect((captured as WhoopApiError).kind).toBe('validation');
+    expect((captured as WhoopApiError).detail).toContain('exceeded 3 pages');
+  });
+
+  test('P-11: throws when rows exceed maxRows', async () => {
+    let i = 0;
+    const fetcher = async (_t: string | null): Promise<WhoopPage<{ id: number }>> => {
+      const records = [{ id: i }, { id: i + 1 }, { id: i + 2 }];
+      i += 3;
+      return { records, next_token: i < 100 ? `t${i}` : null };
+    };
+    let captured: unknown;
+    try {
+      await paginateAll(fetcher, undefined, { maxRows: 5 });
+    } catch (err) {
+      captured = err;
+    }
+    expect(captured).toBeInstanceOf(WhoopApiError);
+    expect((captured as WhoopApiError).kind).toBe('validation');
+    expect((captured as WhoopApiError).detail).toContain('exceeded 5 rows');
+  });
+});

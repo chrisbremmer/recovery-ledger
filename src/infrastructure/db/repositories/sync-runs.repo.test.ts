@@ -152,7 +152,7 @@ describe('sync-runs repo — listRecent() ordering + entity mapping', () => {
     expect(run.perResource.sleeps).toEqual({ status: 'skipped' });
   });
 
-  it('Test 8: corrupted per_resource JSON falls back to {} without crashing', () => {
+  it('Test 8a: corrupted per_resource JSON falls back to {} without crashing', () => {
     const repo = createSyncRunsRepo(mem.db);
     const id = repo.insertRunning({ startedAt: STARTED_AT_BASE, flags: null });
     // Hand-corrupt the per_resource column to simulate a restored backup or
@@ -168,5 +168,58 @@ describe('sync-runs repo — listRecent() ordering + entity mapping', () => {
     expect(run.id).toBe(id);
     expect(run.status).toBe('ok');
     expect(run.perResource).toEqual({});
+  });
+});
+
+describe('sync-runs repo — latestFinished() D-03 data-status anchor', () => {
+  let mem: InMemoryDbResult;
+
+  beforeEach(() => {
+    mem = createInMemoryDb();
+  });
+  afterEach(() => mem.close());
+
+  it('Test 9: empty DB returns null', () => {
+    const repo = createSyncRunsRepo(mem.db);
+    expect(repo.latestFinished()).toBeNull();
+  });
+
+  it("Test 10: only a 'running' row in flight returns null (review wants the previous finished run)", () => {
+    const repo = createSyncRunsRepo(mem.db);
+    repo.insertRunning({ startedAt: STARTED_AT_BASE, flags: null });
+    expect(repo.latestFinished()).toBeNull();
+  });
+
+  it("Test 11: after a single finalized 'ok' run, returns its finished_at + 'ok' status", () => {
+    const repo = createSyncRunsRepo(mem.db);
+    const id = repo.insertRunning({ startedAt: STARTED_AT_BASE, flags: null });
+    repo.finalize(id, 'ok', 0, FINISHED_AT_BASE);
+    const result = repo.latestFinished();
+    expect(result).not.toBeNull();
+    expect(result?.finished_at).toBe(FINISHED_AT_BASE);
+    expect(result?.status).toBe('ok');
+  });
+
+  it('Test 12: returns the most recent FINISHED run when a newer running row is in flight', () => {
+    const repo = createSyncRunsRepo(mem.db);
+    const finishedId = repo.insertRunning({ startedAt: '2026-05-15T10:00:00.000Z', flags: null });
+    repo.finalize(finishedId, 'partial', 0, '2026-05-15T10:05:00.000Z');
+    // A newer running row started later but has not finalized — should be
+    // ignored by latestFinished(), which wants the latest COMPLETED state.
+    repo.insertRunning({ startedAt: '2026-05-16T10:00:00.000Z', flags: null });
+    const result = repo.latestFinished();
+    expect(result).not.toBeNull();
+    expect(result?.finished_at).toBe('2026-05-15T10:05:00.000Z');
+    expect(result?.status).toBe('partial');
+  });
+
+  it("Test 13: passes through 'partial' and 'failed' verbatim", () => {
+    const repo = createSyncRunsRepo(mem.db);
+    const a = repo.insertRunning({ startedAt: '2026-05-15T10:00:00.000Z', flags: null });
+    repo.finalize(a, 'failed', 0, '2026-05-15T10:05:00.000Z');
+    expect(repo.latestFinished()?.status).toBe('failed');
+    const b = repo.insertRunning({ startedAt: '2026-05-16T10:00:00.000Z', flags: null });
+    repo.finalize(b, 'partial', 0, '2026-05-16T10:05:00.000Z');
+    expect(repo.latestFinished()?.status).toBe('partial');
   });
 });

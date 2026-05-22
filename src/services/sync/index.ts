@@ -133,6 +133,15 @@ export interface RunSyncDeps {
  * sqlite handle itself.
  */
 export async function runSync(input: RunSyncInput, deps: RunSyncDeps): Promise<RunSyncResult> {
+  // Review #41: refuse an explicit `resources: []` before persisting a
+  // sync_runs row. The orchestrator's `requested.length === 0` path would
+  // otherwise insert a `running → ok` zero-work row that pollutes
+  // sync_runs and looks like a successful sync to the dashboard.
+  if (input.resources !== undefined && input.resources.length === 0) {
+    throw new Error(
+      'runSync: input.resources is the empty array — pass undefined (sync all) or a non-empty list.',
+    );
+  }
   const startedAt = deps.clock();
   const ianaZone = deps.ianaZone();
   const requestedResources: ReadonlyArray<ResourceName> = input.resources ?? RESOURCES;

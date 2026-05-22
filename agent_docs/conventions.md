@@ -34,7 +34,14 @@ hook). The doc is only the rule's last line of defense.
   and MCP tool inputs. Inside domain code, trust the types.
 - **Comments:** default to none. Add only when the *why* is non-obvious
   (a workaround, a subtle invariant, a known WHOOP quirk). Never describe
-  *what* — the code already does that.
+  *what* — the code already does that. When a comment must REFERENCE a
+  CI grep-gate target (e.g., `console.*`, `process.stdout.write`,
+  `server.registerTool(`, `drizzle-orm`, `fetch(`), use semantic
+  phrasing — never inline the literal substring, because the gates are
+  word-boundary literal checks with no comment-awareness and will trip
+  on the prose. See
+  [`agent_docs/learnings.md`](./learnings.md) §L0005 for the full
+  substitution table.
 
 ## Testing
 

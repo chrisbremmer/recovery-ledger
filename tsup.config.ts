@@ -1,3 +1,5 @@
+import { cpSync, existsSync, mkdirSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { defineConfig } from 'tsup';
 
 export default defineConfig({
@@ -24,4 +26,20 @@ export default defineConfig({
   sourcemap: true,
   splitting: false,
   treeshake: true,
+  // Phase 4 Plan 04-10: copy the hand-rolled migrator's payload tree
+  // into dist/ so the built `mcp.mjs` + `cli.mjs` find migrations at
+  // runtime. `src/services/bootstrap.ts` resolves the migrations dir
+  // from `import.meta.url` (`dirname(HERE)/infrastructure/db/migrations`),
+  // which lands at `dist/infrastructure/db/migrations` for the bundled
+  // binary. Without this copy, `bootstrap()` throws MigrationError
+  // (`journal parse failed` → ENOENT _journal.json) the first time the
+  // dist binary runs. The migrations payload is small (one .sql + a
+  // _journal.json) and read-only at runtime — safe to bundle.
+  async onSuccess() {
+    const src = resolve('src/infrastructure/db/migrations');
+    const dst = resolve('dist/infrastructure/db/migrations');
+    if (!existsSync(src)) return;
+    mkdirSync(resolve('dist/infrastructure/db'), { recursive: true });
+    cpSync(src, dst, { recursive: true });
+  },
 });

@@ -60,6 +60,10 @@ export interface CyclesRepo {
   /** D-29 diagnostic seam. Returns the raw WHOOP JSON payload (the
    *  Phase 3 schema column `raw_json`) or `null` for a missing id. */
   getRawJson(id: number): string | null;
+  /** Review #46: `SELECT MAX(start) FROM cycles WHERE score_state='SCORED' AND baseline_excluded=0`,
+   *  sliced to yyyy-mm-dd. Returns `null` when the table is empty.
+   *  Replaces a full `byRange(MIN, MAX)` walk in `resolveReviewedDate`. */
+  latestScoredDate(): string | null;
 }
 
 type CycleRow = typeof cyclesTable.$inferSelect;
@@ -155,6 +159,19 @@ export function createCyclesRepo(db: ReturnType<typeof drizzle>): CyclesRepo {
         .where(eq(cyclesTable.id, id))
         .get();
       return row?.raw_json ?? null;
+    },
+
+    latestScoredDate(): string | null {
+      // Review #46: index-friendly single-aggregate read with the default
+      // SCORED + non-excluded filter so `resolveReviewedDate` no longer
+      // does a full-table `byRange(MIN, MAX)` walk.
+      const row = db
+        .select({ max: sql<string | null>`MAX(${cyclesTable.start})` })
+        .from(cyclesTable)
+        .where(and(eq(cyclesTable.score_state, 'SCORED'), eq(cyclesTable.baseline_excluded, false)))
+        .get();
+      const max = row?.max ?? null;
+      return max === null ? null : max.slice(0, 10);
     },
   };
 }

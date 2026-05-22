@@ -58,7 +58,7 @@ import { z } from 'zod';
 import { sanitize } from '../../mcp/sanitize.js';
 import { logger } from '../config/logger.js';
 import { AuthError } from './errors.js';
-import { type Tokens, WHOOP_TOKEN_URL } from './token-store.js';
+import { TOKEN_REQUEST_TIMEOUT_MS, type Tokens, WHOOP_TOKEN_URL } from './token-store.js';
 
 // ---------------------------------------------------------------------------
 // Constants — the authorize URL + the verbatim D-09 HTML pages.
@@ -377,11 +377,33 @@ export async function exchangeCode(input: ExchangeCodeInput): Promise<Tokens> {
   // Capture obtainedAt BEFORE the fetch so a slow network does not push
   // expiresAt past the actual token lifetime.
   const obtainedAt = Date.now();
-  const res = await fetchFn(WHOOP_TOKEN_URL, {
-    method: 'POST',
-    headers: { 'content-type': 'application/x-www-form-urlencoded' },
-    body: params,
-  });
+  // AbortController guard against a stalled token endpoint. Lower-stakes
+  // than the refresh path (this fires only during interactive `init`), but
+  // a hung exchangeCode would leave the OAuth callback server orphaned
+  // until the user kills the process.
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), TOKEN_REQUEST_TIMEOUT_MS);
+  let res: Response;
+  try {
+    res = await fetchFn(WHOOP_TOKEN_URL, {
+      method: 'POST',
+      headers: { 'content-type': 'application/x-www-form-urlencoded' },
+      body: params,
+      signal: controller.signal,
+    });
+  } catch (err) {
+    if (controller.signal.aborted) {
+      logger.warn({ event: 'exchange_timeout', timeoutMs: TOKEN_REQUEST_TIMEOUT_MS });
+      throw new AuthError({
+        kind: 'refresh_failed',
+        detail: `token endpoint timeout after ${TOKEN_REQUEST_TIMEOUT_MS}ms`,
+        cause: err,
+      });
+    }
+    throw err;
+  } finally {
+    clearTimeout(timeoutId);
+  }
   if (!res.ok) {
     logger.warn({ event: 'exchange_failed', status: res.status });
     throw new AuthError({
