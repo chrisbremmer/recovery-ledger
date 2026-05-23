@@ -233,6 +233,22 @@ export function bootstrap(opts: BootstrapOptions = {}): Bootstrapped {
     dailySummaries: createDailySummariesRepo(db),
   };
 
+  // #35 — sweep any `sync_runs.status='running'` rows that are older
+  // than 1 hour. These are orphans from a crashed prior process: SIGINT
+  // / SIGTERM is now handled (#15) but a hard kill (`kill -9`, OOM,
+  // power loss) cannot install a cleanup, so the running row stays
+  // forever and masks subsequent failures. 1 hour is comfortably above
+  // the largest plausible sync time (full multi-year backfill at p99
+  // WHOOP latency) so we will not reclassify an actually-in-flight run.
+  const RECLASSIFY_THRESHOLD_MS = 60 * 60 * 1000;
+  const reclassified = repos.syncRuns.reclassifyStaleRunning(
+    RECLASSIFY_THRESHOLD_MS,
+    new Date().toISOString(),
+  );
+  if (reclassified > 0) {
+    log.warn({ event: 'sync_runs_stale_reclassified', count: reclassified });
+  }
+
   const whoop: RunSyncDeps['whoop'] = {
     resources: {
       cycles: listCycles,
