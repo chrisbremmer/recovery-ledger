@@ -23,7 +23,7 @@ import { toStructuredContent } from './utils.js';
 // the D-24 escape hatches (includeUnscored / includeExcluded) and
 // per-resource fields (minRecoveryScore / sportId / status / category).
 // MCP `inputSchema` is a `ZodRawShape` (key→ZodType), so we flatten the
-// discriminated union to top-level fields (Review #7) for parity with the
+// discriminated union to top-level fields for parity with the
 // other six tools. The 8-arm narrowing still lives in `services.queryCache`
 // — the SDK boundary just admits the superset of fields here.
 const QUERY_CACHE_SHAPE = {

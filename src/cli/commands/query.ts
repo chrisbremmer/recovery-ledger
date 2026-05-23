@@ -301,7 +301,7 @@ export async function runQueryCommand(resource: string, opts: RunQueryCommandOpt
     return;
   }
 
-  // 4 & 5. Service + render. Review #40: wrap in try/catch so a repo or
+  // 4 & 5. Service + render. Wrap in try/catch so a repo or
   // formatter failure surfaces a structured log on stderr and a non-zero
   // exit, instead of throwing an unhandled rejection.
   try {

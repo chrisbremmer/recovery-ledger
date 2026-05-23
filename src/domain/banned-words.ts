@@ -84,7 +84,7 @@ export function containsBannedToneToken(text: string): Hit | NoHit {
     return { hit: true, word: 'dial in', index: dialIdx };
   }
   // singleMatch[1] is the captured alternation group; lower-cased to map
-  // back to the tuple's canonical lowercase entry. Review #32: validate
+  // back to the tuple's canonical lowercase entry. validate
   // membership against BANNED_TONE_WORDS_SET before casting so the
   // narrowing is grounded in runtime data rather than blind-cast.
   const lower = (singleMatch?.[1] ?? '').toLowerCase();

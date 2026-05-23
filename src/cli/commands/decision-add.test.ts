@@ -138,7 +138,7 @@ describe('parseFollowUp', () => {
     expect(result.ok).toBe(false);
   });
 
-  test('Review #12: non-ISO date forms are rejected', async () => {
+  test('non-ISO date forms are rejected', async () => {
     const { parseFollowUp } = await import('./decision-add.js');
     const clock = () => new Date('2026-03-15T00:00:00.000Z');
     expect(parseFollowUp('03/15/2026', clock).ok).toBe(false);
@@ -177,7 +177,7 @@ describe('runDecisionAddCommand happy path', () => {
     expect(addSpy).toHaveBeenCalledTimes(1);
     const arg = addSpy.mock.calls[0]?.[0] as { decision: string; followUpDate?: string };
     expect(arg.decision).toBe('sleep more');
-    // Review #22: when --follow-up is omitted, CLI no longer pre-computes
+    // when --follow-up is omitted, CLI no longer pre-computes
     // the now()+7d default; it leaves followUpDate undefined so the service
     // layer (shared with MCP) applies the default. This test asserts the
     // CLI passes nothing through.

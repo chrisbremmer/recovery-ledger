@@ -40,7 +40,7 @@ import { ANOMALY_DIRECTION } from './direction.js';
 
 import type { Anomaly, ZAnalysis } from './types.js';
 
-/** Z-analysis sample-size threshold (Review #52). 14 SCORED days is the
+/** Z-analysis sample-size threshold. 14 SCORED days is the
  *  minimum the baseline window admits — see RESEARCH §Pitfall 5 + ADR
  *  on per-metric Z refusal. Exported so callers can `daysRequired:
  *  DAYS_REQUIRED` instead of repeating the magic literal. */

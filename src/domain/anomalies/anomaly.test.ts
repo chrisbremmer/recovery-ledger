@@ -248,7 +248,7 @@ describe('selectAnomalies', () => {
     expect(metrics).toEqual(['hrv_rmssd_milli', 'resting_heart_rate']);
   });
 
-  it('Review #44: fires HRV-low at exactly z = -2.0 (boundary)', () => {
+  it('fires HRV-low at exactly z = -2.0 (boundary)', () => {
     const today = emptyToday();
     // baseline median=50, mad=8 → robustSigma = 1.4826 * 8 = 11.8608.
     // value = 50 - 2*11.8608 = 26.2784 → z = -2.000 exactly.
@@ -262,7 +262,7 @@ describe('selectAnomalies', () => {
     expect(anomalies[0]?.z).toBeCloseTo(-2.0, 3);
   });
 
-  it('Review #44: does NOT fire HRV-low at z = -1.999 (near-miss boundary)', () => {
+  it('does NOT fire HRV-low at z = -1.999 (near-miss boundary)', () => {
     const today = emptyToday();
     // Same baseline; value=26.29 → z slightly higher than -2 (e.g., -1.998).
     today.hrv_rmssd_milli = 26.29;

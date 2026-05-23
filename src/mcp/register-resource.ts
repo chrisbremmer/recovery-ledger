@@ -52,7 +52,7 @@ export type ResourceHandler = (uri: URL) => Promise<ResourceResult>;
  */
 // Concrete SDK return type for ReadResourceCallback. Awaiting the
 // callback's return type yields the same union the SDK accepts at
-// runtime; naming it locally (Review #9) keeps the SDK contract visible
+// runtime; naming it locally keeps the SDK contract visible
 // at the cast site, and a `Promise<infer R>` extends-clause that fails
 // to infer would otherwise silently resolve to `never`.
 type ReadResourceResult = Awaited<ReturnType<ReadResourceCallback>>;

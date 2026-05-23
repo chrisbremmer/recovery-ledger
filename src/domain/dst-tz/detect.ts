@@ -66,7 +66,7 @@ export interface DstDetectOutput {
 
 export function detectExclusion(input: DstDetectInput): DstDetectOutput {
   // Rule 1 — dst_straddle. Skipped when `end` is null (in-progress cycle).
-  // Review #26: a malformed cycle.start / cycle.end string would yield
+  // a malformed cycle.start / cycle.end string would yield
   // NaN tz-offsets and `NaN !== NaN === true`, silently flagging the cycle
   // as dst_straddle. Guard with an ISO format check and bail to non-excluded
   // rather than mis-flagging; the caller can choose to surface the bad row
@@ -93,7 +93,7 @@ export function detectExclusion(input: DstDetectInput): DstDetectOutput {
   return { baseline_excluded: false, exclusion_reason: null };
 }
 
-// Defensive ISO format check (Review #26). Accepts the WHOOP wire format
+// Defensive ISO format check. Accepts the WHOOP wire format
 // (`YYYY-MM-DDTHH:MM:SS.sssZ` and the `+HH:MM` offset variant) and rejects
 // anything else. Malformed strings produce NaN at `new Date(...)`, which
 // silently passes the `!==` comparison above.

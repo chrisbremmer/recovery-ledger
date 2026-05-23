@@ -133,7 +133,7 @@ export interface RunSyncDeps {
  * sqlite handle itself.
  */
 export async function runSync(input: RunSyncInput, deps: RunSyncDeps): Promise<RunSyncResult> {
-  // Review #41: refuse an explicit `resources: []` before persisting a
+  // refuse an explicit `resources: []` before persisting a
   // sync_runs row. The orchestrator's `requested.length === 0` path would
   // otherwise insert a `running → ok` zero-work row that pollutes
   // sync_runs and looks like a successful sync to the dashboard.

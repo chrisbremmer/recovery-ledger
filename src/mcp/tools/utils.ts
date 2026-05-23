@@ -1,4 +1,4 @@
-// Shared MCP-tool helpers (Review #45).
+// Shared MCP-tool helpers.
 //
 // Every Phase 4 tool used to define its own module-private
 // `toStructuredContent` — same JSON.parse(JSON.stringify(...)) round-trip

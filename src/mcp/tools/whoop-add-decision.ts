@@ -16,8 +16,8 @@ import { toStructuredContent } from './utils.js';
 const TOOL_DESCRIPTION =
   'Record a decision in the decision ledger. Required: decision text. Optional: category, rationale, confidence (low/medium/high), expectedEffect, followUpDate (ISO yyyy-mm-dd).';
 
-// Review #34: hoist the Zod shape so its inferred type is the single
-// source of truth for the handler input. Review #48: cap free-text fields
+// hoist the Zod shape so its inferred type is the single
+// source of truth for the handler input. Cap free-text fields
 // so an over-large agent payload is rejected at the boundary instead of
 // pushed to the DB.
 const ADD_DECISION_SHAPE = {

@@ -60,7 +60,7 @@ export interface CyclesRepo {
   /** D-29 diagnostic seam. Returns the raw WHOOP JSON payload (the
    *  Phase 3 schema column `raw_json`) or `null` for a missing id. */
   getRawJson(id: number): string | null;
-  /** Review #46: `SELECT MAX(start) FROM cycles WHERE score_state='SCORED' AND baseline_excluded=0`,
+  /** `SELECT MAX(start) FROM cycles WHERE score_state='SCORED' AND baseline_excluded=0`,
    *  sliced to yyyy-mm-dd. Returns `null` when the table is empty.
    *  Replaces a full `byRange(MIN, MAX)` walk in `resolveReviewedDate`. */
   latestScoredDate(): string | null;
@@ -162,7 +162,7 @@ export function createCyclesRepo(db: ReturnType<typeof drizzle>): CyclesRepo {
     },
 
     latestScoredDate(): string | null {
-      // Review #46: index-friendly single-aggregate read with the default
+      // index-friendly single-aggregate read with the default
       // SCORED + non-excluded filter so `resolveReviewedDate` no longer
       // does a full-table `byRange(MIN, MAX)` walk.
       const row = db

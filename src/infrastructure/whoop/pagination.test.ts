@@ -184,7 +184,7 @@ describe('paginateAll (compound keyFn — recovery shape, Plan 03-09 contract)',
   });
 });
 
-describe('paginateAll (Review #6 safety caps)', () => {
+describe('paginateAll (safety caps)', () => {
   test('P-10: throws when pages exceed maxPages with a next_token still pending', async () => {
     // Each page returns a single unique row and a non-null next_token; the
     // 4th iteration trips the cap.

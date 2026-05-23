@@ -64,7 +64,7 @@ export async function resolveReviewedDate(
     return { date: input.date, source: 'cli_flag' };
   }
 
-  // Review #46: use `latestScoredDate()` — a single SELECT MAX aggregate —
+  // use `latestScoredDate()` — a single SELECT MAX aggregate —
   // instead of `byRange(MIN_ISO, MAX_ISO)` which pulled the entire SCORED
   // history into memory just to walk for the max. The default repo filter
   // (`SCORED + baseline_excluded = 0`, Phase 3 D-04/D-16) is preserved

@@ -29,7 +29,7 @@ function renderResult(r: ReviewDecisionsResult): string {
     : renderDecisionUpdate(r.decision);
 }
 
-// D-21 dual-mode flattened to top-level fields (Review #7) so this tool
+// D-21 dual-mode flattened to top-level fields so this tool
 // uses the same flat-field calling convention as the other six (callers no
 // longer have to wrap the payload under `{ input: ... }`). The discriminator
 // is the optional `mode` literal — list mode defaults (`mode` omitted or

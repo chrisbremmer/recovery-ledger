@@ -1,4 +1,4 @@
-// Per-resource sync outcome classification tests (Review #15).
+// Per-resource sync outcome classification tests.
 //
 // Plan 03-11 D-25: `classifyOutcome` maps a thrown error to a structured
 // `ResourceSyncOutcome`. The happy-path catch arms (AuthError →
@@ -123,7 +123,7 @@ describe('computeStatus', () => {
     expect(status).toBe('failed');
   });
 
-  it('Review #15: missing outcome for a requested resource defensively flips to failed', () => {
+  it('missing outcome for a requested resource defensively flips to failed', () => {
     const status = computeStatus(
       {
         cycles: { status: 'success', errors: 0 },

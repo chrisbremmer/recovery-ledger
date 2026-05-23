@@ -94,7 +94,7 @@ export function parseFollowUp(
     const d = new Date(clock().getTime() + n * MS_PER_DAY);
     return { ok: true, value: d.toISOString().slice(0, 10) };
   }
-  // Strict yyyy-mm-dd ISO check (Review #12). `new Date(raw)` happily
+  // Strict yyyy-mm-dd ISO check. `new Date(raw)` happily
   // accepts MM/DD/YYYY, "March 15 2026", etc. — implementation-defined
   // shapes that silently round-trip to a non-NaN Date. We only want the
   // explicit ISO date form.
@@ -165,7 +165,7 @@ export async function runDecisionAddCommand(
   }
 
   // 2. Validate --follow-up against a live clock (D-19 default).
-  // Review #22: when `--follow-up` is omitted, leave it undefined and let
+  // when `--follow-up` is omitted, leave it undefined and let
   // `services.addDecision` apply the now()+7d default. Both CLI and MCP
   // surfaces now share that default — no drift.
   const parsedFollowUp =

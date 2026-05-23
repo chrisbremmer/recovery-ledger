@@ -80,7 +80,7 @@ export type ReviewDecisionsResult =
   | { mode: 'list'; decisions: Decision[] }
   | { mode: 'update'; decision: Decision };
 
-// (Review #18) Removed unused `UpdateDecisionInput` and `updateDecision`
+// Removed unused `UpdateDecisionInput` and `updateDecision`
 // convenience surfaces. The CLI shim and MCP tool both build a
 // `ReviewDecisionsInput.mode: 'update'` payload directly; the separate
 // type was a phantom API exported through src/services/index.ts with no

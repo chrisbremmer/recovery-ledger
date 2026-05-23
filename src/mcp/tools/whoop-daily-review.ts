@@ -17,7 +17,7 @@ import { toStructuredContent } from './utils.js';
 const TOOL_DESCRIPTION =
   'Today vs trailing-30 baseline. Returns anomalies, suggested actions, confidence tier, and data-freshness lead.';
 
-// Review #34: hoist the Zod shape so its inferred type can be checked
+// hoist the Zod shape so its inferred type can be checked
 // against the service input contract at compile time. The cast in the
 // handler body now flows through the Zod-derived type instead of the
 // service signature, so a schema drift fails here instead of silently

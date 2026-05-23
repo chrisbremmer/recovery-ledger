@@ -144,7 +144,7 @@ export async function getDailyReview(
   }
 
   // Step 11: per-metric values + per-metric daysAvailable (Pitfall 5).
-  // Review #51: build via Partial accumulator then assert the exhaustive
+  // build via Partial accumulator then assert the exhaustive
   // fill at the boundary. The METRIC_NAMES loop fills every key — the
   // cast is correct, but the Partial accumulator makes the type honest
   // until the fill completes.
@@ -169,7 +169,7 @@ export async function getDailyReview(
 
   // Step 14: daily_summaries memoization. One row per cycle in window — gives
   // Phase 5 doctor a precomputed surface for data-quality counts.
-  // Use a single BEGIN IMMEDIATE transaction (Review #3) instead of 30
+  // Use a single BEGIN IMMEDIATE transaction instead of 30
   // sequential lock+fsync round-trips on cold review.
   const computedAt = deps.clock().toISOString();
   const summariesToUpsert = cyclesWindow.map((cycle) => {

@@ -49,7 +49,7 @@ export interface ReviewDecisionsDeps {
  * structured log payload — `{ event, id, category }` only.
  */
 /** D-19 smart default: undefined followUpDate → now() + 7 days. Centralized
- *  here (Review #22) so both CLI and MCP get the default for free instead
+ *  here so both CLI and MCP get the default for free instead
  *  of having the CLI compute it and the MCP tool ship without one. */
 const DEFAULT_FOLLOW_UP_DAYS = 7;
 const MS_PER_DAY = 86_400_000;

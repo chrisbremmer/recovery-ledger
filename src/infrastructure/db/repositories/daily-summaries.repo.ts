@@ -24,7 +24,7 @@ export interface DailySummariesRepo {
   /** Batched per-day upsert wrapping one BEGIN IMMEDIATE transaction
    *  around N rows. Matches the `upsertBatch` pattern used by
    *  cycles/recovery/sleep/workouts repos and avoids 30 sequential
-   *  lock+fsync round-trips on cold review (Review #3). */
+   *  lock+fsync round-trips on cold review. */
   upsertManyDays(summaries: ReadonlyArray<DailySummary>): void;
   /** Range query inclusive on both ends. */
   byDateRange(start: string, end: string): DailySummary[];
