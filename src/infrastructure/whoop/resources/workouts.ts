@@ -21,7 +21,18 @@ export interface ListWorkoutsOpts {
   until: string;
 }
 
-export async function listWorkouts(opts: ListWorkoutsOpts): Promise<Workout[]> {
+export interface ListWorkoutsResult {
+  /** Normalized workout entities. */
+  entities: Workout[];
+  /**
+   * Raw WHOOP wire-format records, aligned by index to `entities` — the
+   * sync orchestrator passes `JSON.stringify(rawRecords[i])` through to
+   * the repo as `rawJson`, so D-29's reparse path stays alive.
+   */
+  rawRecords: z.infer<typeof WhoopRawWorkout>[];
+}
+
+export async function listWorkouts(opts: ListWorkoutsOpts): Promise<ListWorkoutsResult> {
   const rawRecords = await paginateAll<z.infer<typeof WhoopRawWorkout>>(async (nextToken) =>
     httpGet(
       '/v2/activity/workout',
@@ -35,5 +46,5 @@ export async function listWorkouts(opts: ListWorkoutsOpts): Promise<Workout[]> {
     ),
   );
 
-  return rawRecords.map(normalizeWorkout);
+  return { entities: rawRecords.map(normalizeWorkout), rawRecords };
 }

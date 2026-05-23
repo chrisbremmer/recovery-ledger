@@ -114,7 +114,7 @@ describe('recovery contract — happy path + idempotency (D-11 / SYNC-04)', () =
   test('Test 1: happy path — listRecovery + upsertBatch + byCycleAndSleep round-trip returns the SCORED entity', async () => {
     // Default fixture: cycle_id 12345678 + sleep_id a98fe018-...
     seedParentCycles(mem, [12345678]);
-    const recoveries = await listRecovery({ since: SINCE, until: UNTIL });
+    const { entities: recoveries } = await listRecovery({ since: SINCE, until: UNTIL });
     expect(recoveries).toHaveLength(1);
     expect(recoveries[0]?.scoreState).toBe('SCORED');
 
@@ -133,9 +133,9 @@ describe('recovery contract — happy path + idempotency (D-11 / SYNC-04)', () =
   test('Test 2: idempotency — compound ON CONFLICT(cycle_id, sleep_id) keeps the row count at 1', async () => {
     seedParentCycles(mem, [12345678]);
     const repo = createRecoveryRepo(mem.db);
-    const first = await listRecovery({ since: SINCE, until: UNTIL });
+    const { entities: first } = await listRecovery({ since: SINCE, until: UNTIL });
     repo.upsertBatch(first);
-    const second = await listRecovery({ since: SINCE, until: UNTIL });
+    const { entities: second } = await listRecovery({ since: SINCE, until: UNTIL });
     repo.upsertBatch(second);
 
     const count = (
@@ -152,7 +152,7 @@ describe('recovery contract — Pitfall G score-state discipline (200-mixed-scor
     seedParentCycles(mem, [40001, 40002, 40003]);
     helper.setNextResponse(loadFixture('200-mixed-score-states'));
 
-    const recoveries = await listRecovery({ since: SINCE, until: UNTIL });
+    const { entities: recoveries } = await listRecovery({ since: SINCE, until: UNTIL });
     expect(recoveries).toHaveLength(3);
     const states = recoveries.map((r) => r.scoreState).sort();
     expect(states).toEqual(['PENDING_SCORE', 'SCORED', 'UNSCORABLE']);
@@ -263,7 +263,7 @@ describe('recovery contract — pagination dup-key detection for compound keys (
 describe('recovery contract — getRawJson diagnostic seam (D-29)', () => {
   test('Test 5: getRawJson(cycleId, sleepId) returns the stored wire payload for the SCORED row', async () => {
     seedParentCycles(mem, [12345678]);
-    const recoveries = await listRecovery({ since: SINCE, until: UNTIL });
+    const { entities: recoveries } = await listRecovery({ since: SINCE, until: UNTIL });
     const repo = createRecoveryRepo(mem.db);
     const fixturePayload = JSON.stringify(
       (loadFixture('200-ok') as { records: unknown[] }).records[0],

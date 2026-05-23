@@ -260,4 +260,61 @@ describe('sync idempotency — SYNC-04 anchor', () => {
     expect(runs[0]?.gapsDetected).toBe(0);
     expect(runs[0]?.finishedAt).not.toBeNull();
   });
+
+  test('Test 5: D-29 raw_json round-trip — cycles/recoveries/sleeps/workouts persist non-empty wire JSON', async () => {
+    // Regression guard for #12 — before the fix the orchestrator never
+    // threaded the raw WHOOP payload into upsertBatch, so all four scored
+    // repos defaulted `raw_json` to literal `'{}'`. After the fix each
+    // resource module returns `{ entities, rawRecords }` and the orchestrator
+    // attaches `JSON.stringify(rawRecords[i])` per entity before upsert.
+    const deps = buildDeps(mem);
+    await runSync({ days: 30 }, deps);
+
+    const cyclesRepo = createCyclesRepo(mem.db);
+    const recoveryRepo = createRecoveryRepo(mem.db);
+    const sleepRepo = createSleepsRepo(mem.db);
+    const workoutsRepo = createWorkoutsRepo(mem.db);
+
+    const cycles = cyclesRepo.byRange(SINCE, UNTIL);
+    expect(cycles).toHaveLength(1);
+    const cycleId = cycles[0]?.id;
+    expect(cycleId).toBeDefined();
+    if (cycleId === undefined) throw new Error('unreachable');
+    const cycleRaw = cyclesRepo.getRawJson(cycleId);
+    expect(cycleRaw).not.toBeNull();
+    expect(cycleRaw).not.toBe('{}');
+    expect(() => JSON.parse(cycleRaw ?? '')).not.toThrow();
+    const cycleParsed = JSON.parse(cycleRaw ?? '{}');
+    expect(cycleParsed).toMatchObject({ id: cycleId });
+
+    const recoveries = recoveryRepo.byRange(SINCE, UNTIL);
+    expect(recoveries).toHaveLength(1);
+    const recovery = recoveries[0];
+    expect(recovery).toBeDefined();
+    if (!recovery) throw new Error('unreachable');
+    const recoveryRaw = recoveryRepo.getRawJson(recovery.cycleId, recovery.sleepId);
+    expect(recoveryRaw).not.toBeNull();
+    expect(recoveryRaw).not.toBe('{}');
+    expect(() => JSON.parse(recoveryRaw ?? '')).not.toThrow();
+
+    const sleeps = sleepRepo.byRange(SINCE, UNTIL);
+    expect(sleeps).toHaveLength(1);
+    const sleepId = sleeps[0]?.id;
+    expect(sleepId).toBeDefined();
+    if (sleepId === undefined) throw new Error('unreachable');
+    const sleepRaw = sleepRepo.getRawJson(sleepId);
+    expect(sleepRaw).not.toBeNull();
+    expect(sleepRaw).not.toBe('{}');
+    expect(() => JSON.parse(sleepRaw ?? '')).not.toThrow();
+
+    const workouts = workoutsRepo.byRange(SINCE, UNTIL);
+    expect(workouts).toHaveLength(1);
+    const workoutId = workouts[0]?.id;
+    expect(workoutId).toBeDefined();
+    if (workoutId === undefined) throw new Error('unreachable');
+    const workoutRaw = workoutsRepo.getRawJson(workoutId);
+    expect(workoutRaw).not.toBeNull();
+    expect(workoutRaw).not.toBe('{}');
+    expect(() => JSON.parse(workoutRaw ?? '')).not.toThrow();
+  });
 });
