@@ -38,7 +38,7 @@ function makeDaily(overrides: Partial<DailyReviewResult> = {}): DailyReviewResul
       sleep_efficiency_percent: 0.91,
       respiratory_rate: 15.2,
     },
-    confidence: { tier: 'normal', sample_size: 28 } as unknown as DailyReviewResult['confidence'],
+    confidence: { tier: 'strong', sampleSize: 28, coveragePct: 1.0, minRequired: 20 },
     anomalies: [],
     patterns: [],
     actions: [],
