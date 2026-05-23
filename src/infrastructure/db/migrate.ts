@@ -52,10 +52,17 @@ import type Database from 'better-sqlite3';
 // -----------------------------------------------------------------------------
 
 export const MIGRATION_ERROR_KINDS = [
-  // Schema state disagrees with __drizzle_migrations (orphaned rows, missing
-  // journal entry, missing .sql payload). D-08 surfaces this with the
-  // most-recent backup path so the user can restore manually if needed.
+  // Schema state disagrees with __drizzle_migrations (orphaned rows, broken
+  // hash chain). D-08 surfaces this with the most-recent backup path so the
+  // user can restore manually if needed.
   'inconsistent_state',
+  // Journal entry references a tag whose `.sql` payload is missing on disk.
+  // #25 — split from `inconsistent_state` so the remediation message can
+  // distinguish "DB is fine, restore the missing file" from "DB state is
+  // ambiguous, restore from backup." When `latestSafeMigration` is non-null
+  // the DB is at that tag and restore-from-backup is NOT required; the
+  // remediation is simply to restore the missing `.sql` file.
+  'journal_missing_payload',
   // BEGIN IMMEDIATE → exec(sql) threw → ROLLBACK. WAL recovery on next open
   // is consistent with __drizzle_migrations (the failed migration was
   // never recorded). Backup intact on disk.
@@ -229,8 +236,14 @@ export function migrate(sqlite: Database.Database, opts: MigrateOptions): void {
   for (const entry of journal.entries) {
     const sqlPath = join(opts.migrationsDir, `${entry.tag}.sql`);
     if (!existsSync(sqlPath)) {
+      // #25 — distinct kind from `inconsistent_state` so the remediation
+      // message can branch: when `latestSafeMigration !== null` the DB is
+      // at that tag and the user only needs to restore the missing .sql
+      // file, NOT roll back to a backup. backupPath is still threaded
+      // for the unusual case where prior backups exist on disk but the
+      // user wants belt-and-suspenders.
       throw new MigrationError({
-        kind: 'inconsistent_state',
+        kind: 'journal_missing_payload',
         backupPath: mostRecentBackup,
         latestSafeMigration,
         detail: `journal entry tag ${entry.tag} has no .sql payload on disk`,

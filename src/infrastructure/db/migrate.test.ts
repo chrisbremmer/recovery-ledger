@@ -223,7 +223,10 @@ describe('migrate — sad paths + MigrationError shape', () => {
     expect((thrown as MigrationError).detail).toBe('journal parse failed');
   });
 
-  it('Test 6: journal entry references a .sql tag with no on-disk payload → inconsistent_state w/ tag in detail', () => {
+  it('Test 6: journal entry references a .sql tag with no on-disk payload → journal_missing_payload w/ tag in detail', () => {
+    // #25 — split from inconsistent_state so the remediation message can
+    // distinguish "DB is fine, restore the missing file" from "DB state
+    // is ambiguous, restore from backup."
     writeJournal(migrationsDir, [{ tag: '0042_ghost' }]);
     // No `0042_ghost.sql` written.
 
@@ -236,7 +239,7 @@ describe('migrate — sad paths + MigrationError shape', () => {
 
     expect(isMigrationError(thrown)).toBe(true);
     const err = thrown as MigrationError;
-    expect(err.kind).toBe('inconsistent_state');
+    expect(err.kind).toBe('journal_missing_payload');
     expect(err.detail).toContain('0042_ghost');
   });
 });
