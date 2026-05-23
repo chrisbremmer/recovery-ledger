@@ -22,7 +22,7 @@ import {
 // Cross-layer import (WR-06): see auth.ts in this directory for the full
 // rationale. CLI path's runDoctorCommand emits probe detail strings via
 // process.stdout.write without going through the MCP sanitizer wrapper.
-import { sanitize } from '../../../mcp/sanitize.js';
+import { sanitize } from '../../../infrastructure/observability/sanitize.js';
 import type { DoctorCheck } from '../index.js';
 import { CHECK_NAMES } from './check-names.js';
 

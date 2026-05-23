@@ -26,7 +26,7 @@ import { type Tokens, tokenStore } from '../../../infrastructure/whoop/token-sto
 // Relocating sanitize into `src/infrastructure/observability/` remains
 // deferred work (PLAN-03-CROSS-LAYER); the same cross-layer dependency
 // exists in oauth.ts and auth.ts (CR-04).
-import { sanitize } from '../../../mcp/sanitize.js';
+import { sanitize } from '../../../infrastructure/observability/sanitize.js';
 import type { DoctorCheck } from '../index.js';
 import { CHECK_NAMES } from './check-names.js';
 

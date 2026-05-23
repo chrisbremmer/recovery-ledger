@@ -23,9 +23,9 @@ import { renderDailyReview } from '../../formatters/daily-review.txt.js';
 import { formatBootstrapError } from '../../formatters/sync.txt.js';
 import { paths } from '../../infrastructure/config/paths.js';
 import { isMigrationError } from '../../infrastructure/db/migrate.js';
-// Cross-layer import: src/mcp/sanitize.ts is the single source of truth for
+// Cross-layer import: src/infrastructure/observability/sanitize.ts is the single source of truth for
 // secret-bearing pattern redaction. Mirrors the sync.ts cross-layer import.
-import { sanitize } from '../../mcp/sanitize.js';
+import { sanitize } from '../../infrastructure/observability/sanitize.js';
 import { type Bootstrapped, bootstrap } from '../../services/index.js';
 
 export const REVIEW_EXIT_CODES: Readonly<Record<string, number>> = Object.freeze({
