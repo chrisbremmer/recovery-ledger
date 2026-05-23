@@ -101,9 +101,16 @@ export interface ResourceSyncOutcome {
 /**
  * CLI / MCP input to `runSync` (D-26).
  *
- * - `days`      — sets `since = now() - days*86400000`. The CLI shim provides
- *                 the default value (30); `computeWindow` treats `undefined`
- *                 and `0` identically (falls through to the 7-day re-window).
+ * - `days`      — sets `since = now() - days*86400000`. **Both transport
+ *                 surfaces apply the D-26 30-day default before calling
+ *                 `runSync`** — the CLI via `opts.days ?? 30` in `sync.ts`,
+ *                 the MCP tool via `.default(30)` in the Zod schema. The
+ *                 service layer therefore expects `days` to be set on every
+ *                 real-world call; `undefined` reaches `computeWindow` only
+ *                 from internal call sites (tests, future refactors) and
+ *                 falls through to the trailing-7d re-window. #19 — keep
+ *                 BOTH surfaces in sync so a Phase 4 MCP agent and the CLI
+ *                 see identical windows for the same input.
  * - `since`     — ISO 8601 string; overrides everything. Backfill mode.
  * - `resources` — defaults to all six when omitted (the orchestrator iterates
  *                 the RESOURCES tuple in D-23 order). When provided, the
