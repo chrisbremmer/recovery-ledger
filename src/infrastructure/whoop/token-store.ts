@@ -47,6 +47,17 @@ export const REFRESH_BUFFER_MS = 5 * 60 * 1000;
  *  fetch path. */
 export const TOKEN_REQUEST_TIMEOUT_MS = 30_000;
 
+/** `proper-lockfile` stale-lock threshold (#31). The lock-holding process
+ *  is inside the WHOOP token-endpoint POST; if it exceeds this window the
+ *  lock is reclaimable as stale by a sibling, which could then POST the
+ *  same refresh_token and prompt WHOOP to revoke the token family. The
+ *  ceiling is set safely above `TOKEN_REQUEST_TIMEOUT_MS` (30s) so the
+ *  in-process POST timeout fires first and releases the lock cleanly;
+ *  60s only matters when a process actually crashes mid-refresh, in
+ *  which case the sibling waits 60s before reclaiming — the safer
+ *  failure mode than burning the refresh family. */
+export const STALE_LOCK_MS = 60_000;
+
 /** WHOOP token-endpoint URL. Read once at module load from
  *  `process.env.WHOOP_TOKEN_URL` (the test-only override used by Plan 02-08's
  *  cross-process integration test); production never sets the env var. */
@@ -212,7 +223,7 @@ export function createTokenStore(opts: TokenStoreOptions = {}): TokenStore {
     await writeFile(resolvedPaths.tokensLockFile, '', { flag: 'a' });
     const release = await lockfile.lock(resolvedPaths.tokensLockFile, {
       retries: { retries: 10, factor: 1.2, minTimeout: 50 },
-      stale: 5000,
+      stale: STALE_LOCK_MS,
     });
     try {
       await writeUnderLock(tokens);
@@ -303,12 +314,18 @@ export function createTokenStore(opts: TokenStoreOptions = {}): TokenStore {
     // proper-lockfile requires the lock target to exist before `.lock()`.
     await writeFile(resolvedPaths.tokensLockFile, '', { flag: 'a' });
 
-    // GATE 2: cross-process advisory lock. Options spelled exactly per
-    // ADR-0002 §Decision (line 33): retries 10, factor 1.2, minTimeout 50ms;
-    // stale 5000ms.
+    // GATE 2: cross-process advisory lock. Options per ADR-0002 §Decision:
+    // retries 10, factor 1.2, minTimeout 50ms. `stale` is raised to
+    // STALE_LOCK_MS (60s) so the lock cannot be reclaimed as stale while a
+    // slow WHOOP token-endpoint POST is still in flight — issue #31. The
+    // tradeoff (a crashed process holds the lock 60s instead of 5s) is
+    // the cheaper failure mode: a crashed-mid-refresh sibling that re-POSTs
+    // the same refresh_token would prompt WHOOP to revoke the whole token
+    // family. The 60s ceiling stays well below the human attention span,
+    // and `doctor` surfaces a stuck lock for manual recovery.
     const release = await lockfile.lock(resolvedPaths.tokensLockFile, {
       retries: { retries: 10, factor: 1.2, minTimeout: 50 },
-      stale: 5000,
+      stale: STALE_LOCK_MS,
     });
     try {
       // Re-read after acquiring lock — a sibling process may have refreshed

@@ -30,9 +30,16 @@ second presents a now-invalid token; WHOOP revokes the family.
    primitive that works portably across macOS + Linux without depending
    on `flock(1)`, which macOS does not ship). The lock target is the
    token-store file (`<config-dir>/tokens.json.lock`) with
-   `{ retries: { retries: 10, factor: 1.2, minTimeout: 50 }, stale: 5000 }`.
+   `{ retries: { retries: 10, factor: 1.2, minTimeout: 50 }, stale: 60_000 }`.
    Held only across the refresh request, not for the whole token
-   lifetime.
+   lifetime. `stale` is set to 60s — safely above the in-process
+   `TOKEN_REQUEST_TIMEOUT_MS` (30s) cap on the WHOOP token-endpoint
+   POST. The original 5s ceiling was unsafe: a slow POST could exceed
+   5s under rate limiting or transient TLS latency, letting a sibling
+   reclaim the lock as stale and POST the same refresh_token — WHOOP
+   then revokes the entire token family (#31). The tradeoff (a
+   crashed-mid-refresh process holds the lock 60s) is the cheaper
+   failure: callers wait, not burn the family.
 3. **Atomic temp-and-rename write.** Refreshed tokens are written to
    `tokens.json.tmp`, fsynced, then renamed over `tokens.json`. Readers
    see either the old or the new file, never a partial write.
