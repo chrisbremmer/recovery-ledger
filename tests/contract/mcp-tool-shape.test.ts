@@ -167,6 +167,46 @@ describe('Phase 4 MCP tool dual-shape contract — MCP-02 + D-29', () => {
     const text = JSON.stringify(result);
     assertNoSecretLeak(text);
   });
+
+  // #49 regression — includeExcluded is only supported on the cycles arm.
+  // The flat Zod schema admits it on every arm; the handler-side
+  // `rejectUnsupportedFlags` guard surfaces an explicit error instead of
+  // silently dropping the flag.
+  test('whoop_query_cache rejects includeExcluded on non-cycles arms', async () => {
+    const result = await client.callTool({
+      name: 'whoop_query_cache',
+      arguments: { resource: 'recoveries', includeExcluded: true },
+    });
+    expect(result.isError).toBe(true);
+    const text = (result.content as Array<{ type: string; text?: string }>)
+      .map((c) => c.text ?? '')
+      .join('\n');
+    expect(text).toMatch(/includeExcluded/i);
+    assertNoSecretLeak(text);
+  });
+
+  // #50 regression — followUpDate must be a strict yyyy-mm-dd calendar date.
+  // Arbitrary strings ("next Thursday") and rollover dates ("2026-02-30")
+  // are rejected at the schema boundary.
+  test('whoop_add_decision rejects malformed followUpDate at the schema boundary', async () => {
+    const result = await client.callTool({
+      name: 'whoop_add_decision',
+      arguments: { decision: 'test', followUpDate: 'next Thursday' },
+    });
+    const text = JSON.stringify(result);
+    expect(text).toMatch(/followUpDate|invalid|calendar/i);
+    assertNoSecretLeak(text);
+  });
+
+  test('whoop_add_decision rejects calendar-rollover followUpDate (2026-02-30)', async () => {
+    const result = await client.callTool({
+      name: 'whoop_add_decision',
+      arguments: { decision: 'test', followUpDate: '2026-02-30' },
+    });
+    const text = JSON.stringify(result);
+    expect(text).toMatch(/followUpDate|invalid|calendar/i);
+    assertNoSecretLeak(text);
+  });
 });
 
 // MCP-02 surface name `structuredContent` is referenced inside the
