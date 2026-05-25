@@ -220,6 +220,9 @@ export const sync_runs = sqliteTable('sync_runs', {
   started_at: text('started_at').notNull(),
   finished_at: text('finished_at'),
   status: text('status', {
+    // 'aborted' added (#15 + #35) for crash recovery — sync_runs rows
+    // whose process died (SIGINT/SIGTERM/hard kill) are reclassified by
+    // the signal handler or by bootstrap's stale-row sweep.
     enum: ['running', 'ok', 'partial', 'failed', 'aborted'],
   }).notNull(),
   per_resource: text('per_resource').notNull().default('{}'),

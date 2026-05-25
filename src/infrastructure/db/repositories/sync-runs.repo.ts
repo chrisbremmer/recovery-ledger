@@ -74,6 +74,12 @@ export interface SyncRunsRepo {
     since: string | undefined,
     limit: number,
   ): SyncRun[];
+  /** #35 — bootstrap-time crash recovery. Marks any `running` row whose
+   *  `started_at` is older than `thresholdMs` as `aborted`. Returns the
+   *  number of rows reclassified. Called by `bootstrap()` after the
+   *  migrator so the data-status anchor (`latestFinished()`) sees the
+   *  abort instead of treating the crashed run as in-flight forever. */
+  reclassifyStaleRunning(thresholdMs: number, nowIso: string): number;
 }
 
 type SyncRunRow = typeof syncRunsTable.$inferSelect;
@@ -193,6 +199,25 @@ export function createSyncRunsRepo(db: ReturnType<typeof drizzle>): SyncRunsRepo
         return null;
       }
       return { finished_at: row.finished_at, status: row.status };
+    },
+    reclassifyStaleRunning(thresholdMs, nowIso): number {
+      // #35 — sweep 'running' rows whose started_at is older than the
+      // threshold. The SQLite text column accepts 'aborted' (the schema
+      // enum was widened in #15 to include it).
+      const cutoffIso = new Date(Date.now() - thresholdMs).toISOString();
+      // @ts-expect-error Drizzle's BetterSQLite3Database has a $client
+      // accessor on the better-sqlite3 handle. Going direct here keeps
+      // the UPDATE outside any outer transaction (bootstrap calls this
+      // before any other write).
+      const stmt = (db.$client as import('better-sqlite3').Database).prepare(
+        `UPDATE sync_runs
+            SET status = 'aborted',
+                finished_at = ?
+          WHERE status = 'running'
+            AND started_at < ?`,
+      );
+      const result = stmt.run(nowIso, cutoffIso);
+      return result.changes;
     },
   };
 }

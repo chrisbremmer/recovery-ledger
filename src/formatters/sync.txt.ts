@@ -138,6 +138,26 @@ export function formatSyncResult(result: RunSyncResult): string {
  */
 export function formatBootstrapError(err: unknown, dbFile: string): string {
   if (isMigrationErrorShape(err)) {
+    // #25 — `journal_missing_payload` is a separate failure mode from a
+    // truly inconsistent schema: when `latestSafeMigration !== null` the
+    // DB IS at that tag and a backup restore is NOT required; the user
+    // only needs to restore the missing `.sql` file (likely a corrupt
+    // checkout, a missed `git lfs pull`, or an editor that ate the file).
+    if (err.kind === 'journal_missing_payload') {
+      const lines = ['Bootstrap failed: migration journal entry has no .sql payload.'];
+      if (err.latestSafeMigration !== null) {
+        lines.push(`DB is at ${err.latestSafeMigration} — restore not required.`);
+        lines.push(
+          'Fix the missing migration file in src/infrastructure/db/migrations/ and retry.',
+        );
+      } else {
+        lines.push('No prior migrations applied; the migrator cannot proceed.');
+        lines.push(
+          'Fix the missing migration file in src/infrastructure/db/migrations/ and retry.',
+        );
+      }
+      return lines.join('\n');
+    }
     const lines = [
       `Bootstrap failed: migration ${err.kind === 'inconsistent_state' ? 'state inconsistency' : 'apply failed'}.`,
     ];
@@ -183,7 +203,9 @@ function isMigrationErrorShape(err: unknown): err is MigrationError {
   return (
     e.name === 'MigrationError' &&
     typeof e.kind === 'string' &&
-    (e.kind === 'inconsistent_state' || e.kind === 'apply_failed') &&
+    (e.kind === 'inconsistent_state' ||
+      e.kind === 'journal_missing_payload' ||
+      e.kind === 'apply_failed') &&
     (e.backupPath === null || typeof e.backupPath === 'string') &&
     (e.latestSafeMigration === null || typeof e.latestSafeMigration === 'string')
   );

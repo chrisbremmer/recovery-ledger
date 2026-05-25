@@ -176,8 +176,14 @@ export function migrate(sqlite: Database.Database, opts: MigrateOptions): void {
   for (const entry of journal.entries) {
     const sqlPath = join(opts.migrationsDir, `${entry.tag}.sql`);
     if (!existsSync(sqlPath)) {
+      // #25 — distinct kind from `inconsistent_state` so the remediation
+      // message can branch: when `latestSafeMigration !== null` the DB is
+      // at that tag and the user only needs to restore the missing .sql
+      // file, NOT roll back to a backup. backupPath is still threaded
+      // for the unusual case where prior backups exist on disk but the
+      // user wants belt-and-suspenders.
       throw new MigrationError({
-        kind: 'inconsistent_state',
+        kind: 'journal_missing_payload',
         backupPath: mostRecentBackup,
         latestSafeMigration,
         detail: `journal entry tag ${entry.tag} has no .sql payload on disk`,
@@ -202,8 +208,25 @@ export function migrate(sqlite: Database.Database, opts: MigrateOptions): void {
     }
 
     // Step 4b–e: BEGIN IMMEDIATE / exec / record / COMMIT or ROLLBACK.
-    sqlite.exec('BEGIN IMMEDIATE');
+    // #34 — busy-retry on SQLITE_BUSY. Two concurrent bootstrap() calls
+    // (e.g., CLI sync + MCP daemon starting fresh on the same install)
+    // race on BEGIN IMMEDIATE. Without retry the second caller throws
+    // apply_failed even though the first succeeded. The retry loop also
+    // re-checks the migration ledger after each backoff so we detect
+    // "sibling already applied this migration" and skip to the next
+    // entry instead of redundantly re-applying.
+    beginImmediateWithBusyRetry(sqlite);
     try {
+      // After acquiring the write lock, the sibling may have already
+      // applied this exact migration. Re-check the ledger before exec.
+      const reAppliedRow = sqlite
+        .prepare('SELECT 1 AS x FROM __drizzle_migrations WHERE hash = ?')
+        .get(hash) as { x: number } | undefined;
+      if (reAppliedRow !== undefined) {
+        sqlite.exec('COMMIT');
+        latestSafeMigration = entry.tag;
+        continue;
+      }
       sqlite.exec(sql);
       sqlite
         .prepare('INSERT INTO __drizzle_migrations (hash, created_at) VALUES (?, ?)')
@@ -347,4 +370,47 @@ export function pruneBackups(backupsDir: string, keep: number): void {
       }
     }
   }
+}
+
+/**
+ * #34 — `BEGIN IMMEDIATE` busy-retry. Two concurrent `bootstrap()` calls
+ * race on the write-lock acquisition; without retry the second caller
+ * surfaces `apply_failed` even though the first call succeeds and the
+ * ledger eventually settles. The loop wraps the raw `sqlite.exec` so
+ * the caller's try/finally semantics (ROLLBACK on inner failure) stay
+ * unchanged.
+ *
+ * Backoff: exponential with jitter, capped at MAX_RETRIES. After the
+ * cap, throw `apply_failed` so the caller's outer handler surfaces the
+ * documented error shape.
+ */
+const BEGIN_IMMEDIATE_MAX_RETRIES = 8;
+const BEGIN_IMMEDIATE_BASE_DELAY_MS = 25;
+
+function beginImmediateWithBusyRetry(sqlite: import('better-sqlite3').Database): void {
+  let attempt = 0;
+  while (true) {
+    try {
+      sqlite.exec('BEGIN IMMEDIATE');
+      return;
+    } catch (err) {
+      const code = (err as NodeJS.ErrnoException | { code?: string }).code;
+      if (code !== 'SQLITE_BUSY' && code !== 'SQLITE_BUSY_SNAPSHOT') throw err;
+      if (attempt >= BEGIN_IMMEDIATE_MAX_RETRIES) throw err;
+      // Exponential backoff with mild jitter: 25, 50, 100, 200, ...
+      const delay = BEGIN_IMMEDIATE_BASE_DELAY_MS * 2 ** attempt;
+      const jitter = Math.floor(Math.random() * (delay / 4));
+      busySleep(delay + jitter);
+      attempt += 1;
+    }
+  }
+}
+
+/** Synchronous sleep — better-sqlite3 is synchronous, so the busy-retry
+ *  loop has to block. Uses `Atomics.wait` on a throwaway buffer rather
+ *  than busy-spinning the CPU. */
+function busySleep(ms: number): void {
+  const sab = new SharedArrayBuffer(4);
+  const view = new Int32Array(sab);
+  Atomics.wait(view, 0, 0, ms);
 }
