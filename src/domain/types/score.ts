@@ -59,3 +59,33 @@ export type ScoreState = (typeof SCORE_STATES)[number];
  *   - Repository assertions on row data before narrowing the union.
  */
 export const SCORE_STATES_SET: ReadonlySet<ScoreState> = new Set(SCORE_STATES);
+
+/**
+ * #16 — Branded type for collections that have been narrowed to
+ * `score_state === 'SCORED'` only. ADR-0003 §Enforcement promised this
+ * type plus a `filterScored` helper as the only legal path to a SCORED-
+ * only collection. The default `byRange()` filter on the four scored
+ * repos already returns SCORED-only rows at runtime; this brand puts
+ * the invariant on the type level so a Phase 4 baseline math caller
+ * that takes `ScoredOnly<Cycle>[]` is statically prevented from being
+ * handed a list that includes PENDING_SCORE / UNSCORABLE rows.
+ *
+ * The brand is structural-only at runtime — it does not allocate or
+ * change row identity. The cast inside `filterScored` is the single
+ * narrowing site.
+ */
+export type ScoredOnly<T extends { scoreState: ScoreState }> = T & {
+  readonly __brand: 'ScoredOnly';
+};
+
+/**
+ * #16 — Cast a heterogeneous entity collection to its SCORED-only
+ * brand. Filters out any row whose `scoreState !== 'SCORED'`, then
+ * applies the brand. Downstream type signatures that accept
+ * `ScoredOnly<T>[]` document the upstream-filter dependency at the
+ * type level; the only legal way to produce a value of that type is
+ * to go through this helper or the SCORED-default repo `byRange()`.
+ */
+export function filterScored<T extends { scoreState: ScoreState }>(items: T[]): ScoredOnly<T>[] {
+  return items.filter((i) => i.scoreState === 'SCORED') as ScoredOnly<T>[];
+}
