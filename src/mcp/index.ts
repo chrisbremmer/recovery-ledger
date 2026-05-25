@@ -46,7 +46,7 @@ const server = new McpServer({ name: 'recovery-ledger', version: '0.1.0' });
 // ~/.recovery-ledger directory. Production callers leave the env unset
 // and pay the normal paths.dbFile resolution.
 const dbFileOverride = process.env.MCP_DB_FILE;
-// Review #20: bootstrap can throw MigrationError (corrupt DB, missing
+// bootstrap can throw MigrationError (corrupt DB, missing
 // migration dir, schema-version skew). An unhandled throw at this
 // top-level site exits the process with a stack trace on stderr that
 // agents see as a generic "MCP startup failed" with no remediation hint.

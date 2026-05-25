@@ -358,7 +358,7 @@ export function pruneBackups(backupsDir: string, keep: number): void {
       try {
         unlinkSync(targetPath);
       } catch (err) {
-        // Review #47: narrow the catch — ENOENT (missing companion) is
+        // narrow the catch — ENOENT (missing companion) is
         // expected when a checkpointed-clean DB has no WAL/shm sidecar.
         // Anything else (EPERM, EBUSY, EIO) is a real failure we should
         // re-throw rather than silently absorb. This module follows the

@@ -157,7 +157,7 @@ export async function withRetry<T>(
 
 /**
  * Run the 2nd attempt (after a 429 or 5xx retry) inside the same network-
- * error envelope used by the first attempt. Review #19: a bare `return
+ * error envelope used by the first attempt. a bare `return
  * fn();` would let DNS failures, dropped sockets, and AbortError surface
  * as raw `Error` to `httpGet.classifyHttpError`, which then mis-classifies
  * them as `failed_unknown` instead of `failed_network`.

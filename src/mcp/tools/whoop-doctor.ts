@@ -4,7 +4,7 @@ import type { Services } from '../../services/index.js';
 import { register } from '../register.js';
 import { toStructuredContent } from './utils.js';
 
-// WR-05 + Review #45: `toStructuredContent` is the shared JSON round-trip
+// WR-05 + `toStructuredContent` is the shared JSON round-trip
 // helper in `./utils.ts`. It validates JSON serializability at runtime
 // (a future DoctorResult field that adds a Date, function, Map, or
 // Buffer triggers a JSON.stringify failure that surfaces as a sanitized

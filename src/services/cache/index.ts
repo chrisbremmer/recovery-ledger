@@ -88,7 +88,7 @@ function clampLimit(raw: number | undefined): number {
   return Math.min(Math.floor(raw), MAX_LIMIT);
 }
 
-/** Truncation detection (Review #38): most arms read `limit + 1` rows
+/** Truncation detection: most arms read `limit + 1` rows
  *  from the repo; `applyTruncation` slices to `limit` and sets `truncated`
  *  accordingly. When truncation fires, `count` is set to `limit + 1` as a
  *  sentinel — it is NOT the total dataset size. Callers wanting the true

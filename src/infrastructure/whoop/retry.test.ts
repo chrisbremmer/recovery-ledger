@@ -167,7 +167,7 @@ describe('withRetry', () => {
     expect(fn).toHaveBeenCalledTimes(2);
   });
 
-  test('Review #19: 5xx retry whose 2nd attempt throws a network error surfaces as WhoopApiError({kind:network})', async () => {
+  test('5xx retry whose 2nd attempt throws a network error surfaces as WhoopApiError({kind:network})', async () => {
     const spies = makeSpies(0.5);
     const fn = vi
       .fn<() => Promise<RetryResult<unknown>>>()
@@ -185,7 +185,7 @@ describe('withRetry', () => {
     expect(fn).toHaveBeenCalledTimes(2);
   });
 
-  test('Review #19: 429 retry whose 2nd attempt throws AbortError surfaces as WhoopApiError({kind:network, detail:request aborted})', async () => {
+  test('429 retry whose 2nd attempt throws AbortError surfaces as WhoopApiError({kind:network, detail:request aborted})', async () => {
     const spies = makeSpies(0.5);
     const abortErr = new Error('aborted');
     abortErr.name = 'AbortError';

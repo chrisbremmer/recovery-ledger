@@ -182,7 +182,7 @@ describe('detectExclusion', () => {
 // regression that breaks ISO parsing would only surface via downstream
 // expectation noise (a malformed cycle silently flagged as dst_straddle).
 // Pinning the guard's behavior here makes the regression localizable.
-describe('isParsableIsoDate (Review #26 guard, direct coverage)', () => {
+describe('isParsableIsoDate (guard, direct coverage)', () => {
   it('valid full ISO timestamp (Z) → true', () => {
     expect(isParsableIsoDate('2026-03-07T15:00:00.000Z')).toBe(true);
   });

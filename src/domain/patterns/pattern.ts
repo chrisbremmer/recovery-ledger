@@ -203,7 +203,7 @@ export function detectWeeklyPattern(
     if (idx < 1) return null;
     const prior = cyclesByStartAsc[idx - 1];
     if (prior === undefined) return null;
-    // Review #37: hoist priorDate out of the workout loop — it only depends
+    // hoist priorDate out of the workout loop — it only depends
     // on the prior cycle's start, not on the workout being compared. Saves
     // a per-workout Intl.DateTimeFormat round-trip.
     const priorDate = dateInZone(Date.parse(prior.cycle.start), input.ianaZone);

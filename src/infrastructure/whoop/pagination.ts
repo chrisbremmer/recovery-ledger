@@ -42,7 +42,7 @@ import { WhoopApiError } from './errors.js';
 export const PAGE_SIZE = 25;
 
 /**
- * Safety caps for `paginateAll` (Review #6). A malformed `next_token` chain
+ * Safety caps for `paginateAll`. A malformed `next_token` chain
  * or `--since 1900-01-01` will otherwise accumulate the entire history into
  * a single in-memory array + Set. At PAGE_SIZE=25, 1000 pages == 25_000 rows
  * (~10y of cycles), which is well past the personal-tool envelope. The row

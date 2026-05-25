@@ -76,7 +76,7 @@ describe('services/decision — addDecision (D-19 smart defaults)', () => {
     expect(created.rationale).toBeNull();
     expect(created.confidence).toBeNull();
     expect(created.expectedEffect).toBeNull();
-    // Review #22: undefined `followUpDate` is defaulted at the service layer
+    // undefined `followUpDate` is defaulted at the service layer
     // to clock.now() + 7 days so both CLI and MCP surfaces share the default.
     expect(created.followUpDate).toMatch(/^\d{4}-\d{2}-\d{2}$/);
     expect(created.status).toBe('open');

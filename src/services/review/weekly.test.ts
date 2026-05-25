@@ -192,7 +192,7 @@ describe('getWeeklyReview — D-35 partial-rejection path (D-18 multi-detection 
     expect(result.pattern.kind).toBe('detected');
     if (result.pattern.kind !== 'detected') throw new Error('narrow');
     expect(result.pattern.pattern_confidence).toBe('strong');
-    // Review #16: tighten the cleared-count assertion. The fixture
+    // tighten the cleared-count assertion. The fixture
     // engineers two candidates (sleep_duration_short, strain_high_prior_day)
     // with strong signal, so the partial-rejection BH path must yield at
     // least 2 cleared candidates — not the previous bare `>= 1`.

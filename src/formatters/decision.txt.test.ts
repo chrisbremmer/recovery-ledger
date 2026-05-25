@@ -59,7 +59,7 @@ describe('renderDecisionList — list mode (Decision[])', () => {
     expect(rendered).toBe('No decisions recorded.');
   });
 
-  it('Review #39: same-day follow-up renders 0d expected window (not the 7d default fallback)', () => {
+  it('same-day follow-up renders 0d expected window (not the 7d default fallback)', () => {
     // createdAt + followUpDate are both 2026-03-15 (same calendar day).
     // Pre-fix: diffDays === 0 was treated as "invalid" and fell back to
     // DEFAULT_FOLLOW_UP_DAYS (7). Post-fix: 0d is the correct window.
