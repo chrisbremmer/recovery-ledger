@@ -144,10 +144,14 @@ export function formatBootstrapError(err: unknown, dbFile: string): string {
       const lines = ['Bootstrap failed: migration journal entry has no .sql payload.'];
       if (err.latestSafeMigration !== null) {
         lines.push(`DB is at ${err.latestSafeMigration} — restore not required.`);
-        lines.push('Fix the missing migration file in src/infrastructure/db/migrations/ and retry.');
+        lines.push(
+          'Fix the missing migration file in src/infrastructure/db/migrations/ and retry.',
+        );
       } else {
         lines.push('No prior migrations applied; the migrator cannot proceed.');
-        lines.push('Fix the missing migration file in src/infrastructure/db/migrations/ and retry.');
+        lines.push(
+          'Fix the missing migration file in src/infrastructure/db/migrations/ and retry.',
+        );
       }
       return lines.join('\n');
     }

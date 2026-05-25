@@ -13,7 +13,9 @@
 // (`review/types.ts`, anomaly callers, etc.) keep their existing
 // `import { CANDIDATE_FACTORS_TYPE_ONLY, ... } from './types.js'`.
 export { CANDIDATE_NAMES as CANDIDATE_FACTORS_TYPE_ONLY } from './names.js';
+
 import type { CandidateName } from './names.js';
+
 export type { CandidateName };
 
 /**
