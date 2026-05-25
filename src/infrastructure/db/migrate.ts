@@ -176,8 +176,14 @@ export function migrate(sqlite: Database.Database, opts: MigrateOptions): void {
   for (const entry of journal.entries) {
     const sqlPath = join(opts.migrationsDir, `${entry.tag}.sql`);
     if (!existsSync(sqlPath)) {
+      // #25 — distinct kind from `inconsistent_state` so the remediation
+      // message can branch: when `latestSafeMigration !== null` the DB is
+      // at that tag and the user only needs to restore the missing .sql
+      // file, NOT roll back to a backup. backupPath is still threaded
+      // for the unusual case where prior backups exist on disk but the
+      // user wants belt-and-suspenders.
       throw new MigrationError({
-        kind: 'inconsistent_state',
+        kind: 'journal_missing_payload',
         backupPath: mostRecentBackup,
         latestSafeMigration,
         detail: `journal entry tag ${entry.tag} has no .sql payload on disk`,

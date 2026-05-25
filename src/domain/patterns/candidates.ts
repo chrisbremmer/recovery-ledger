@@ -19,20 +19,16 @@
 // `BANNED_TONE_WORDS` / `BANNED_TONE_WORDS_SET` (Plan 04-01) and
 // `METRIC_NAMES` / `METRIC_NAMES_SET` (Plan 04-02).
 
-import type { CandidateName } from './types.js';
+import { CANDIDATE_NAMES, type CandidateName } from './names.js';
 
 /**
- * D-11 5-tuple of pre-registered weekly-pattern candidate factors. Order
- * matches `CANDIDATE_FACTORS_TYPE_ONLY` in `types.ts` verbatim — the
- * candidates.test.ts deep-equal anchors that contract.
+ * D-11 5-tuple of pre-registered weekly-pattern candidate factors.
+ *
+ * #39 — sourced from `names.ts` (single source of truth) instead of
+ * duplicating the tuple. The historical `CANDIDATE_FACTORS` export
+ * name is preserved so downstream consumers stay unchanged.
  */
-export const CANDIDATE_FACTORS = [
-  'sleep_duration_prior_night',
-  'sleep_debt_3d_rolling',
-  'day_strain_prior_day',
-  'workout_timing_late_evening',
-  'hrv_delta_prior_day',
-] as const satisfies readonly CandidateName[];
+export const CANDIDATE_FACTORS = CANDIDATE_NAMES;
 
 /**
  * Runtime Set for O(1) membership checks. Constructed from the tuple so any

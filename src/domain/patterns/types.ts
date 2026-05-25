@@ -2,45 +2,21 @@
 // D-16 (`WeeklyPattern` 2-arm discriminated union) + D-18 (multi-detection
 // policy: pattern reports smallest p_adjusted; candidate_results carries
 // full ranked list) + D-34 (ADDITIVE `pattern_confidence: 'weak' | 'strong'`
-// on the detected arm). Pure type file; no imports, no runtime behavior
-// beyond the type-anchor tuple.
+// on the detected arm).
 //
-// `CANDIDATE_FACTORS_TYPE_ONLY` is the type-anchor only. The load-bearing
-// module-load constant `CANDIDATE_FACTORS` (with the dropped-candidates
-// rationale comment block per D-11) lives in Plan 04-05's
-// `domain/patterns/candidates.ts`. Both must stay textually in sync —
-// the candidates.ts test will assert deep-equal against this tuple.
-// Inlining the type-anchor here avoids a circular `import from
-// candidates.ts → import from types.ts` cycle when downstream code
-// (e.g., `Anomaly` consumers in `review/types.ts`) only wants the type.
+// #39 — the 5-tuple of candidate factor names + the `CandidateName` type
+// now live in the import-free `./names.ts` module. Both this file and
+// `./candidates.ts` import from `names.ts` — single source of truth, no
+// circular import, no dual-source-of-truth hazard.
 
-/**
- * Type-anchor tuple for the 5 D-11 candidate factor names. Wave 1 Plan
- * 04-05's `domain/patterns/candidates.ts` re-exports the same string
- * values as the load-bearing module-load constant + the dropped-
- * candidates rationale comment. A deep-equal assertion in Plan 04-05
- * keeps the two in sync.
- *
- * The 5 names: `sleep_duration_prior_night`, `sleep_debt_3d_rolling`,
- * `day_strain_prior_day`, `workout_timing_late_evening`,
- * `hrv_delta_prior_day`. The 2 dropped from REV-06's 7-factor list
- * (`rhr_delta_prior_day` — multicollinear with HRV;
- * `respiratory_rate_anomaly_prior_day` — rare-event low statistical
- * power) live as code comments in `candidates.ts` per D-11.
- */
-export const CANDIDATE_FACTORS_TYPE_ONLY = [
-  'sleep_duration_prior_night',
-  'sleep_debt_3d_rolling',
-  'day_strain_prior_day',
-  'workout_timing_late_evening',
-  'hrv_delta_prior_day',
-] as const;
+// Re-export under the historical name so downstream consumers
+// (`review/types.ts`, anomaly callers, etc.) keep their existing
+// `import { CANDIDATE_FACTORS_TYPE_ONLY, ... } from './types.js'`.
+export { CANDIDATE_NAMES as CANDIDATE_FACTORS_TYPE_ONLY } from './names.js';
 
-/**
- * Derived 5-literal union of candidate factor names. Used as the
- * `factor` field type on `WeeklyPattern.detected` + `CandidateResult`.
- */
-export type CandidateName = (typeof CANDIDATE_FACTORS_TYPE_ONLY)[number];
+import type { CandidateName } from './names.js';
+
+export type { CandidateName };
 
 /**
  * Weekly pattern result per D-16, with D-34's `pattern_confidence`
