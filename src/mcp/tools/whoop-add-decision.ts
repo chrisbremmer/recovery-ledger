@@ -20,13 +20,33 @@ const TOOL_DESCRIPTION =
 // source of truth for the handler input. Cap free-text fields
 // so an over-large agent payload is rejected at the boundary instead of
 // pushed to the DB.
+//
+// #50: `followUpDate` validates as strict yyyy-mm-dd with a calendar
+// round-trip — matches the CLI's `parseFollowUp` rigor so neither surface
+// accepts arbitrary strings, free-form English ("next Thursday"), or
+// rollover dates like "2026-02-30" that JS `Date` silently coerces.
+// `isPastWindow` downstream assumes a real calendar date.
+const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+const isValidIsoDate = (raw: string): boolean => {
+  if (!ISO_DATE_RE.test(raw)) return false;
+  const parsed = new Date(`${raw}T00:00:00.000Z`);
+  if (Number.isNaN(parsed.getTime())) return false;
+  // Reject calendar rollover ("2026-02-30" → "2026-03-02").
+  return parsed.toISOString().slice(0, 10) === raw;
+};
+
 const ADD_DECISION_SHAPE = {
   decision: z.string().min(1).max(500),
   category: z.string().max(100).optional(),
   rationale: z.string().max(2000).nullable().optional(),
   confidence: z.enum(['low', 'medium', 'high']).nullable().optional(),
   expectedEffect: z.string().max(500).nullable().optional(),
-  followUpDate: z.string().optional(),
+  followUpDate: z
+    .string()
+    .refine(isValidIsoDate, {
+      message: 'followUpDate must be a valid calendar date in yyyy-mm-dd form',
+    })
+    .optional(),
 };
 type AddDecisionInput = z.infer<z.ZodObject<typeof ADD_DECISION_SHAPE>>;
 

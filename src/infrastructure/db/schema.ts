@@ -220,7 +220,7 @@ export const sync_runs = sqliteTable('sync_runs', {
   started_at: text('started_at').notNull(),
   finished_at: text('finished_at'),
   status: text('status', {
-    enum: ['running', 'ok', 'partial', 'failed'],
+    enum: ['running', 'ok', 'partial', 'failed', 'aborted'],
   }).notNull(),
   per_resource: text('per_resource').notNull().default('{}'),
   gaps_detected: integer('gaps_detected').notNull().default(0),

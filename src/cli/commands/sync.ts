@@ -28,15 +28,15 @@ import { RESOURCE_NAMES_SET, type ResourceName } from '../../domain/types/sync.j
 import { formatBootstrapError, formatSyncResult } from '../../formatters/sync.txt.js';
 import { paths } from '../../infrastructure/config/paths.js';
 import { isMigrationError } from '../../infrastructure/db/migrate.js';
+// Cross-layer import: src/infrastructure/observability/sanitize.ts is the single source of truth for
+// secret-bearing pattern redaction. Mirrors the auth.ts cross-layer import.
+import { sanitize } from '../../infrastructure/observability/sanitize.js';
 import {
   formatAuthError,
   formatWhoopApiError,
   isAuthError,
   isWhoopApiError,
 } from '../../infrastructure/whoop/errors.js';
-// Cross-layer import: src/mcp/sanitize.ts is the single source of truth for
-// secret-bearing pattern redaction. Mirrors the auth.ts cross-layer import.
-import { sanitize } from '../../mcp/sanitize.js';
 import { type Bootstrapped, bootstrap } from '../../services/index.js';
 
 export const SYNC_EXIT_CODES: Readonly<Record<string, number>> = Object.freeze({
@@ -178,6 +178,16 @@ export async function runSyncCommand(opts: RunSyncCommandOpts): Promise<void> {
     return;
   }
 
+  // 3a. Install SIGINT / SIGTERM handlers so a Ctrl-C mid-sync flips the
+  // in-flight `sync_runs.status='running'` row to `'aborted'` instead of
+  // leaving an orphan that masks subsequent failures (#15). The handler
+  // is idempotent on repeated signals (a guard flag short-circuits the
+  // second SIGINT) and runs a single direct UPDATE — it does NOT try to
+  // gracefully unwind the active fetch / repo transaction, since both
+  // can block indefinitely. SQLite's WAL recovery handles partial
+  // transactional state on the next open.
+  installAbortHandlers(app);
+
   // 4. Run sync. AuthError + WhoopApiError have typed formatters; unknown
   // errors flow through sanitize() (T-03.12-01: any token / Bearer / JWT
   // pattern that leaked into err.message is redacted before stdout).
@@ -192,10 +202,12 @@ export async function runSyncCommand(opts: RunSyncCommandOpts): Promise<void> {
     // precedent — slow pipe consumers truncate on synchronous exit).
     const body = formatSyncResult(result);
     process.stdout.write(`${body}\n`, () => {
+      removeAbortHandlers();
       app.close();
       process.exit(SYNC_EXIT_CODES[result.status] ?? SYNC_EXIT_CODES.failed);
     });
   } catch (err) {
+    removeAbortHandlers();
     app.close();
     const body = isAuthError(err)
       ? formatAuthError(err)
@@ -206,4 +218,59 @@ export async function runSyncCommand(opts: RunSyncCommandOpts): Promise<void> {
       process.exit(SYNC_EXIT_CODES.failed);
     });
   }
+}
+
+// #15 — SIGINT / SIGTERM handler state. Held at module scope (not closed
+// over) so `removeAbortHandlers()` can `process.off(...)` the same
+// reference that `process.on(...)` registered. Module scope is fine
+// because the CLI is a one-shot process; there is no second sync run in
+// the same process to clobber state.
+let sigintListener: NodeJS.SignalsListener | null = null;
+let sigtermListener: NodeJS.SignalsListener | null = null;
+let abortInProgress = false;
+
+function installAbortHandlers(app: Bootstrapped): void {
+  const makeListener = (exitCode: number): NodeJS.SignalsListener => {
+    return () => {
+      // Idempotent: a second SIGINT while we're in the middle of the
+      // first one's cleanup must not double-update or crash.
+      if (abortInProgress) return;
+      abortInProgress = true;
+      try {
+        // Best-effort: flip any `running` row to `aborted`. We do this
+        // via the raw sqlite handle so the UPDATE bypasses Drizzle's
+        // transactional state and lands even if an outer transaction
+        // was open. The next bootstrap will treat the run as terminated.
+        const nowIso = new Date().toISOString();
+        app.sqlite
+          .prepare("UPDATE sync_runs SET status='aborted', finished_at=? WHERE status='running'")
+          .run(nowIso);
+      } catch {
+        // Swallow — the DB may already be in an unrecoverable state.
+        // Exiting cleanly is more important than logging here.
+      }
+      try {
+        app.close();
+      } catch {
+        // Same — close() may throw if the DB handle is mid-transaction.
+      }
+      process.exit(exitCode);
+    };
+  };
+  sigintListener = makeListener(130);
+  sigtermListener = makeListener(143);
+  process.on('SIGINT', sigintListener);
+  process.on('SIGTERM', sigtermListener);
+}
+
+function removeAbortHandlers(): void {
+  if (sigintListener !== null) {
+    process.off('SIGINT', sigintListener);
+    sigintListener = null;
+  }
+  if (sigtermListener !== null) {
+    process.off('SIGTERM', sigtermListener);
+    sigtermListener = null;
+  }
+  abortInProgress = false;
 }

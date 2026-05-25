@@ -148,6 +148,12 @@ export async function getDailyReview(
   // fill at the boundary. The METRIC_NAMES loop fills every key — the
   // cast is correct, but the Partial accumulator makes the type honest
   // until the fill completes.
+  //
+  // #43 — runtime exhaustiveness guard: a future loop short-circuit
+  // (early `continue` / `return`) would silently leave the cast lying
+  // because TypeScript cannot verify the Partial→Record narrowing. The
+  // post-loop assertion fires immediately on any missing key so a
+  // partial fill is detectable in tests, not just in a downstream NaN.
   const baselines: BaselineStats[] = [];
   const perMetricDaysAvailablePartial: Partial<Record<MetricName, number>> = {};
   for (const metric of METRIC_NAMES) {
@@ -155,6 +161,13 @@ export async function getDailyReview(
     perMetricDaysAvailablePartial[metric] = values.length;
     if (values.length >= 14) {
       baselines.push(computeBaseline(metric, values, BASELINE_WINDOW_DAYS));
+    }
+  }
+  for (const metric of METRIC_NAMES) {
+    if (perMetricDaysAvailablePartial[metric] === undefined) {
+      throw new Error(
+        `daily review: exhaustiveness violation — METRIC_NAMES fill loop missed '${metric}'`,
+      );
     }
   }
   const perMetricDaysAvailable = perMetricDaysAvailablePartial as Record<MetricName, number>;

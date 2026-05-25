@@ -14,15 +14,15 @@
 // `formatDuration` is exported as a named function so the unit suite can
 // pin its contract directly without going through the probe.
 
+// Cross-layer import (WR-06): see auth.ts in this directory for the full
+// rationale. CLI path's runDoctorCommand emits probe detail strings via
+// process.stdout.write without going through the MCP sanitizer wrapper.
+import { sanitize } from '../../../infrastructure/observability/sanitize.js';
 import {
   REFRESH_BUFFER_MS,
   type Tokens,
   tokenStore,
 } from '../../../infrastructure/whoop/token-store.js';
-// Cross-layer import (WR-06): see auth.ts in this directory for the full
-// rationale. CLI path's runDoctorCommand emits probe detail strings via
-// process.stdout.write without going through the MCP sanitizer wrapper.
-import { sanitize } from '../../../mcp/sanitize.js';
 import type { DoctorCheck } from '../index.js';
 import { CHECK_NAMES } from './check-names.js';
 

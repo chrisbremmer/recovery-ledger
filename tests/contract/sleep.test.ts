@@ -88,7 +88,7 @@ afterEach(() => {
 
 describe('sleep contract — happy path + idempotency', () => {
   test('Test 1: happy path — listSleep + upsertBatch + byRange returns the fixture sleep (UUID id)', async () => {
-    const sleeps = await listSleep({ since: SINCE, until: UNTIL });
+    const { entities: sleeps } = await listSleep({ since: SINCE, until: UNTIL });
     expect(sleeps).toHaveLength(1);
     expect(sleeps[0]?.scoreState).toBe('SCORED');
     expect(sleeps[0]?.id).toBe(FIXTURE_SLEEP_ID);
@@ -104,9 +104,9 @@ describe('sleep contract — happy path + idempotency', () => {
 
   test('Test 2: idempotency — second listSleep + upsertBatch leaves row count at 1', async () => {
     const repo = createSleepsRepo(mem.db);
-    const first = await listSleep({ since: SINCE, until: UNTIL });
+    const { entities: first } = await listSleep({ since: SINCE, until: UNTIL });
     repo.upsertBatch(first);
-    const second = await listSleep({ since: SINCE, until: UNTIL });
+    const { entities: second } = await listSleep({ since: SINCE, until: UNTIL });
     repo.upsertBatch(second);
 
     const count = (mem.sqlite.prepare('SELECT COUNT(*) AS c FROM sleeps').get() as { c: number }).c;
@@ -133,7 +133,7 @@ describe('sleep contract — D-04 SCORED-only default filter', () => {
 
 describe('sleep contract — A6 UUID-string id shape', () => {
   test('Test 4: stored sleep id is a 36-char UUID string', async () => {
-    const sleeps = await listSleep({ since: SINCE, until: UNTIL });
+    const { entities: sleeps } = await listSleep({ since: SINCE, until: UNTIL });
     const repo = createSleepsRepo(mem.db);
     repo.upsertBatch(sleeps);
     const stored = repo.byRange(SINCE, UNTIL);
@@ -144,7 +144,7 @@ describe('sleep contract — A6 UUID-string id shape', () => {
 
 describe('sleep contract — getRawJson diagnostic seam (D-29)', () => {
   test('Test 5: getRawJson(id) returns the stored raw_json payload', async () => {
-    const sleeps = await listSleep({ since: SINCE, until: UNTIL });
+    const { entities: sleeps } = await listSleep({ since: SINCE, until: UNTIL });
     const repo = createSleepsRepo(mem.db);
     const fixturePayload = '{"id":"7dee4993-8fa2-43a7-8e54-94a5c0d3227a","mock":true}';
     const withRaw = sleeps.map(

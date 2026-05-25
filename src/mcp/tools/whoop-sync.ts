@@ -32,7 +32,14 @@ export function registerWhoopSync(server: McpServer, services: Services): void {
     {
       description: TOOL_DESCRIPTION,
       inputSchema: {
-        days: z.number().int().positive().max(365).optional(),
+        // #19 — `.default(30)` so MCP sync without args matches the CLI
+        // shim's `?? 30`. Without this, the MCP path passed `days: undefined`
+        // to `runSync`, which hit `computeWindow`'s 7-day re-window default;
+        // the CLI passed `days: 30`, which took the explicit-N branch.
+        // Same input, two different windows. Defaulting to 30 here aligns
+        // both surfaces with D-26 ("default 30") without changing the
+        // service-layer contract.
+        days: z.number().int().positive().max(365).optional().default(30),
         // Defense-in-depth shape check: the CLI validates `since` via
         // parseSinceFlag, but the MCP tool was accepting any string. Limit to
         // ISO date (yyyy-mm-dd) or full ISO timestamp prefix so callers cannot

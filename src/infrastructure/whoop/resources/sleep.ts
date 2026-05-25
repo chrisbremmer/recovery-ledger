@@ -18,7 +18,18 @@ export interface ListSleepOpts {
   until: string;
 }
 
-export async function listSleep(opts: ListSleepOpts): Promise<Sleep[]> {
+export interface ListSleepResult {
+  /** Normalized sleep entities. */
+  entities: Sleep[];
+  /**
+   * Raw WHOOP wire-format records, aligned by index to `entities` — the
+   * sync orchestrator passes `JSON.stringify(rawRecords[i])` through to
+   * the repo as `rawJson`, so D-29's reparse path stays alive.
+   */
+  rawRecords: z.infer<typeof WhoopRawSleep>[];
+}
+
+export async function listSleep(opts: ListSleepOpts): Promise<ListSleepResult> {
   const rawRecords = await paginateAll<z.infer<typeof WhoopRawSleep>>(async (nextToken) =>
     httpGet(
       '/v2/activity/sleep',
@@ -32,5 +43,5 @@ export async function listSleep(opts: ListSleepOpts): Promise<Sleep[]> {
     ),
   );
 
-  return rawRecords.map(normalizeSleep);
+  return { entities: rawRecords.map(normalizeSleep), rawRecords };
 }

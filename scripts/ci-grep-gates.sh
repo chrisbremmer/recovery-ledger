@@ -24,7 +24,7 @@
 #         Biome's noRestrictedImports operates on import paths, not URL
 #         strings, so this grep gate is the load-bearing enforcement for
 #         literal URL references. Test files (*.test.ts) are excluded — the
-#         Plan 02-07 fixture in src/mcp/sanitize.test.ts deliberately
+#         Plan 02-07 fixture in src/infrastructure/observability/sanitize.test.ts deliberately
 #         includes the URL as a redaction-coverage test input, and
 #         src/infrastructure/whoop/oauth.test.ts has test cases that
 #         exercise the URL constant in error paths. Production-module
@@ -221,7 +221,7 @@ rm -f /tmp/gate-d.$$
 # grep gate is the load-bearing enforcement for literal URL references.
 #
 # Test files (*.test.ts) are excluded for two reasons:
-#  - src/mcp/sanitize.test.ts has a Plan 02-07 fixture that includes the
+#  - src/infrastructure/observability/sanitize.test.ts has a Plan 02-07 fixture that includes the
 #    literal URL as a redaction-coverage test input.
 #  - src/infrastructure/whoop/oauth.test.ts has test cases that reference
 #    the URL constant in error paths (Plan 02-03).

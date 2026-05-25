@@ -42,12 +42,21 @@ import { cycles as cyclesTable } from '../schema.js';
 
 export type { ByRangeOpts };
 
+/**
+ * Cycle + the optional raw WHOOP wire-format JSON used as `raw_json` on
+ * insert. #38 — replaces the previous inline `(c as Cycle & { rawJson?:
+ * string })` cast. The field is optional so existing call sites that
+ * pass plain `Cycle` (unit tests, future surfaces that don't carry the
+ * wire payload) keep working; the mapper defaults to `'{}'`.
+ */
+export type CycleInsertPayload = Cycle & { rawJson?: string };
+
 export interface CyclesRepo {
   /** `COALESCE(MAX(updated_at), EPOCH_ZERO_ISO)` over the cycles table (D-09). */
   cursor(): string;
   /** Idempotent upsert per Pitfall 10. Returns `{ changed: 0 }` when `rows` is
    *  empty. Wrapped in `BEGIN IMMEDIATE` per D-31. */
-  upsertBatch(rows: Cycle[]): { changed: number };
+  upsertBatch(rows: CycleInsertPayload[]): { changed: number };
   /** Range query over `cycles.start` ∈ [start, end]. Default filter:
    *  `score_state = 'SCORED' AND baseline_excluded = 0` (D-04 + D-16). */
   byRange(start: string, end: string, opts?: ByRangeOpts): Cycle[];
@@ -80,7 +89,7 @@ export function createCyclesRepo(db: ReturnType<typeof drizzle>): CyclesRepo {
       return row?.cursor ?? EPOCH_ZERO_ISO;
     },
 
-    upsertBatch(rows: Cycle[]): { changed: number } {
+    upsertBatch(rows: CycleInsertPayload[]): { changed: number } {
       if (rows.length === 0) return { changed: 0 };
       // D-31: BEGIN IMMEDIATE on every write. Pitfall 13: deferred BEGIN
       // can upgrade mid-flight and defeat busy_timeout — immediate locks
@@ -235,7 +244,7 @@ export function rowToCycle(row: CycleRow): Cycle {
 }
 
 /** camelCase Cycle → snake_case insert values for `cycles` table. */
-function cycleEntityToRow(c: Cycle): typeof cyclesTable.$inferInsert {
+function cycleEntityToRow(c: CycleInsertPayload): typeof cyclesTable.$inferInsert {
   const base = {
     id: c.id,
     user_id: c.userId,
@@ -253,7 +262,7 @@ function cycleEntityToRow(c: Cycle): typeof cyclesTable.$inferInsert {
     // domain), so we attach `{}` when the caller doesn't provide one. The
     // sync orchestrator (Plan 03-11) will override this with the real
     // wire-format JSON it received from WHOOP before calling upsertBatch.
-    raw_json: (c as Cycle & { rawJson?: string }).rawJson ?? '{}',
+    raw_json: c.rawJson ?? '{}',
   };
   if (c.scoreState === 'SCORED') {
     return {

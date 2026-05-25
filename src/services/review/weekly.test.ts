@@ -280,7 +280,10 @@ describe('getWeeklyReview — reproducibility across clocks', () => {
     loadIntoDb(h, spec);
     const r1 = await getWeeklyReview({ date: spec.reviewed_date }, h.deps);
 
-    const h2 = makeHarness({ clock: () => new Date('2030-01-01T00:00:00.000Z') });
+    // #33 bound: clocks > 365d after spec.reviewed_date now reject the
+    // --date as "too far in the past". Use a clock ~4 months later — still
+    // proves clock independence within the bounded window.
+    const h2 = makeHarness({ clock: () => new Date('2026-09-01T00:00:00.000Z') });
     loadIntoDb(h2, spec);
     const r2 = await getWeeklyReview({ date: spec.reviewed_date }, h2.deps);
     h2.mem.close();

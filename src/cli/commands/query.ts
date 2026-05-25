@@ -16,7 +16,7 @@ import { formatBootstrapError } from '../../formatters/sync.txt.js';
 import { logger } from '../../infrastructure/config/logger.js';
 import { paths } from '../../infrastructure/config/paths.js';
 import { isMigrationError } from '../../infrastructure/db/migrate.js';
-import { sanitize, serializeError } from '../../mcp/sanitize.js';
+import { sanitize, serializeError } from '../../infrastructure/observability/sanitize.js';
 import type { QueryCacheInput } from '../../services/cache/types.js';
 import { type Bootstrapped, bootstrap } from '../../services/index.js';
 
