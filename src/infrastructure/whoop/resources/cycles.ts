@@ -38,7 +38,18 @@ export interface ListCyclesOpts {
   priorTimezoneOffset: string | null;
 }
 
-export async function listCycles(opts: ListCyclesOpts): Promise<Cycle[]> {
+export interface ListCyclesResult {
+  /** Normalized cycle entities in start-ascending order. */
+  entities: Cycle[];
+  /**
+   * Raw WHOOP wire-format records, aligned by index to `entities` — the
+   * sync orchestrator passes `JSON.stringify(rawRecords[i])` through to
+   * the repo as `rawJson`, so D-29's reparse path stays alive.
+   */
+  rawRecords: z.infer<typeof WhoopRawCycle>[];
+}
+
+export async function listCycles(opts: ListCyclesOpts): Promise<ListCyclesResult> {
   const rawRecords = await paginateAll<z.infer<typeof WhoopRawCycle>>(async (nextToken) =>
     httpGet(
       '/v2/cycle',
@@ -64,5 +75,5 @@ export async function listCycles(opts: ListCyclesOpts): Promise<Cycle[]> {
     );
     priorOffset = raw.timezone_offset;
   }
-  return entities;
+  return { entities, rawRecords: sorted };
 }

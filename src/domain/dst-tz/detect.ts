@@ -97,7 +97,10 @@ export function detectExclusion(input: DstDetectInput): DstDetectOutput {
 // (`YYYY-MM-DDTHH:MM:SS.sssZ` and the `+HH:MM` offset variant) and rejects
 // anything else. Malformed strings produce NaN at `new Date(...)`, which
 // silently passes the `!==` comparison above.
-function isParsableIsoDate(s: string): boolean {
+//
+// Exported so `detect.test.ts` can pin the guard directly without
+// reaching through `detectExclusion`'s broader fixture surface (#45).
+export function isParsableIsoDate(s: string): boolean {
   if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/.test(s)) return false;
   const t = Date.parse(s);
   return !Number.isNaN(t);

@@ -6,7 +6,7 @@
 // Wave 2 plans (02-02 token-store + 02-03 oauth).
 
 import { describe, expect, test } from 'vitest';
-import { sanitize, serializeError } from '../../mcp/sanitize.js';
+import { sanitize, serializeError } from '../observability/sanitize.js';
 import {
   AUTH_ERROR_KINDS,
   AuthError,
@@ -245,7 +245,7 @@ describe('WhoopApiError', () => {
 
   test('WAE-06: JSON.stringify of a WhoopApiError does NOT leak the cause message', () => {
     // Same defense-in-depth pin as AuthError Test 9. The load-bearing
-    // sanitizer pipeline lives in src/mcp/sanitize.ts; this assertion
+    // sanitizer pipeline lives in src/infrastructure/observability/sanitize.ts; this assertion
     // pins Error.toJSON's default behavior so a future override surfaces.
     const inner = new Error('secret-token-leak');
     const err = new WhoopApiError({ kind: 'server', cause: inner });
@@ -253,7 +253,7 @@ describe('WhoopApiError', () => {
   });
 
   test('WAE-07: WhoopApiError flows through serializeError + sanitize unchanged (D-34 attestation)', () => {
-    // Phase 3 D-34: src/mcp/sanitize.ts is UNMODIFIED. Pin that a
+    // Phase 3 D-34: src/infrastructure/observability/sanitize.ts is UNMODIFIED. Pin that a
     // Bearer-bearing cause message routes through the existing pipeline
     // and lands redacted, identical to AuthError Test 9b.
     const inner = new Error('Authorization: Bearer abc123.def456.ghi789xyzlong');

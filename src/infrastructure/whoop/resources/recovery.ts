@@ -31,7 +31,18 @@ export interface ListRecoveryOpts {
   until: string;
 }
 
-export async function listRecovery(opts: ListRecoveryOpts): Promise<Recovery[]> {
+export interface ListRecoveryResult {
+  /** Normalized recovery entities. */
+  entities: Recovery[];
+  /**
+   * Raw WHOOP wire-format records, aligned by index to `entities` — the
+   * sync orchestrator passes `JSON.stringify(rawRecords[i])` through to
+   * the repo as `rawJson`, so D-29's reparse path stays alive.
+   */
+  rawRecords: z.infer<typeof WhoopRawRecovery>[];
+}
+
+export async function listRecovery(opts: ListRecoveryOpts): Promise<ListRecoveryResult> {
   const rawRecords = await paginateAll<z.infer<typeof WhoopRawRecovery>>(
     async (nextToken) =>
       httpGet(
@@ -48,5 +59,5 @@ export async function listRecovery(opts: ListRecoveryOpts): Promise<Recovery[]> 
     (row) => row.cycle_id + ':' + row.sleep_id,
   );
 
-  return rawRecords.map(normalizeRecovery);
+  return { entities: rawRecords.map(normalizeRecovery), rawRecords };
 }

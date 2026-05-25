@@ -129,11 +129,18 @@ describe('resolveReviewedDate — D-01 anchor for D-02 / D-12 / D-17', () => {
     expect(result).toEqual({ date: '2026-05-20', source: 'fallback_today' });
   });
 
-  it('Test 7: D-02 reproducibility — same input.date returns the same output regardless of clock', async () => {
+  it('Test 7: D-02 reproducibility — same input.date returns the same output under any clock within the ±bound window', async () => {
+    // Original test used a 4-year-future clock to assert clock independence.
+    // With the #33 bounds in place, a clock that pushes input.date outside
+    // ±(MAX_FUTURE_DAYS today, MAX_PAST_DAYS today) IS expected to throw —
+    // that's the bounds feature, not a reproducibility violation. Restate
+    // the invariant: within the window, the resolved value is identical
+    // regardless of clock position. Both clocks below keep '2026-03-15'
+    // inside the 365-day past window.
     const r1 = await resolveReviewedDate({ date: '2026-03-15' }, h.deps);
     const r2 = await resolveReviewedDate(
       { date: '2026-03-15' },
-      { ...h.deps, clock: () => new Date('2030-01-01T00:00:00.000Z') },
+      { ...h.deps, clock: () => new Date('2026-08-01T00:00:00.000Z') },
     );
     expect(r1).toEqual(r2);
   });
@@ -143,5 +150,37 @@ describe('resolveReviewedDate — D-01 anchor for D-02 / D-12 / D-17', () => {
     const result = await resolveReviewedDate({}, h.deps);
     expect(result.date).toBe('2026-03-10');
     expect(result.date).toHaveLength(10);
+  });
+});
+
+// #33 — bound `--date` input. Future / ancient dates throw at the
+// resolver boundary instead of silently rendering an empty review.
+describe('resolveReviewedDate — #33 date bounds', () => {
+  it('rejects --date more than 1 day in the future', async () => {
+    const h = makeHarness();
+    await expect(resolveReviewedDate({ date: '2026-05-23' }, h.deps)).rejects.toThrow(/future/i);
+  });
+
+  it('accepts --date exactly today (no future violation)', async () => {
+    const h = makeHarness();
+    const result = await resolveReviewedDate({ date: '2026-05-20' }, h.deps);
+    expect(result).toEqual({ date: '2026-05-20', source: 'cli_flag' });
+  });
+
+  it('accepts --date exactly today + 1 (within bound)', async () => {
+    const h = makeHarness();
+    const result = await resolveReviewedDate({ date: '2026-05-21' }, h.deps);
+    expect(result).toEqual({ date: '2026-05-21', source: 'cli_flag' });
+  });
+
+  it('rejects --date more than 365 days in the past', async () => {
+    const h = makeHarness();
+    await expect(resolveReviewedDate({ date: '2024-01-01' }, h.deps)).rejects.toThrow(/past/i);
+  });
+
+  it('accepts --date within the 365-day past bound', async () => {
+    const h = makeHarness();
+    const result = await resolveReviewedDate({ date: '2025-06-15' }, h.deps);
+    expect(result).toEqual({ date: '2025-06-15', source: 'cli_flag' });
   });
 });

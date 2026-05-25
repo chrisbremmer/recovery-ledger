@@ -25,10 +25,7 @@ import open from 'open';
 import { z } from 'zod';
 import { paths } from '../../infrastructure/config/paths.js';
 import { ConfigSchema } from '../../infrastructure/config/schema.js';
-import { AuthError, formatAuthError, isAuthError } from '../../infrastructure/whoop/errors.js';
-import { runOAuth } from '../../infrastructure/whoop/oauth.js';
-import { tokenStore } from '../../infrastructure/whoop/token-store.js';
-// Cross-layer import: src/mcp/sanitize.ts is the single source of truth for
+// Cross-layer import: src/infrastructure/observability/sanitize.ts is the single source of truth for
 // secret-bearing pattern redaction (D-07 / Pitfall 17). CR-04: a Zod or
 // JSON.parse error raised inside the outer try wraps the offending value
 // verbatim in its message; running `String(err)` through `sanitize()` is the
@@ -36,7 +33,10 @@ import { tokenStore } from '../../infrastructure/whoop/token-store.js';
 // same cross-layer dependency exists in src/infrastructure/whoop/oauth.ts;
 // relocating sanitize to src/infrastructure/observability/ is tracked as
 // deferred work (PLAN-03-CROSS-LAYER).
-import { sanitize } from '../../mcp/sanitize.js';
+import { sanitize } from '../../infrastructure/observability/sanitize.js';
+import { AuthError, formatAuthError, isAuthError } from '../../infrastructure/whoop/errors.js';
+import { runOAuth } from '../../infrastructure/whoop/oauth.js';
+import { tokenStore } from '../../infrastructure/whoop/token-store.js';
 
 export const AUTH_EXIT_CODES: Readonly<Record<string, number>> = Object.freeze({
   success: 0,
