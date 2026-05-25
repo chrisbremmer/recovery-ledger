@@ -350,13 +350,13 @@ async function syncOneResource(
       const priorCycle = deps.repos.cycles.priorBefore(window.since);
       const priorTimezoneOffset = priorCycle?.timezoneOffset ?? null;
 
-      const entities = await deps.whoop.resources.cycles({
+      const { entities, rawRecords } = await deps.whoop.resources.cycles({
         since: window.since,
         until: window.until,
         ianaZone,
         priorTimezoneOffset,
       });
-      const upsert = deps.repos.cycles.upsertBatch(entities);
+      const upsert = deps.repos.cycles.upsertBatch(attachRawJson(entities, rawRecords));
       return {
         status: 'success',
         fetched: entities.length,
@@ -371,11 +371,11 @@ async function syncOneResource(
         flagSinceISO: input.since ?? null,
         flagDaysN: input.days ?? null,
       });
-      const entities = await deps.whoop.resources.recoveries({
+      const { entities, rawRecords } = await deps.whoop.resources.recoveries({
         since: window.since,
         until: window.until,
       });
-      const upsert = deps.repos.recoveries.upsertBatch(entities);
+      const upsert = deps.repos.recoveries.upsertBatch(attachRawJson(entities, rawRecords));
       return {
         status: 'success',
         fetched: entities.length,
@@ -390,11 +390,11 @@ async function syncOneResource(
         flagSinceISO: input.since ?? null,
         flagDaysN: input.days ?? null,
       });
-      const entities = await deps.whoop.resources.sleeps({
+      const { entities, rawRecords } = await deps.whoop.resources.sleeps({
         since: window.since,
         until: window.until,
       });
-      const upsert = deps.repos.sleeps.upsertBatch(entities);
+      const upsert = deps.repos.sleeps.upsertBatch(attachRawJson(entities, rawRecords));
       return {
         status: 'success',
         fetched: entities.length,
@@ -409,11 +409,11 @@ async function syncOneResource(
         flagSinceISO: input.since ?? null,
         flagDaysN: input.days ?? null,
       });
-      const entities = await deps.whoop.resources.workouts({
+      const { entities, rawRecords } = await deps.whoop.resources.workouts({
         since: window.since,
         until: window.until,
       });
-      const upsert = deps.repos.workouts.upsertBatch(entities);
+      const upsert = deps.repos.workouts.upsertBatch(attachRawJson(entities, rawRecords));
       return {
         status: 'success',
         fetched: entities.length,
@@ -421,4 +421,18 @@ async function syncOneResource(
       };
     }
   }
+}
+
+/**
+ * Zip per-entity `rawJson` onto each entity using the index-aligned raw
+ * payload returned by the resource module. The repo-side mappers read
+ * `(entity as ... & { rawJson?: string }).rawJson` and persist the string
+ * verbatim, keeping the D-29 reparse path alive for cycles / recoveries /
+ * sleeps / workouts.
+ *
+ * The entities and raw records are aligned by index — every resource
+ * module guarantees `rawRecords[i]` corresponds to `entities[i]`.
+ */
+function attachRawJson<E, R>(entities: E[], rawRecords: R[]): (E & { rawJson: string })[] {
+  return entities.map((e, i) => ({ ...e, rawJson: JSON.stringify(rawRecords[i]) }));
 }
