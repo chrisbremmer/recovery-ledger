@@ -47,7 +47,7 @@ function makeWeekly(overrides: Partial<WeeklyReviewResult> = {}): WeeklyReviewRe
     },
     candidate_results: [],
     decision_prompt: { kind: 'silent' },
-    confidence: { tier: 'normal', sample_size: 28 } as unknown as WeeklyReviewResult['confidence'],
+    confidence: { tier: 'strong', sampleSize: 28, coveragePct: 1.0, minRequired: 20 },
     ...overrides,
   } as WeeklyReviewResult;
 }

@@ -173,9 +173,24 @@ export async function runSync(input: RunSyncInput, deps: RunSyncDeps): Promise<R
   // 'skipped' so the type is Record<ResourceName, ResourceSyncOutcome> (no
   // Partial). The loop below overwrites entries for requested resources with
   // their real outcomes; non-requested ones keep the seeded 'skipped' value.
+  //
+  // #44 — runtime exhaustiveness guard: Object.fromEntries returns
+  // `{[k:string]: V}`, so the `as Record<ResourceName, V>` cast is
+  // pragmatically correct (RESOURCES is const-asserted) but TypeScript
+  // cannot verify it. A future RESOURCES modification that drops or
+  // renames an entry without updating ResourceName would silently
+  // produce an under-filled record. The post-construction loop asserts
+  // every ResourceName key is present.
   const perResource: Record<ResourceName, ResourceSyncOutcome> = Object.fromEntries(
     RESOURCES.map((resource) => [resource, { status: 'skipped' } as ResourceSyncOutcome]),
   ) as Record<ResourceName, ResourceSyncOutcome>;
+  for (const resource of RESOURCES) {
+    if (perResource[resource] === undefined) {
+      throw new Error(
+        `runSync: exhaustiveness violation — perResource seed loop missed '${resource}'`,
+      );
+    }
+  }
 
   // Iterate in canonical D-23 order, not in the user's --resources order.
   // The user can omit resources but not reorder them — the FK from
