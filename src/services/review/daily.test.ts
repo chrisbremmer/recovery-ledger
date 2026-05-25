@@ -227,17 +227,18 @@ describe('getDailyReview — D-02 reproducibility anchor', () => {
   });
   afterEach(() => h.mem.close());
 
-  it('Test 8: same fixture + same --date returns identical confidence + anomalies across two runs with different clocks', async () => {
+  it('Test 8: same fixture + same --date returns identical confidence + anomalies under any clock within the #33 bounds window', async () => {
     const spec = loadDailyFixture('daily-no-anomalies');
     loadIntoDb(h, spec);
     const r1 = await getDailyReview({ date: spec.reviewed_date }, h.deps);
-    const h2 = makeHarness(() => new Date('2030-01-01T00:00:00.000Z'));
+    // #33 bound: clocks > 365d after spec.reviewed_date now reject the
+    // --date as "too far in the past". Use a clock ~4 months later — still
+    // proves "anchored at reviewed_date, not today" without leaving the
+    // window. D-02 anchor.
+    const h2 = makeHarness(() => new Date('2026-09-01T00:00:00.000Z'));
     loadIntoDb(h2, spec);
     const r2 = await getDailyReview({ date: spec.reviewed_date }, h2.deps);
     h2.mem.close();
-    // The baseline window is anchored at reviewed_date, NOT today — so the
-    // confidence + anomalies + actions are identical even with a 4-year
-    // gap in clock. D-02 anchor.
     expect(r1.confidence).toEqual(r2.confidence);
     expect(r1.anomalies).toEqual(r2.anomalies);
     expect(r1.actions).toEqual(r2.actions);

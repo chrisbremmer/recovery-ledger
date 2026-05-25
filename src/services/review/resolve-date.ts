@@ -33,6 +33,18 @@ import type { CyclesRepo } from '../../infrastructure/db/repositories/cycles.rep
  *  the additional `Date.parse(`${s}T00:00:00.000Z`)` check catches that. */
 const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
+/** Future bound for `--date` (#33). Allow exactly 1 day ahead so a user
+ *  syncing late at night sees "today" in their local zone resolve to a
+ *  date that may be UTC-tomorrow. Anything beyond is rejected — a daily
+ *  review against tomorrow has nothing to say. */
+const MAX_FUTURE_DAYS = 1;
+/** Past bound for `--date` (#33). 365 days back captures the entire useful
+ *  history for a single-user tool whose baselines look at trailing-30. A
+ *  request beyond a year is almost certainly a typo or a user trying to
+ *  re-render something against data we no longer have. */
+const MAX_PAST_DAYS = 365;
+const MS_PER_DAY = 24 * 60 * 60 * 1000;
+
 export interface ResolveReviewedDateDeps {
   repos: { cycles: CyclesRepo };
   clock: () => Date;
@@ -59,6 +71,22 @@ export async function resolveReviewedDate(
     if (Number.isNaN(parsed.getTime()) || roundTrip !== input.date) {
       throw new Error(
         `resolveReviewedDate: input.date is not a valid calendar date: '${input.date}'`,
+      );
+    }
+    // #33 — bound the date against the clock so future-dated reviews
+    // (silent no-data renders) and ancient-dated reviews (confusing
+    // baseline errors) get caught at the boundary with a clear message.
+    const today = deps.clock();
+    const todayMs = today.getTime();
+    const dateMs = parsed.getTime();
+    if (dateMs > todayMs + MAX_FUTURE_DAYS * MS_PER_DAY) {
+      throw new Error(
+        `resolveReviewedDate: input.date '${input.date}' is more than ${MAX_FUTURE_DAYS} day(s) in the future`,
+      );
+    }
+    if (dateMs < todayMs - MAX_PAST_DAYS * MS_PER_DAY) {
+      throw new Error(
+        `resolveReviewedDate: input.date '${input.date}' is more than ${MAX_PAST_DAYS} days in the past`,
       );
     }
     return { date: input.date, source: 'cli_flag' };
