@@ -14,7 +14,6 @@
 // Remediation phrasing matches the native-modules.ts MR-22 convention:
 // every fail detail ends with a "`run \`recovery-ledger ...\`" remediation.
 
-import { type Tokens, tokenStore } from '../../../infrastructure/whoop/token-store.js';
 // Cross-layer import (WR-06): the MCP register wrapper sanitizes results before
 // they leave the JSON-RPC boundary, but `runDoctorCommand` on the CLI path
 // emits probe `detail` strings verbatim through `process.stdout.write`. A
@@ -27,6 +26,7 @@ import { type Tokens, tokenStore } from '../../../infrastructure/whoop/token-sto
 // deferred work (PLAN-03-CROSS-LAYER); the same cross-layer dependency
 // exists in oauth.ts and auth.ts (CR-04).
 import { sanitize } from '../../../infrastructure/observability/sanitize.js';
+import { type Tokens, tokenStore } from '../../../infrastructure/whoop/token-store.js';
 import type { DoctorCheck } from '../index.js';
 import { CHECK_NAMES } from './check-names.js';
 
