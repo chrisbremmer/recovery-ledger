@@ -28,15 +28,15 @@ import { RESOURCE_NAMES_SET, type ResourceName } from '../../domain/types/sync.j
 import { formatBootstrapError, formatSyncResult } from '../../formatters/sync.txt.js';
 import { paths } from '../../infrastructure/config/paths.js';
 import { isMigrationError } from '../../infrastructure/db/migrate.js';
+// Cross-layer import: src/infrastructure/observability/sanitize.ts is the single source of truth for
+// secret-bearing pattern redaction. Mirrors the auth.ts cross-layer import.
+import { sanitize } from '../../infrastructure/observability/sanitize.js';
 import {
   formatAuthError,
   formatWhoopApiError,
   isAuthError,
   isWhoopApiError,
 } from '../../infrastructure/whoop/errors.js';
-// Cross-layer import: src/mcp/sanitize.ts is the single source of truth for
-// secret-bearing pattern redaction. Mirrors the auth.ts cross-layer import.
-import { sanitize } from '../../mcp/sanitize.js';
 import { type Bootstrapped, bootstrap } from '../../services/index.js';
 
 export const SYNC_EXIT_CODES: Readonly<Record<string, number>> = Object.freeze({
