@@ -158,9 +158,7 @@ describe('resolveReviewedDate — D-01 anchor for D-02 / D-12 / D-17', () => {
 describe('resolveReviewedDate — #33 date bounds', () => {
   it('rejects --date more than 1 day in the future', async () => {
     const h = makeHarness();
-    await expect(
-      resolveReviewedDate({ date: '2026-05-23' }, h.deps),
-    ).rejects.toThrow(/future/i);
+    await expect(resolveReviewedDate({ date: '2026-05-23' }, h.deps)).rejects.toThrow(/future/i);
   });
 
   it('accepts --date exactly today (no future violation)', async () => {
@@ -177,9 +175,7 @@ describe('resolveReviewedDate — #33 date bounds', () => {
 
   it('rejects --date more than 365 days in the past', async () => {
     const h = makeHarness();
-    await expect(
-      resolveReviewedDate({ date: '2024-01-01' }, h.deps),
-    ).rejects.toThrow(/past/i);
+    await expect(resolveReviewedDate({ date: '2024-01-01' }, h.deps)).rejects.toThrow(/past/i);
   });
 
   it('accepts --date within the 365-day past bound', async () => {
