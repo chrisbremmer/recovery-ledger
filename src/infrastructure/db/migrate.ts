@@ -45,80 +45,27 @@ import { join } from 'node:path';
 import type Database from 'better-sqlite3';
 
 // -----------------------------------------------------------------------------
-// MigrationError — mirrors AuthError / WhoopApiError shape from
-// src/infrastructure/whoop/errors.ts. Same MR-21 forcing function: the
-// tuple is the source of truth, the type + duck-type SET + (future)
-// exhaustive formatter switch all derive from it.
+// MigrationError lives in `src/domain/errors/migration.ts` (#18). Imported
+// here so the `new MigrationError(...)` throw sites below resolve, and
+// re-exported so existing `import { MigrationError, isMigrationError } from
+// '../../infrastructure/db/migrate.js'` continues to work.
 // -----------------------------------------------------------------------------
 
-export const MIGRATION_ERROR_KINDS = [
-  // Schema state disagrees with __drizzle_migrations (orphaned rows, missing
-  // journal entry, missing .sql payload). D-08 surfaces this with the
-  // most-recent backup path so the user can restore manually if needed.
-  'inconsistent_state',
-  // BEGIN IMMEDIATE → exec(sql) threw → ROLLBACK. WAL recovery on next open
-  // is consistent with __drizzle_migrations (the failed migration was
-  // never recorded). Backup intact on disk.
-  'apply_failed',
-] as const;
+import {
+  isMigrationError,
+  MIGRATION_ERROR_KINDS,
+  MigrationError,
+  type MigrationErrorInit,
+  type MigrationErrorKind,
+} from '../../domain/errors/migration.js';
 
-export type MigrationErrorKind = (typeof MIGRATION_ERROR_KINDS)[number];
-
-const MIGRATION_ERROR_KINDS_SET: ReadonlySet<string> = new Set(MIGRATION_ERROR_KINDS);
-
-export interface MigrationErrorInit {
-  kind: MigrationErrorKind;
-  /** Absolute path to the pre-migration backup (or null when no backup was
-   *  taken — first-ever migration on an empty $HOME, or `:memory:` DB). */
-  backupPath: string | null;
-  /** Tag of the most-recent migration that completed cleanly before this
-   *  one threw; null when the failure is at startup before any apply. */
-  latestSafeMigration: string | null;
-  /** Short human-readable detail; surfaces into the Error message. */
-  detail?: string;
-  /** Original cause; preserved through the ES2022 Error `cause` option so
-   *  the Phase 1 sanitize.ts walker can traverse it. Mirrors AuthError. */
-  cause?: unknown;
-}
-
-export class MigrationError extends Error {
-  readonly kind: MigrationErrorKind;
-  readonly backupPath: string | null;
-  readonly latestSafeMigration: string | null;
-  readonly detail?: string;
-
-  constructor(init: MigrationErrorInit) {
-    // Same conditional-spread shape as AuthError: only pass the second arg
-    // when cause is defined so we do not synthesize a `{ cause: undefined }`
-    // literal that diverges from the AuthError carrier shape.
-    super(init.detail ?? init.kind, init.cause === undefined ? undefined : { cause: init.cause });
-    this.kind = init.kind;
-    this.backupPath = init.backupPath;
-    this.latestSafeMigration = init.latestSafeMigration;
-    if (init.detail !== undefined) {
-      this.detail = init.detail;
-    }
-    this.name = 'MigrationError';
-  }
-}
-
-/**
- * Duck-type guard for MigrationError. Mirrors isAuthError: `instanceof
- * MigrationError` is unreliable under vi.resetModules() (two module-graph
- * instances of migrate.ts produce different class identities for the same
- * logical type). The guard checks `name === 'MigrationError'` plus `kind`
- * membership in the tuple, so a structurally-equivalent error from a
- * different module-graph copy of this file still narrows correctly.
- */
-export function isMigrationError(err: unknown): err is MigrationError {
-  if (typeof err !== 'object' || err === null) return false;
-  const e = err as { name?: unknown; kind?: unknown };
-  return (
-    e.name === 'MigrationError' &&
-    typeof e.kind === 'string' &&
-    MIGRATION_ERROR_KINDS_SET.has(e.kind)
-  );
-}
+export {
+  isMigrationError,
+  MIGRATION_ERROR_KINDS,
+  MigrationError,
+  type MigrationErrorInit,
+  type MigrationErrorKind,
+};
 
 // -----------------------------------------------------------------------------
 // migrate() — the public entry point. Reads the canonical migration list
