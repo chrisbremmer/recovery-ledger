@@ -61,15 +61,46 @@ describe('bootstrap() — Phase 4 service wiring', () => {
   });
 });
 
-describe('createServices() — DB-dependent methods throw (D-31)', () => {
-  it('Test 4: every DB-backed method throws with a bootstrap-pointer message', () => {
+describe('createServices() — DB-dependent methods are absent from the type (D-31)', () => {
+  it('Test 4: createServices() returns ServicesBase; DB-backed methods are absent at runtime', () => {
     const services = createServices();
-    expect(() => services.runSync({} as never)).toThrow(/bootstrap\(\)/);
-    expect(() => services.getDailyReview({})).toThrow(/bootstrap\(\)/);
-    expect(() => services.getWeeklyReview({})).toThrow(/bootstrap\(\)/);
-    expect(() => services.addDecision({ decision: 'x' })).toThrow(/bootstrap\(\)/);
-    expect(() => services.reviewDecisions({ mode: 'list' })).toThrow(/bootstrap\(\)/);
-    expect(() => services.queryCache({ resource: 'cycles' })).toThrow(/bootstrap\(\)/);
-    expect(() => services.getApiGap()).toThrow(/bootstrap\(\)/);
+    // Phase 1-2 surface is present.
+    expect(typeof services.runDoctor).toBe('function');
+    expect(typeof services.refreshOrchestrator.callWithAuth).toBe('function');
+    // Runtime confirms the absence — the previous stub satisfied the full
+    // Services interface with throwing functions, so these property reads
+    // returned a callable that threw on invocation. After the fix the type
+    // is narrowed to ServicesBase and these reads return undefined.
+    const asAny = services as unknown as Record<string, unknown>;
+    expect(asAny.runSync).toBeUndefined();
+    expect(asAny.getDailyReview).toBeUndefined();
+    expect(asAny.getWeeklyReview).toBeUndefined();
+    expect(asAny.addDecision).toBeUndefined();
+    expect(asAny.reviewDecisions).toBeUndefined();
+    expect(asAny.queryCache).toBeUndefined();
+    expect(asAny.getApiGap).toBeUndefined();
   });
 });
+
+// Compile-time regression guard for #13. Each line below would FAIL to
+// compile if `createServices()`'s return type ever widens back to include
+// the method, because @ts-expect-error requires the suppressed line to
+// actually emit a type error. Wrapped in a function never invoked so the
+// expressions are never executed at runtime.
+function _typeGuard_createServicesIsServicesBase(): void {
+  const services = createServices();
+  // @ts-expect-error — runSync is not on ServicesBase
+  type _RunSync = typeof services.runSync;
+  // @ts-expect-error — getDailyReview is not on ServicesBase
+  type _Daily = typeof services.getDailyReview;
+  // @ts-expect-error — getWeeklyReview is not on ServicesBase
+  type _Weekly = typeof services.getWeeklyReview;
+  // @ts-expect-error — addDecision is not on ServicesBase
+  type _AddDec = typeof services.addDecision;
+  // @ts-expect-error — reviewDecisions is not on ServicesBase
+  type _RevDec = typeof services.reviewDecisions;
+  // @ts-expect-error — queryCache is not on ServicesBase
+  type _Query = typeof services.queryCache;
+  // @ts-expect-error — getApiGap is not on ServicesBase
+  type _Gap = typeof services.getApiGap;
+}
