@@ -31,6 +31,10 @@
 // Gate G compliance: this file imports zero drizzle-orm symbols. It
 // consumes domain types (RunSyncResult, ResourceSyncOutcome) only.
 
+// #18 — MigrationError lives in src/domain/errors/migration.ts. The
+// formatter imports from domain (not infrastructure) per the lite-
+// hexagonal layout — formatters must be import-free of infrastructure.
+import type { MigrationError } from '../domain/errors/migration.js';
 import {
   RESOURCES,
   type ResourceName,
@@ -38,7 +42,6 @@ import {
   type ResourceSyncStatus,
   type RunSyncResult,
 } from '../domain/types/sync.js';
-import type { MigrationError } from '../infrastructure/db/migrate.js';
 import { formatAuthError, isAuthError } from '../infrastructure/whoop/errors.js';
 
 const RESOURCE_COL_WIDTH = 20;

@@ -677,7 +677,7 @@ describe('cross-process lock', () => {
     expect(lockedPath).toBe(paths.tokensLockFile);
     expect(options).toMatchObject({
       retries: { retries: 10, factor: 1.2, minTimeout: 50 },
-      stale: 5000,
+      stale: 60_000,
     });
   });
 
@@ -811,7 +811,7 @@ describe('cross-process lock', () => {
     expect(lockedPath).toBe(paths.tokensLockFile);
     expect(options).toMatchObject({
       retries: { retries: 10, factor: 1.2, minTimeout: 50 },
-      stale: 5000,
+      stale: 60_000,
     });
     // Release must have been called once (write completed cleanly).
     expect(lf.releaseSpy).toHaveBeenCalledTimes(1);

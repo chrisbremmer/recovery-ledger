@@ -21,7 +21,7 @@
 //
 // Pitfall E (token leakage via WhoopApiError.cause): the catch block logs
 // the resource + status fields only; the raw error never lands in the log
-// payload. The error itself flows through `src/mcp/sanitize.ts` at the
+// payload. The error itself flows through `src/infrastructure/observability/sanitize.ts` at the
 // MCP boundary when surfaced through Phase 4's tool.
 // `tests/integration/sync/partial-failure.test.ts` Test 2 asserts on
 // captured stderr that `grep -E '(Bearer|access_token=)'` returns 0
@@ -173,9 +173,24 @@ export async function runSync(input: RunSyncInput, deps: RunSyncDeps): Promise<R
   // 'skipped' so the type is Record<ResourceName, ResourceSyncOutcome> (no
   // Partial). The loop below overwrites entries for requested resources with
   // their real outcomes; non-requested ones keep the seeded 'skipped' value.
+  //
+  // #44 — runtime exhaustiveness guard: Object.fromEntries returns
+  // `{[k:string]: V}`, so the `as Record<ResourceName, V>` cast is
+  // pragmatically correct (RESOURCES is const-asserted) but TypeScript
+  // cannot verify it. A future RESOURCES modification that drops or
+  // renames an entry without updating ResourceName would silently
+  // produce an under-filled record. The post-construction loop asserts
+  // every ResourceName key is present.
   const perResource: Record<ResourceName, ResourceSyncOutcome> = Object.fromEntries(
     RESOURCES.map((resource) => [resource, { status: 'skipped' } as ResourceSyncOutcome]),
   ) as Record<ResourceName, ResourceSyncOutcome>;
+  for (const resource of RESOURCES) {
+    if (perResource[resource] === undefined) {
+      throw new Error(
+        `runSync: exhaustiveness violation — perResource seed loop missed '${resource}'`,
+      );
+    }
+  }
 
   // Iterate in canonical D-23 order, not in the user's --resources order.
   // The user can omit resources but not reorder them — the FK from
@@ -350,13 +365,13 @@ async function syncOneResource(
       const priorCycle = deps.repos.cycles.priorBefore(window.since);
       const priorTimezoneOffset = priorCycle?.timezoneOffset ?? null;
 
-      const entities = await deps.whoop.resources.cycles({
+      const { entities, rawRecords } = await deps.whoop.resources.cycles({
         since: window.since,
         until: window.until,
         ianaZone,
         priorTimezoneOffset,
       });
-      const upsert = deps.repos.cycles.upsertBatch(entities);
+      const upsert = deps.repos.cycles.upsertBatch(attachRawJson(entities, rawRecords));
       return {
         status: 'success',
         fetched: entities.length,
@@ -371,11 +386,11 @@ async function syncOneResource(
         flagSinceISO: input.since ?? null,
         flagDaysN: input.days ?? null,
       });
-      const entities = await deps.whoop.resources.recoveries({
+      const { entities, rawRecords } = await deps.whoop.resources.recoveries({
         since: window.since,
         until: window.until,
       });
-      const upsert = deps.repos.recoveries.upsertBatch(entities);
+      const upsert = deps.repos.recoveries.upsertBatch(attachRawJson(entities, rawRecords));
       return {
         status: 'success',
         fetched: entities.length,
@@ -390,11 +405,11 @@ async function syncOneResource(
         flagSinceISO: input.since ?? null,
         flagDaysN: input.days ?? null,
       });
-      const entities = await deps.whoop.resources.sleeps({
+      const { entities, rawRecords } = await deps.whoop.resources.sleeps({
         since: window.since,
         until: window.until,
       });
-      const upsert = deps.repos.sleeps.upsertBatch(entities);
+      const upsert = deps.repos.sleeps.upsertBatch(attachRawJson(entities, rawRecords));
       return {
         status: 'success',
         fetched: entities.length,
@@ -409,11 +424,11 @@ async function syncOneResource(
         flagSinceISO: input.since ?? null,
         flagDaysN: input.days ?? null,
       });
-      const entities = await deps.whoop.resources.workouts({
+      const { entities, rawRecords } = await deps.whoop.resources.workouts({
         since: window.since,
         until: window.until,
       });
-      const upsert = deps.repos.workouts.upsertBatch(entities);
+      const upsert = deps.repos.workouts.upsertBatch(attachRawJson(entities, rawRecords));
       return {
         status: 'success',
         fetched: entities.length,
@@ -421,4 +436,18 @@ async function syncOneResource(
       };
     }
   }
+}
+
+/**
+ * Zip per-entity `rawJson` onto each entity using the index-aligned raw
+ * payload returned by the resource module. The repo-side mappers read
+ * `(entity as ... & { rawJson?: string }).rawJson` and persist the string
+ * verbatim, keeping the D-29 reparse path alive for cycles / recoveries /
+ * sleeps / workouts.
+ *
+ * The entities and raw records are aligned by index — every resource
+ * module guarantees `rawRecords[i]` corresponds to `entities[i]`.
+ */
+function attachRawJson<E, R>(entities: E[], rawRecords: R[]): (E & { rawJson: string })[] {
+  return entities.map((e, i) => ({ ...e, rawJson: JSON.stringify(rawRecords[i]) }));
 }

@@ -30,7 +30,12 @@ export function registerExperimentDesigner(server: McpServer, services: Services
     'whoop_experiment_designer',
     {
       description: 'Render the baseline snapshot and ask for an experiment design.',
-      argsSchema: { hypothesis: z.string(), durationDays: z.string().optional() },
+      // #54: `hypothesis` is `.optional()` so the wire contract matches the
+      // handler's tolerance for missing values (the `?? '(none supplied)'`
+      // fallback below). A `z.string()` shape would tell `listPrompts`
+      // clients the field is required while leaving SDK arg-validation
+      // behavior implementation-defined.
+      argsSchema: { hypothesis: z.string().optional(), durationDays: z.string().optional() },
     },
     async (args) => {
       const a = (args ?? {}) as { hypothesis?: string; durationDays?: string };

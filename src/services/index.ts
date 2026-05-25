@@ -26,10 +26,12 @@
 // ≤5-line CLI shim precedent.
 //
 // Two entry points coexist:
-//   - `createServices()` — Phase 1+2 doctor/auth surfaces; no DB. Throws
-//     for every DB-dependent method (Phase 3 D-31 discipline:
-//     `bootstrap()` is the only path that wires DB-backed services).
+//   - `createServices()` — Phase 1+2 doctor/auth surfaces; no DB. Returns
+//     `ServicesBase` so DB-dependent methods are unreachable at compile
+//     time (Phase 3 D-31 discipline: `bootstrap()` is the only path that
+//     wires DB-backed services).
 //   - `bootstrap()`       — Phase 3+4 full surface; opens DB + migrates.
+//     Returns the full `Services` interface (`ServicesBase` + DB methods).
 
 import { runDoctor } from './doctor/index.js';
 import { refreshOrchestrator } from './refresh-orchestrator.js';
@@ -89,96 +91,58 @@ import type {
   ReviewDecisionsResult,
 } from './decision/types.js';
 
-export interface Services {
+/**
+ * Phase 1-2 surface: doctor + auth only. No DB dependency. `createServices()`
+ * returns this — DB-backed methods are simply absent from the type, so a
+ * caller that wires `whoop_sync` (or any review/decision/cache tool) against
+ * `createServices()` instead of `bootstrap()` fails to compile.
+ */
+export interface ServicesBase {
   runDoctor: typeof runDoctor;
   refreshOrchestrator: typeof refreshOrchestrator;
-  /**
-   * Sync orchestrator. NOTE: the lightweight `createServices()` factory
-   * below does NOT wire this — runSync requires an open DB handle which
-   * comes from `bootstrap()`. CLI shims that need runSync call `bootstrap()`
-   * directly; this field exists on the Services interface so the future
-   * Phase 4 `whoop_sync` MCP tool can declare its dependency via the
-   * same type surface.
-   */
+}
+
+/**
+ * Full Phase 3+4 surface. Returned by `bootstrap()` — every method below
+ * is DB-backed and the bootstrap layer wires the repos + resource modules.
+ * `Services` extends `ServicesBase` so doctor/auth code that takes a
+ * `ServicesBase` keeps working when handed the full `Services`.
+ */
+export interface Services extends ServicesBase {
+  /** Sync orchestrator (Phase 3 Plan 03-11). DB-backed: only `bootstrap()` wires this. */
   runSync: (input: RunSyncInput) => Promise<RunSyncResult>;
-  /**
-   * Phase 4 daily-review orchestrator (Plan 04-07). DB-backed: composed in
-   * `bootstrap()`. The lightweight `createServices()` factory throws if
-   * this method is called (D-31 discipline — `bootstrap()` is the only
-   * wiring path).
-   */
+  /** Daily-review orchestrator (Phase 4 Plan 04-07). DB-backed. */
   getDailyReview: (input: { date?: string }) => Promise<DailyReviewResult>;
-  /** Phase 4 weekly-review orchestrator (Plan 04-07). DB-backed. */
+  /** Weekly-review orchestrator (Phase 4 Plan 04-07). DB-backed. */
   getWeeklyReview: (input: { date?: string }) => Promise<WeeklyReviewResult>;
-  /** Phase 4 decision-ledger insert (Plan 04-06 D-19). DB-backed. */
+  /** Decision-ledger insert (Phase 4 Plan 04-06 D-19). DB-backed. */
   addDecision: (input: AddDecisionInput) => Promise<Decision>;
-  /** Phase 4 decision-ledger dual-mode read/update (Plan 04-06 D-21). DB-backed. */
+  /** Decision-ledger dual-mode read/update (Phase 4 Plan 04-06 D-21). DB-backed. */
   reviewDecisions: (input: ReviewDecisionsInput) => Promise<ReviewDecisionsResult>;
-  /** Phase 4 whoop_query_cache 8-arm dispatch (Plan 04-08 D-24). DB-backed. */
+  /** `whoop_query_cache` 8-arm dispatch (Phase 4 Plan 04-08 D-24). DB-backed. */
   queryCache: (input: QueryCacheInput) => Promise<QueryCacheResult>;
-  /** Phase 4 whoop_api_gap catalog accessor (Plan 04-06 D-28). No DB; safe
-   *  to call through `createServices()` once the factory below wires it
-   *  through. */
+  /** `whoop_api_gap` catalog accessor (Phase 4 Plan 04-06 D-28). DB-backed. */
   getApiGap: () => Promise<ApiGapResult>;
 }
 
 /**
- * Lightweight services factory — does NOT open the DB. Consumers that
- * need `runSync`, the Phase 4 review/decision/cache services use
- * `bootstrap()` instead, which opens the DB + runs the migrator +
- * wires the repos. The doctor + auth surfaces continue to use this
- * factory so they pay no DB-open cost.
+ * Lightweight services factory — does NOT open the DB. Returns only the
+ * Phase 1-2 surface (`ServicesBase`: doctor + auth). Consumers that need
+ * `runSync`, the Phase 4 review/decision/cache services, or `getApiGap`
+ * use `bootstrap()` instead — bootstrap opens the DB, runs the migrator,
+ * and wires the repos.
  *
- * Every DB-dependent method below throws when called through this
- * factory — Phase 3 D-31 discipline: `bootstrap()` is the ONLY path
- * that wires DB-backed services. The throw messages identify the
- * service so a misconfigured caller gets pointed at the fix without
- * grepping the source.
- *
- * `getApiGap` is special: it has no DB dependency, so it could be
- * wired here. We keep it on the bootstrap-only path anyway so the
- * lightweight factory stays a single Phase 1-2 surface (doctor + auth)
- * — that boundary is load-bearing for the CLI doctor command which
- * must NOT open the DB.
+ * D-31 discipline is now enforced at compile time: `createServices()`
+ * returns `ServicesBase` so an attempt to call `services.runSync(...)`
+ * etc. on this factory's result is a type error, not a runtime throw.
+ * That's the whole point of finding #13 — the previous stub satisfied
+ * the full `Services` interface with throwing implementations, which
+ * meant a Phase 4 MCP wiring mistake would compile cleanly and only
+ * fail at first call.
  */
-export function createServices(): Services {
+export function createServices(): ServicesBase {
   return {
     runDoctor,
     refreshOrchestrator,
-    runSync: () => {
-      throw new Error(
-        'runSync requires bootstrap() — call bootstrap() instead of createServices() when you need the sync service',
-      );
-    },
-    getDailyReview: () => {
-      throw new Error(
-        'getDailyReview requires bootstrap() — call bootstrap() instead of createServices() when you need the daily review service',
-      );
-    },
-    getWeeklyReview: () => {
-      throw new Error(
-        'getWeeklyReview requires bootstrap() — call bootstrap() instead of createServices() when you need the weekly review service',
-      );
-    },
-    addDecision: () => {
-      throw new Error(
-        'addDecision requires bootstrap() — call bootstrap() instead of createServices() when you need the decision service',
-      );
-    },
-    reviewDecisions: () => {
-      throw new Error(
-        'reviewDecisions requires bootstrap() — call bootstrap() instead of createServices() when you need the decision service',
-      );
-    },
-    queryCache: () => {
-      throw new Error(
-        'queryCache requires bootstrap() — call bootstrap() instead of createServices() when you need the query cache service',
-      );
-    },
-    getApiGap: () => {
-      throw new Error(
-        'getApiGap requires bootstrap() — call bootstrap() instead of createServices(). The factory is reserved for the Phase 1-2 doctor/auth surfaces; api-gap composes against the bootstrap surface alongside the review/decision services.',
-      );
-    },
   };
 }

@@ -6,7 +6,7 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { detectExclusion } from './detect.js';
+import { detectExclusion, isParsableIsoDate } from './detect.js';
 
 const FIXTURES_DIR = join(process.cwd(), 'tests', 'fixtures', 'whoop', 'cycles');
 
@@ -174,5 +174,39 @@ describe('detectExclusion', () => {
     const third = detectExclusion(input);
     expect(first).toEqual(second);
     expect(second).toEqual(third);
+  });
+});
+
+// #45 — direct coverage for `isParsableIsoDate`. The detect.test.ts suite
+// exercises the guard indirectly through `detectExclusion`, but a future
+// regression that breaks ISO parsing would only surface via downstream
+// expectation noise (a malformed cycle silently flagged as dst_straddle).
+// Pinning the guard's behavior here makes the regression localizable.
+describe('isParsableIsoDate (Review #26 guard, direct coverage)', () => {
+  it('valid full ISO timestamp (Z) → true', () => {
+    expect(isParsableIsoDate('2026-03-07T15:00:00.000Z')).toBe(true);
+  });
+  it('valid full ISO timestamp with +HH:MM offset → true', () => {
+    expect(isParsableIsoDate('2026-03-07T15:00:00.000+08:00')).toBe(true);
+  });
+  it('valid ISO timestamp with second precision (no .sss) → true', () => {
+    expect(isParsableIsoDate('2026-03-07T15:00:00Z')).toBe(true);
+  });
+  it('bare yyyy-mm-dd (no time component) → false (regex demands time)', () => {
+    expect(isParsableIsoDate('2026-03-07')).toBe(false);
+  });
+  it('malformed string → false', () => {
+    expect(isParsableIsoDate('not-a-date')).toBe(false);
+  });
+  it('empty string → false', () => {
+    expect(isParsableIsoDate('')).toBe(false);
+  });
+  it('calendar rollover (2026-02-30T00:00:00.000Z) → true (Date.parse coerces)', () => {
+    // The regex passes; Date.parse silently coerces "2026-02-30" to
+    // "2026-03-02". The guard does NOT round-trip the date — it only
+    // rejects unparseable strings, not invalid calendar dates. Pinning
+    // this behavior so a future caller that requires strict calendar
+    // validation can layer their own check on top.
+    expect(isParsableIsoDate('2026-02-30T00:00:00.000Z')).toBe(true);
   });
 });

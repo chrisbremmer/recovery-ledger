@@ -72,11 +72,15 @@ the `SCORED` count, not the row count:
 
 ## Enforcement
 
-- Type definition in `src/domain/types/score.ts` (lands with Phase 3 when
-  the first scored entity is modelled).
-- Domain functions accept `Score[]` or `ScoredOnly[]` (branded type);
-  the brand can only be produced by passing through the filter
-  helper.
+- Type definition in `src/domain/types/score.ts` (landed in Phase 3).
+- Branded `ScoredOnly<T>` + `filterScored(items)` helper also in
+  `src/domain/types/score.ts` (landed #16). The brand can only be
+  produced by passing through `filterScored` (or by an explicit
+  cast at a repo boundary that has already filtered on
+  `score_state = 'SCORED'` — the four scored-resource repos do this
+  by default in `byRange()`). Domain functions that depend on the
+  SCORED-only invariant accept `ScoredOnly<T>[]` so the upstream
+  filter is documented at the type level.
 - Contract test asserting baseline output excludes `PENDING_SCORE`
   and `UNSCORABLE` rows.
 

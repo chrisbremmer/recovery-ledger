@@ -94,7 +94,7 @@ afterEach(() => {
 
 describe('workouts contract — happy path + idempotency', () => {
   test('Test 1: happy path — listWorkouts + upsertBatch + byRange returns the fixture workout', async () => {
-    const workouts = await listWorkouts({ since: SINCE, until: UNTIL });
+    const { entities: workouts } = await listWorkouts({ since: SINCE, until: UNTIL });
     expect(workouts).toHaveLength(1);
     expect(workouts[0]?.scoreState).toBe('SCORED');
     expect(workouts[0]?.id).toBe(FIXTURE_WORKOUT_ID);
@@ -110,9 +110,9 @@ describe('workouts contract — happy path + idempotency', () => {
 
   test('Test 2: idempotency — second pass leaves row count at 1', async () => {
     const repo = createWorkoutsRepo(mem.db);
-    const first = await listWorkouts({ since: SINCE, until: UNTIL });
+    const { entities: first } = await listWorkouts({ since: SINCE, until: UNTIL });
     repo.upsertBatch(first);
-    const second = await listWorkouts({ since: SINCE, until: UNTIL });
+    const { entities: second } = await listWorkouts({ since: SINCE, until: UNTIL });
     repo.upsertBatch(second);
 
     const count = (mem.sqlite.prepare('SELECT COUNT(*) AS c FROM workouts').get() as { c: number })
@@ -140,7 +140,7 @@ describe('workouts contract — D-04 SCORED-only default filter', () => {
 
 describe('workouts contract — A6 UUID id shape', () => {
   test('Test 4: stored workout id is a 36-char UUID string', async () => {
-    const workouts = await listWorkouts({ since: SINCE, until: UNTIL });
+    const { entities: workouts } = await listWorkouts({ since: SINCE, until: UNTIL });
     const repo = createWorkoutsRepo(mem.db);
     repo.upsertBatch(workouts);
     const stored = repo.byRange(SINCE, UNTIL);
@@ -151,7 +151,7 @@ describe('workouts contract — A6 UUID id shape', () => {
 
 describe('workouts contract — getRawJson diagnostic seam (D-29)', () => {
   test('Test 5: getRawJson(id) returns the stored raw_json payload', async () => {
-    const workouts = await listWorkouts({ since: SINCE, until: UNTIL });
+    const { entities: workouts } = await listWorkouts({ since: SINCE, until: UNTIL });
     const repo = createWorkoutsRepo(mem.db);
     const fixturePayload = '{"id":"fb8ce391-62b3-4fb3-8113-3eb522ede16c","mock":true}';
     const withRaw = workouts.map(
@@ -167,7 +167,7 @@ describe('workouts contract — getRawJson diagnostic seam (D-29)', () => {
 
 describe('workouts contract — DU discriminator narrowing (D-03 + ADR-0003)', () => {
   test('Test 6: SCORED workout has strain; PENDING_SCORE workout does not — ts-expect-error locks the type', async () => {
-    const workouts = await listWorkouts({ since: SINCE, until: UNTIL });
+    const { entities: workouts } = await listWorkouts({ since: SINCE, until: UNTIL });
     const repo = createWorkoutsRepo(mem.db);
     repo.upsertBatch(workouts);
     // Seed a PENDING_SCORE row alongside the SCORED one.

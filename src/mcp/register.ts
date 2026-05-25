@@ -14,7 +14,7 @@
 import type { McpServer, ToolCallback } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import type { ZodRawShape } from 'zod';
-import { sanitize, serializeError } from './sanitize.js';
+import { sanitize, serializeError } from '../infrastructure/observability/sanitize.js';
 
 interface ToolConfig<I extends ZodRawShape> {
   title?: string;

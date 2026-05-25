@@ -13,7 +13,7 @@ import { renderApiGap } from '../../formatters/api-gap.txt.js';
 import { formatBootstrapError } from '../../formatters/sync.txt.js';
 import { paths } from '../../infrastructure/config/paths.js';
 import { isMigrationError } from '../../infrastructure/db/migrate.js';
-import { sanitize } from '../../mcp/sanitize.js';
+import { sanitize } from '../../infrastructure/observability/sanitize.js';
 import { type Bootstrapped, bootstrap } from '../../services/index.js';
 
 export const API_GAP_EXIT_CODES: Readonly<Record<string, number>> = Object.freeze({

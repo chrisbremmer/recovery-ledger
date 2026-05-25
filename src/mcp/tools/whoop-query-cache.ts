@@ -57,12 +57,32 @@ const QUERY_CACHE_SHAPE = {
 const TOOL_DESCRIPTION =
   'Query the local cache for one of 8 resources (cycles, recoveries, sleeps, workouts, profile, body_measurements, sync_runs, decisions). Default limit 100, hard cap 500. Flat-field input: callers pass {resource, since?, until?, limit?, ...per-resource filters} at the top level.';
 
+// #49: per-resource flag-set guard. The flat Zod shape above admits
+// `includeExcluded` on every resource arm, but the typed
+// `QueryCacheInput` discriminated union only declares it on `cycles`.
+// Without this guard, a payload like `{resource:'recoveries', includeExcluded:true}`
+// silently lands as SCORED-only rows with no error — agents have no way
+// to learn the flag is ignored. The CLI rejects this combination via
+// `unsupported()` in `query.ts`; this is the MCP-side mirror.
+type QueryCacheFlatInput = QueryCacheInput & {
+  includeExcluded?: boolean;
+};
+
+function rejectUnsupportedFlags(input: QueryCacheFlatInput): void {
+  if (input.includeExcluded !== undefined && input.resource !== 'cycles') {
+    throw new Error(
+      `includeExcluded is only supported on the 'cycles' arm, not '${input.resource}'.`,
+    );
+  }
+}
+
 export function registerWhoopQueryCache(server: McpServer, services: Services): void {
   register(
     server,
     'whoop_query_cache',
     { description: TOOL_DESCRIPTION, inputSchema: QUERY_CACHE_SHAPE },
     async (input) => {
+      rejectUnsupportedFlags(input as QueryCacheFlatInput);
       const result = await services.queryCache(input as QueryCacheInput);
       return {
         content: [{ type: 'text', text: renderQueryCache(result) }],
