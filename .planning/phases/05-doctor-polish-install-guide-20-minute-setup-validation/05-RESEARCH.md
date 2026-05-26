@@ -1182,7 +1182,9 @@ register(
 | A9 | `repos.syncRuns.latestFinished()` returns `{finished_at, status: 'ok'|'partial'|'failed'} | null` | Finding §3.6 | [VERIFIED: src/infrastructure/db/repositories/sync-runs.repo.ts:65-66] — exact shape. |
 | A10 | The `register()` wrapper's input shape accepts `{offline?, stress?}` Zod fields without breaking the existing zero-arg call signature | Finding §3 code examples | [ASSUMED] All three fields are optional; the SDK should accept `inputSchema: {offline: z.boolean().optional(), ...}` without breaking the no-arg invocation. Planner verifies against the existing pattern (Phase 4 tools with optional Zod fields). |
 
-## Open Questions for Planner
+## Open Questions for Planner (RESOLVED)
+
+> All six questions below were resolved during planning. The planner adopted each recommendation; see plans 05-01, 05-06, 05-07, 05-09, and 05-10 for the implementing tasks. Original Q&A retained verbatim below for traceability.
 
 1. **DB-handle injection seam for db_* probes.**
    - What we know: 7 of the 9 new checks need DB access. The bootstrap composition root (`src/services/bootstrap.ts`) already opens a sqlite handle; the existing `createServices()` (lightweight, no DB) returns `ServicesBase` which does NOT include sync/review/decision/cache surfaces.

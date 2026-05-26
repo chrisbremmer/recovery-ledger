@@ -114,7 +114,18 @@
   2. The install guide ships per-client sections for Claude Code, Claude Desktop, and Cursor, plus a WHOOP developer-app setup checklist and a troubleshooting map keyed to every documented doctor exit code; a launchd `.plist` template is shipped as documentation (not auto-installed) for users who want scheduled local sync.
   3. `whoop_api_gap` and the bundled API-gap markdown list every WHOOP consumer-app feature not available via the public v2 API (Healthspan, ECG, BP, journal, continuous HR, hormonal insights, etc.) with a clear "unavailable via API" explanation per item.
   4. A CI stopwatch test on a fresh macOS image (or clean-clone container) asserts that the path from `git clone` through `init` → `auth` → first `sync` → first `review daily` completes in under 20 minutes.
-**Plans**: TBD
+**Plans**: 11 plans
+- [ ] 05-01-PLAN.md — Wave 0 scaffolding: CHECK_NAMES (5→14) + RunDoctorOptions + CLI --offline/--stress + MCP inputSchema + recoveries/sleeps latestScoredDate + cycles/recoveries/sleeps countByScoreState + reserved directories (DOC-01, DOC-02)
+- [ ] 05-02-PLAN.md — whoop_roundtrip probe + 5 test cases (online check via callWithAuth + httpGet) (DOC-01)
+- [ ] 05-03-PLAN.md — 4 DB probes: db_open, db_integrity, db_schema_version, db_wal_size + 16 test cases (DOC-01)
+- [ ] 05-04-PLAN.md — 3 sync-recency/data-quality probes: last_sync_recency, most_recent_scored_day, data_quality_counts + 14 test cases (DOC-01)
+- [ ] 05-05-PLAN.md — concurrent_writers_stress probe + worker entry + 3 test cases (--stress + subprocess-skip gates) (DOC-01)
+- [ ] 05-06-PLAN.md — runDoctor() extended 5→14 probes + bootstrap composition wiring + CLI switch to bootstrap() + 14-check smoke (DOC-01, DOC-02)
+- [ ] 05-07-PLAN.md — API-gap markdown generator + parity contract test + docs:generate-api-gap npm script (DOC-03)
+- [ ] 05-08-PLAN.md — INSTALL.md + 5 docs/install/*.md + launchd .plist template + README link (DOC-04, DOC-05)
+- [ ] 05-09-PLAN.md — troubleshooting.md (14 H2 sections) + 3-test contract enforcement (DOC-02, DOC-04)
+- [ ] 05-10-PLAN.md — env-gated tests/integration/setup-stopwatch.test.ts + dedicated CI workflow on macos-latest + ubuntu-latest (DOC-06)
+- [ ] 05-11-PLAN.md — Phase close + v1.0 milestone (full-suite green + 10 gates + D-29 + D-21 + REQ flips + STATE/ROADMAP/VALIDATION) (all 6 REQ-IDs)
 **UI hint**: no
 
 ## Progress
@@ -125,7 +136,7 @@
 | 2. OAuth, Token Store & Single-Flight Refresh | 8/8 | Complete | 2026-05-12 |
 | 3. Data Model, DB Layer & Sync Loop | 13/13 | Complete | 2026-05-16 |
 | 4. Domain Math, Reviews, Decision Ledger & MCP Surface | 12/12 | Complete | 2026-05-20 |
-| 5. Doctor Polish, Install Guide & <20-Minute Setup Validation | 0/? | Not started | - |
+| 5. Doctor Polish, Install Guide & <20-Minute Setup Validation | 0/11 | Not started | - |
 
 ## Coverage
 
@@ -151,4 +162,4 @@ Concerns originate in the phase where the first vulnerable code is introduced; t
 
 ---
 *Roadmap created: 2026-05-11*
-*Last updated: 2026-05-20 — Phase 4 closed (Plan 04-12). 39 / 39 plans complete across Phases 1 + 2 + 3 + 4 (6 + 8 + 13 + 12). 44 / 50 v1 requirements complete; remaining 6 (DOC-01..06) → Phase 5.*
+*Last updated: 2026-05-26 — Phase 5 planning complete (11 plans drafted across 5 waves; 0/11 executed). 39 / 39 plans complete across Phases 1+2+3+4. 44 / 50 v1 requirements complete; remaining 6 (DOC-01..06) → Phase 5 execution.*
