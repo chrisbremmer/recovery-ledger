@@ -4,7 +4,7 @@ Local-first WHOOP data reviews for recovery-aware training and sleep decisions.
 
 Recovery Ledger syncs your official WHOOP API v2 data into a local SQLite cache and exposes structured daily and weekly review tools through a CLI and an MCP server. It is built for people who want a private, repeatable way to turn WHOOP data into decisions — not another endpoint wrapper.
 
-> **Status:** Pre-v1, in active development. Phases 1–3 of the five-phase v1 roadmap are complete (foundation + MCP bootstrap, OAuth + token store, data model + sync loop); Phase 4 (domain math, reviews, decision ledger, full MCP surface) is in planning. The CLI and MCP servers can install and sync, but the daily/weekly review surface is not wired up yet. See [`.planning/STATE.md`](.planning/STATE.md) and [`.planning/ROADMAP.md`](.planning/ROADMAP.md).
+> **Status:** Pre-v1, in active development. Phases 1–4 of the five-phase v1 roadmap are complete: foundation + stdout-pure MCP bootstrap, BYO OAuth with single-flight refresh, the SQLite data model + idempotent sync loop, and the full domain-math/review/decision-ledger/MCP surface (Phase 4 closed 2026-05-20). The CLI and MCP server expose the complete daily/weekly review and decision-ledger workflow today. Phase 5 — `doctor` polish, per-client install guides, and a CI-enforced sub-20-minute setup — is in planning. See [`.planning/STATE.md`](.planning/STATE.md) and [`.planning/ROADMAP.md`](.planning/ROADMAP.md).
 >
 > **Not affiliated with or endorsed by WHOOP.** Bring your own WHOOP developer app.
 
@@ -53,30 +53,30 @@ Five phases, layered to lock cross-cutting safety nets before any application co
 | 1 | Foundation & Stdout-Pure MCP Bootstrap | Complete (2026-05-12) | Repo, CLI/MCP shells, stderr-only logging, MCP error sanitizer, native-module checks |
 | 2 | OAuth, Token Store & Single-Flight Refresh | Complete (2026-05-12) | BYO WHOOP auth, keychain-backed tokens, concurrent CLI+MCP refresh without burning the token family |
 | 3 | Data Model, DB Layer & Sync Loop | Complete (2026-05-16) | Drizzle schema with `score_state` discipline, DST/tz exclusion, idempotent sync with partial-failure reporting |
-| 4 | Domain Math, Reviews, Decision Ledger & MCP Surface | In planning | Daily + weekly reviews (median + MAD baselines, FDR-corrected patterns), decision ledger, 8 tools + 6 resources + 4 prompts |
-| 5 | Doctor Polish, Install Guide & <20-min Setup | Not started | `doctor` covering every prior phase; per-client install guides; CI stopwatch test |
+| 4 | Domain Math, Reviews, Decision Ledger & MCP Surface | Complete (2026-05-20) | Daily + weekly reviews (median + MAD baselines, FDR-corrected patterns), decision ledger, 8 tools + 6 resources + 4 prompts |
+| 5 | Doctor Polish, Install Guide & <20-min Setup | In planning | `doctor` covering every prior phase; per-client install guides; CI stopwatch test |
 
 ## CLI surface
 
-Implemented today (Phases 1–3):
+All commands below are implemented (Phases 1–4):
 
 ```sh
-recovery-ledger init                  # configure BYO WHOOP credentials
-recovery-ledger auth                  # OAuth flow on dynamic loopback port
-recovery-ledger sync --days 30        # sync last N days of WHOOP data into local SQLite
-recovery-ledger doctor                # auth, token, DB, sync, MCP, data-quality checks
+recovery-ledger init                     # bootstrap BYO WHOOP OAuth credentials → ~/.recovery-ledger/config.json
+recovery-ledger auth                     # OAuth flow on a dynamic loopback port; tokens to keychain or chmod-600 file
+recovery-ledger sync --days 30           # sync WHOOP data into the local SQLite cache (idempotent, partial-failure aware)
+recovery-ledger review daily             # today vs trailing-30 baseline + up to 3 concrete actions
+recovery-ledger review weekly            # trailing-7 narrative + FDR-corrected 28-day pattern test
+recovery-ledger decision add "<text>"    # record a decision (--category, --rationale, --confidence, --follow-up)
+recovery-ledger decision review          # list open decisions; --interactive prompts past-window outcomes
+recovery-ledger decision update <id>     # record an outcome (--status followed_up|abandoned, --notes)
+recovery-ledger query <resource>         # read a typed slice of the cache (cycles, recoveries, decisions, …)
+recovery-ledger api-gap                  # list WHOOP features unavailable via the public v2 API
+recovery-ledger doctor                   # auth, token, DB, sync, MCP, data-quality checks (exit 0 pass / 1 fail / 2 warn)
 ```
 
-Landing in Phase 4:
+Phase 5 expands `doctor` to cover every prior phase's failure modes and ships the per-client install guide its exit codes map to.
 
-```sh
-recovery-ledger review daily          # today + baseline deltas + top 3 actions
-recovery-ledger review weekly         # worst-recovery days + plausible precursors
-recovery-ledger decision add          # record a training/sleep/recovery decision
-recovery-ledger decision review       # check outcomes of prior decisions
-```
-
-## MCP surface (Phase 4)
+## MCP surface
 
 **Tools** — `whoop_sync`, `whoop_daily_review`, `whoop_weekly_review`, `whoop_query_cache`, `whoop_add_decision`, `whoop_review_decisions`, `whoop_api_gap`, `whoop_doctor`
 
