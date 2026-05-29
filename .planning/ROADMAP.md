@@ -11,7 +11,7 @@
 - [x] **Phase 2: OAuth, Token Store & Single-Flight Refresh** - WHOOP OAuth flow, keychain-backed token store with chmod 600 fallback, in-process + cross-process single-flight refresh, MCP error sanitizer wired through
 - [x] **Phase 3: Data Model, DB Layer & Sync Loop** - Three-layer types with discriminated-union Score, Drizzle schema + atomic migrator with pre-migration backup, WHOOP HTTP client with rate limiting + pagination, idempotent sync with DST/tz flagging and partial-failure reporting
 - [x] **Phase 4: Domain Math, Reviews, Decision Ledger & MCP Surface** — completed 2026-05-20 - Median+MAD baselines, confidence-tier gating, FDR-corrected weekly patterns, daily + weekly reviews, decision ledger, 8 MCP tools + 6 resources + 4 prompts, banned-word tone lint
-- [ ] **Phase 5: Doctor Polish, Install Guide & <20-Minute Setup Validation** - Full doctor checks, per-client install guides, API-gap docs, launchd template, CI stopwatch test asserting clean-clone-to-first-review under 20 minutes
+- [x] **Phase 5: Doctor Polish, Install Guide & <20-Minute Setup Validation** — completed 2026-05-29 - Full doctor checks, per-client install guides, API-gap docs, launchd template, CI stopwatch test asserting clean-clone-to-first-review under 20 minutes
 
 ## Phase Details
 
@@ -115,17 +115,17 @@
   3. `whoop_api_gap` and the bundled API-gap markdown list every WHOOP consumer-app feature not available via the public v2 API (Healthspan, ECG, BP, journal, continuous HR, hormonal insights, etc.) with a clear "unavailable via API" explanation per item.
   4. A CI stopwatch test on a fresh macOS image (or clean-clone container) asserts that the path from `git clone` through `init` → `auth` → first `sync` → first `review daily` completes in under 20 minutes.
 **Plans**: 11 plans
-- [ ] 05-01-PLAN.md — Wave 0 scaffolding: CHECK_NAMES (5→14) + RunDoctorOptions + CLI --offline/--stress + MCP inputSchema + recoveries/sleeps latestScoredDate + cycles/recoveries/sleeps countByScoreState + reserved directories (DOC-01, DOC-02)
-- [ ] 05-02-PLAN.md — whoop_roundtrip probe + 5 test cases (online check via callWithAuth + httpGet) (DOC-01)
-- [ ] 05-03-PLAN.md — 4 DB probes: db_open, db_integrity, db_schema_version, db_wal_size + 16 test cases (DOC-01)
-- [ ] 05-04-PLAN.md — 3 sync-recency/data-quality probes: last_sync_recency, most_recent_scored_day, data_quality_counts + 14 test cases (DOC-01)
-- [ ] 05-05-PLAN.md — concurrent_writers_stress probe + worker entry + 3 test cases (--stress + subprocess-skip gates) (DOC-01)
-- [ ] 05-06-PLAN.md — runDoctor() extended 5→14 probes + bootstrap composition wiring + CLI switch to bootstrap() + 14-check smoke (DOC-01, DOC-02)
-- [ ] 05-07-PLAN.md — API-gap markdown generator + parity contract test + docs:generate-api-gap npm script (DOC-03)
-- [ ] 05-08-PLAN.md — INSTALL.md + 5 docs/install/*.md + launchd .plist template + README link (DOC-04, DOC-05)
-- [ ] 05-09-PLAN.md — troubleshooting.md (14 H2 sections) + 3-test contract enforcement (DOC-02, DOC-04)
-- [ ] 05-10-PLAN.md — env-gated tests/integration/setup-stopwatch.test.ts + dedicated CI workflow on macos-latest + ubuntu-latest (DOC-06)
-- [ ] 05-11-PLAN.md — Phase close + v1.0 milestone (full-suite green + 10 gates + D-29 + D-21 + REQ flips + STATE/ROADMAP/VALIDATION) (all 6 REQ-IDs)
+- [x] 05-01-PLAN.md — Wave 0 scaffolding: CHECK_NAMES (5→14) + RunDoctorOptions + CLI --offline/--stress + MCP inputSchema + recoveries/sleeps latestScoredDate + cycles/recoveries/sleeps countByScoreState + reserved directories (DOC-01, DOC-02)
+- [x] 05-02-PLAN.md — whoop_roundtrip probe + 5 test cases (online check via callWithAuth + httpGet) (DOC-01)
+- [x] 05-03-PLAN.md — 4 DB probes: db_open, db_integrity, db_schema_version, db_wal_size + 16 test cases (DOC-01)
+- [x] 05-04-PLAN.md — 3 sync-recency/data-quality probes: last_sync_recency, most_recent_scored_day, data_quality_counts + 14 test cases (DOC-01)
+- [x] 05-05-PLAN.md — concurrent_writers_stress probe + worker entry + 3 test cases (--stress + subprocess-skip gates) (DOC-01)
+- [x] 05-06-PLAN.md — runDoctor() extended 5→14 probes + bootstrap composition wiring + CLI switch to bootstrap() + 14-check smoke (DOC-01, DOC-02)
+- [x] 05-07-PLAN.md — API-gap markdown generator + parity contract test + docs:generate-api-gap npm script (DOC-03)
+- [x] 05-08-PLAN.md — INSTALL.md + 5 docs/install/*.md + launchd .plist template + README link (DOC-04, DOC-05)
+- [x] 05-09-PLAN.md — troubleshooting.md (14 H2 sections) + 3-test contract enforcement (DOC-02, DOC-04)
+- [x] 05-10-PLAN.md — env-gated tests/integration/setup-stopwatch.test.ts + dedicated CI workflow on macos-latest + ubuntu-latest (DOC-06)
+- [x] 05-11-PLAN.md — Phase close + v1.0 milestone (full-suite green + 10 gates + D-29 + D-21 + REQ flips + STATE/ROADMAP/VALIDATION) (all 6 REQ-IDs)
 **UI hint**: no
 
 ## Progress
@@ -136,14 +136,14 @@
 | 2. OAuth, Token Store & Single-Flight Refresh | 8/8 | Complete | 2026-05-12 |
 | 3. Data Model, DB Layer & Sync Loop | 13/13 | Complete | 2026-05-16 |
 | 4. Domain Math, Reviews, Decision Ledger & MCP Surface | 12/12 | Complete | 2026-05-20 |
-| 5. Doctor Polish, Install Guide & <20-Minute Setup Validation | 0/11 | Not started | - |
+| 5. Doctor Polish, Install Guide & <20-Minute Setup Validation | 11/11 | Complete | 2026-05-29 |
 
 ## Coverage
 
 - **v1 requirements:** 50 total (FND=7, AUTH=6, DATA=6, SYNC=7, REV=8, DEC=4, MCP=6, DOC=6)
 - **Mapped to phases:** 50
 - **Unmapped:** 0
-- **Complete:** 44 / 50 (Phases 1+2+3+4 closed; DOC-01..06 deferred to Phase 5)
+- **Complete:** 50 / 50 (Phases 1+2+3+4+5 closed — milestone v1.0 complete)
 
 ## Cross-Cutting Concerns (Test Origin Map)
 
@@ -162,4 +162,4 @@ Concerns originate in the phase where the first vulnerable code is introduced; t
 
 ---
 *Roadmap created: 2026-05-11*
-*Last updated: 2026-05-26 — Phase 5 planning complete (11 plans drafted across 5 waves; 0/11 executed). 39 / 39 plans complete across Phases 1+2+3+4. 44 / 50 v1 requirements complete; remaining 6 (DOC-01..06) → Phase 5 execution.*
+*Last updated: 2026-05-29 — Phase 5 closed (11/11 plans executed across 5 waves). 50 / 50 plans complete across Phases 1+2+3+4+5. 50 / 50 v1 requirements complete — milestone v1.0 complete.*
