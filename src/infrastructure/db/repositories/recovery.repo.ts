@@ -41,6 +41,20 @@ export interface RecoveryRepo {
   /** Range query over `recoveries.created_at` ∈ [start, end]. Default filter:
    *  SCORED + cycle's `baseline_excluded = 0` (D-04 + D-16). */
   byRange(start: string, end: string, opts?: ByRangeOpts): Recovery[];
+  /** `MAX(created_at)` over SCORED recoveries whose parent cycle is NOT
+   *  baseline_excluded, sliced to yyyy-mm-dd. Returns `null` for an empty
+   *  filtered set. Mirrors `CyclesRepo.latestScoredDate()`; recoveries carry
+   *  no `start` column on the wire (A4) and no `baseline_excluded` flag —
+   *  exclusion is resolved via the cycles JOIN, identical to `byRange`'s
+   *  default filter (D-04 + D-16). Phase 5 most_recent_scored_day probe
+   *  (Plan 05-04) reads this across cycles + recoveries + sleeps. */
+  latestScoredDate(): string | null;
+  /** Single-round-trip score-state census (Phase 5 Plan 05-01; Assumption
+   *  A3). Same return shape as `CyclesRepo.countByScoreState()`. Recoveries
+   *  carry no own baseline_excluded flag — `scored` and `excluded` resolve it
+   *  via the parent-cycle JOIN (D-14 + D-16), identical to byRange. Feeds the
+   *  Phase 5 data_quality_counts probe (Plan 05-04). */
+  countByScoreState(): { scored: number; pending: number; unscorable: number; excluded: number };
   /** D-29 diagnostic seam — compound-key lookup. */
   getRawJson(cycleId: number, sleepId: string): string | null;
 }
@@ -134,6 +148,51 @@ export function createRecoveryRepo(db: ReturnType<typeof drizzle>): RecoveryRepo
         .orderBy(asc(recoveriesTable.created_at))
         .all();
       return rows.map(rowToRecovery);
+    },
+
+    latestScoredDate(): string | null {
+      // Recoveries have no `start` column (A4) and no own baseline_excluded
+      // flag — exclusion is inherited from the parent cycle via JOIN, exactly
+      // as byRange's default filter does (D-14 + D-16). MAX(created_at) over
+      // SCORED recoveries whose parent cycle is NOT excluded.
+      const row = db
+        .select({ max: sql<string | null>`MAX(${recoveriesTable.created_at})` })
+        .from(recoveriesTable)
+        .innerJoin(cyclesTable, eq(recoveriesTable.cycle_id, cyclesTable.id))
+        .where(
+          and(eq(recoveriesTable.score_state, 'SCORED'), eq(cyclesTable.baseline_excluded, false)),
+        )
+        .get();
+      const max = row?.max ?? null;
+      return max === null ? null : max.slice(0, 10);
+    },
+
+    countByScoreState(): {
+      scored: number;
+      pending: number;
+      unscorable: number;
+      excluded: number;
+    } {
+      // Recoveries inherit exclusion from the parent cycle via JOIN (D-14 +
+      // D-16). The FK (recoveries.cycle_id REFERENCES cycles.id) guarantees
+      // every recovery has a parent, so the inner join drops no rows. One
+      // CASE-WHEN aggregation round trip; COALESCE guards the empty set.
+      const row = db
+        .select({
+          scored: sql<number>`COALESCE(SUM(CASE WHEN ${recoveriesTable.score_state} = 'SCORED' AND ${cyclesTable.baseline_excluded} = 0 THEN 1 ELSE 0 END), 0)`,
+          pending: sql<number>`COALESCE(SUM(CASE WHEN ${recoveriesTable.score_state} = 'PENDING_SCORE' THEN 1 ELSE 0 END), 0)`,
+          unscorable: sql<number>`COALESCE(SUM(CASE WHEN ${recoveriesTable.score_state} = 'UNSCORABLE' THEN 1 ELSE 0 END), 0)`,
+          excluded: sql<number>`COALESCE(SUM(CASE WHEN ${cyclesTable.baseline_excluded} = 1 THEN 1 ELSE 0 END), 0)`,
+        })
+        .from(recoveriesTable)
+        .innerJoin(cyclesTable, eq(recoveriesTable.cycle_id, cyclesTable.id))
+        .get();
+      return {
+        scored: row?.scored ?? 0,
+        pending: row?.pending ?? 0,
+        unscorable: row?.unscorable ?? 0,
+        excluded: row?.excluded ?? 0,
+      };
     },
 
     getRawJson(cycleId: number, sleepId: string): string | null {

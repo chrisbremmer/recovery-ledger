@@ -139,6 +139,14 @@ export interface Services extends ServicesBase {
  * the full `Services` interface with throwing implementations, which
  * meant a Phase 4 MCP wiring mistake would compile cleanly and only
  * fail at first call.
+ *
+ * Plan 05-06: `createServices().runDoctor` is the lightweight no-DB,
+ * no-repos, no-fetcher path — the bare `runDoctor` re-export, NOT the
+ * bootstrap pre-bound wrapper. Invoked through this path, the db_* +
+ * recency + whoop_roundtrip probes report 'no <X> injected' /
+ * 'skipped (--offline)'. The CLI `doctor` command now flows through
+ * `bootstrap()` (src/cli/commands/doctor.ts) so the full 14-check surface
+ * runs end-to-end with the production sqlite handle + repos + fetcher.
  */
 export function createServices(): ServicesBase {
   return {

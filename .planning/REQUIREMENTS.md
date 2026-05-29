@@ -74,12 +74,12 @@ Requirements for the initial release. Each maps to roadmap phases.
 
 ### Diagnostics & Setup
 
-- [ ] **DOC-01**: `recovery-ledger doctor` checks: auth state, token freshness + WHOOP roundtrip, DB integrity + schema version + WAL file size, last-sync recency + most-recent SCORED day, MCP transport stdout-purity self-test, data-quality counts, native-module load, concurrent-writers stress
-- [ ] **DOC-02**: Doctor emits structured exit codes that map to documented troubleshooting steps
-- [ ] **DOC-03**: API-gap documentation lists every WHOOP consumer-app feature not available via the public API (Healthspan, ECG, BP, journal, continuous HR, etc.) with a clear "unavailable via API" explanation surfaced through `whoop_api_gap`
-- [ ] **DOC-04**: Install guide includes per-client sections for Claude Code, Claude Desktop, and Cursor; WHOOP developer-app setup checklist; and a troubleshooting map keyed to doctor exit codes
-- [ ] **DOC-05**: launchd `.plist` template for macOS is shipped as documentation (not auto-installed) for users who want a scheduled local sync
-- [ ] **DOC-06**: Clean-clone-to-first-daily-review measured at < 20 minutes on a fresh macOS image, asserted by a CI stopwatch test
+- [x] **DOC-01**: `recovery-ledger doctor` checks: auth state, token freshness + WHOOP roundtrip, DB integrity + schema version + WAL file size, last-sync recency + most-recent SCORED day, MCP transport stdout-purity self-test, data-quality counts, native-module load, concurrent-writers stress
+- [x] **DOC-02**: Doctor emits structured exit codes that map to documented troubleshooting steps
+- [x] **DOC-03**: API-gap documentation lists every WHOOP consumer-app feature not available via the public API (Healthspan, ECG, BP, journal, continuous HR, etc.) with a clear "unavailable via API" explanation surfaced through `whoop_api_gap`
+- [x] **DOC-04**: Install guide includes per-client sections for Claude Code, Claude Desktop, and Cursor; WHOOP developer-app setup checklist; and a troubleshooting map keyed to doctor exit codes
+- [x] **DOC-05**: launchd `.plist` template for macOS is shipped as documentation (not auto-installed) for users who want a scheduled local sync
+- [x] **DOC-06**: Clean-clone-to-first-daily-review measured at < 20 minutes on a fresh macOS image, asserted by a CI stopwatch test
 
 ## v2 Requirements
 
@@ -169,22 +169,24 @@ Explicitly excluded. Gated behind the hard scope guardrail in PROJECT.md (≥ 12
 | MCP-04 | Phase 4 | Complete (Plans 04-01 + 04-10, 2026-05-20 — Verified by `tests/integration/mcp-runtime.test.ts` (resources.length === 6), `tests/contract/mcp-resource-shape.test.ts`) |
 | MCP-05 | Phase 4 | Complete (Plans 04-01 + 04-10, 2026-05-20 — Verified by `tests/integration/mcp-runtime.test.ts` (prompts.length === 4), `tests/contract/mcp-prompt-shape.test.ts`) |
 | MCP-06 | Phase 4 | Complete (Plans 04-01 + 04-10, 2026-05-20 — Verified by `src/mcp/sanitize.test.ts` (extended Plan 04-10 Task 4 with Phase 4 fixtures)) |
-| DOC-01 | Phase 5 | Pending |
-| DOC-02 | Phase 5 | Pending |
-| DOC-03 | Phase 5 | Pending |
-| DOC-04 | Phase 5 | Pending |
-| DOC-05 | Phase 5 | Pending |
-| DOC-06 | Phase 5 | Pending |
+| DOC-01 | Phase 5 | Complete (Plans 05-01..05-06, 2026-05-29 — Verified by `src/services/doctor/index.test.ts` (14-check assertion) + per-probe tests: `whoop-roundtrip.test.ts`, `db-{open,integrity,schema-version,wal-size}.test.ts`, `last-sync-recency.test.ts`, `most-recent-scored-day.test.ts`, `data-quality-counts.test.ts`, `concurrent-writers-stress.test.ts`) |
+| DOC-02 | Phase 5 | Complete (Plans 05-01 + 05-09, 2026-05-29 — Verified by `tests/contract/troubleshooting-coverage.test.ts` (1:1 check-name ↔ troubleshooting section) + `DOCTOR_EXIT_CODES` {pass:0,fail:1,warn:2} in `src/cli/commands/doctor.ts` per D-04) |
+| DOC-03 | Phase 5 | Complete (Plan 05-07, 2026-05-29 — Verified by `tests/contract/api-gap-md-parity.test.ts` + `scripts/generate-api-gap-md.test.ts`) |
+| DOC-04 | Phase 5 | Complete (Plans 05-08 + 05-09, 2026-05-29 — Verified by `tests/contract/troubleshooting-coverage.test.ts` + `INSTALL.md` + `docs/install/{claude-code,claude-desktop,cursor,launchd,whoop-app,troubleshooting,api-gap}.md`) |
+| DOC-05 | Phase 5 | Complete (Plan 05-08, 2026-05-29 — Verified by `templates/com.recovery-ledger.daily-sync.plist` (plutil -lint passes) + `docs/install/launchd.md`) |
+| DOC-06 | Phase 5 | Complete (Plan 05-10, 2026-05-29 — Verified by `tests/integration/setup-stopwatch.test.ts` (env-gated; local gated run 5s vs 1200s budget) + `.github/workflows/setup-stopwatch.yml` on macos-latest + ubuntu-latest) |
 
 **Coverage:**
 - v1 requirements: 50 total (FND=7, AUTH=6, DATA=6, SYNC=7, REV=8, DEC=4, MCP=6, DOC=6)
 - Mapped to phases: 50
 - Unmapped: 0 ✓
-- Complete: 44 / 50 (7 FND + 6 AUTH + 13 DATA/SYNC + 18 REV/DEC/MCP; Phases 1 + 2 + 3 + 4 closed)
-- Remaining: 6 / 50 (DOC-01..06 → Phase 5)
+- Complete: 50 / 50 (7 FND + 6 AUTH + 13 DATA/SYNC + 18 REV/DEC/MCP + 6 DOC; Phases 1 + 2 + 3 + 4 + 5 closed)
+- Remaining: 0 / 50 (v1.0 complete)
+
+> *v1.0 complete: 2026-05-29 — 50 / 50 v1 requirements done across Phases 1+2+3+4+5.*
 
 > *Note:* prior coverage lines read "26/49" / "44/49"; the actual prefix-by-prefix sum is 50 (FND=7+AUTH=6+DATA=6+SYNC=7+REV=8+DEC=4+MCP=6+DOC=6). Corrected during Phase 4 close (Plan 04-12).
 
 ---
 *Requirements defined: 2026-05-11*
-*Last updated: 2026-05-20 — Phase 4 closed (18 REQ-IDs flipped to Complete: REV-01..08 + DEC-01..04 + MCP-01..06); 44 / 50 requirements done*
+*Last updated: 2026-05-29 — Phase 5 closed (6 REQ-IDs flipped to Complete: DOC-01..06); 50 / 50 requirements done — milestone v1.0 complete*

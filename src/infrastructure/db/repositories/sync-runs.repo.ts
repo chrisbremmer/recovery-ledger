@@ -77,8 +77,11 @@ export interface SyncRunsRepo {
   /** #35 — bootstrap-time crash recovery. Marks any `running` row whose
    *  `started_at` is older than `thresholdMs` as `aborted`. Returns the
    *  number of rows reclassified. Called by `bootstrap()` after the
-   *  migrator so the data-status anchor (`latestFinished()`) sees the
-   *  abort instead of treating the crashed run as in-flight forever. */
+   *  migrator so a crashed run stops counting as in-flight forever — a
+   *  `byStatus('running')` query no longer sees the zombie. The data-status
+   *  anchor (`latestFinished()`) deliberately skips `aborted` rows too, so
+   *  the review surfaces the previous genuine outcome rather than the
+   *  crash. */
   reclassifyStaleRunning(thresholdMs: number, nowIso: string): number;
 }
 
@@ -179,23 +182,26 @@ export function createSyncRunsRepo(db: ReturnType<typeof drizzle>): SyncRunsRepo
     },
 
     latestFinished(): { finished_at: string; status: 'ok' | 'partial' | 'failed' } | null {
-      // Order by finished_at DESC; running rows have finished_at = null and
-      // are excluded by the status != 'running' filter. The schema enum
-      // is ['running','ok','partial','failed'], so after the filter the
-      // narrowed status type is exactly the D-03 user-facing 3.
+      // D-03 anchor surfaces the latest genuine sync OUTCOME (the three
+      // user-facing states per DataStatus). 'running' rows have no result
+      // yet; 'aborted' rows (crash-recovery sentinel, #15/#35) synced
+      // nothing meaningful — both are excluded so the review falls through
+      // to the previous real result rather than showing a non-outcome.
+      // Order by finished_at DESC; the limit picks the most recent.
       const row = db
         .select({ finished_at: syncRunsTable.finished_at, status: syncRunsTable.status })
         .from(syncRunsTable)
-        .where(ne(syncRunsTable.status, 'running'))
+        .where(and(ne(syncRunsTable.status, 'running'), ne(syncRunsTable.status, 'aborted')))
         .orderBy(desc(syncRunsTable.finished_at), desc(syncRunsTable.id))
         .limit(1)
         .get();
       if (row === undefined || row.finished_at === null) {
         return null;
       }
-      // Defensive narrow: the WHERE filter already excludes 'running', so
-      // this assertion is a type-level no-op that strict-TS requires.
-      if (row.status === 'running') {
+      // Defensive narrow: the WHERE filter already excludes the two
+      // non-outcome states, but the column type still spans all five, so
+      // strict-TS needs this to reach the user-facing 3-literal return.
+      if (row.status === 'running' || row.status === 'aborted') {
         return null;
       }
       return { finished_at: row.finished_at, status: row.status };
@@ -205,10 +211,9 @@ export function createSyncRunsRepo(db: ReturnType<typeof drizzle>): SyncRunsRepo
       // threshold. The SQLite text column accepts 'aborted' (the schema
       // enum was widened in #15 to include it).
       const cutoffIso = new Date(Date.now() - thresholdMs).toISOString();
-      // @ts-expect-error Drizzle's BetterSQLite3Database has a $client
-      // accessor on the better-sqlite3 handle. Going direct here keeps
-      // the UPDATE outside any outer transaction (bootstrap calls this
-      // before any other write).
+      // Go direct via the better-sqlite3 handle on `db.$client` to keep the
+      // UPDATE outside any outer transaction (bootstrap calls this before
+      // any other write).
       const stmt = (db.$client as import('better-sqlite3').Database).prepare(
         `UPDATE sync_runs
             SET status = 'aborted',

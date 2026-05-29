@@ -56,6 +56,14 @@ jobs:
       - name: Lint
         run: npm run lint
 
+      # Typecheck the whole project (src + tests) with the TypeScript
+      # compiler. Neither Build (tsup/esbuild) nor Test (vitest) run the
+      # type checker — both strip types without checking them — so type
+      # errors can otherwise land on main unseen. Runs before Build to fail
+      # fast on type regressions.
+      - name: Typecheck
+        run: npm run typecheck
+
       # Build MUST precede test — the integration test in
       # tests/integration/mcp-stdout-purity.test.ts spawns `dist/mcp.mjs` as a
       # subprocess (Pattern 5(b) caveat + Pitfall 7).

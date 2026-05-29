@@ -202,6 +202,49 @@ describe('runDoctorCommand — MR-08 exception path', () => {
     expect(parsed.checks[0]?.status).toBe('warn');
   });
 
+  // Phase 5 Wave 0 (Plan 05-01) — the widened runDoctorCommand signature
+  // ({ offline?, stress? }) must thread through to a clean exit on a healthy
+  // result. The flags are accepted at the type level and forwarded to
+  // services.runDoctor(); the probes that read them ship in later plans, so
+  // this test only pins that the wider signature does not break the exit
+  // path. Mirrors the MR-42 happy-path mock structure above.
+  test('Phase 5 — runDoctorCommand({ offline: true }) exits with a documented code on a healthy result', async () => {
+    vi.resetModules();
+    vi.doMock('../../services/doctor/index.js', () => ({
+      runDoctor: async () => ({
+        checks: [{ name: 'mock_check', status: 'pass' as const, detail: 'all good' }],
+        overall: 'pass' as const,
+      }),
+    }));
+
+    let exitCode: number | undefined;
+    let resolveExit!: () => void;
+    const exitObserved = new Promise<void>((resolve) => {
+      resolveExit = resolve;
+    });
+    process.exit = ((code?: number) => {
+      exitCode = code;
+      resolveExit();
+      return undefined as never;
+    }) as never;
+    process.stdout.write = ((
+      _chunk: string | Uint8Array,
+      cbOrEncoding?: ((err?: Error | null) => void) | string,
+      cb?: (err?: Error | null) => void,
+    ) => {
+      const finished = typeof cbOrEncoding === 'function' ? cbOrEncoding : cb;
+      if (finished) finished();
+      return true;
+    }) as typeof process.stdout.write;
+
+    const { runDoctorCommand } = await import('./doctor.js');
+    await runDoctorCommand({ offline: true });
+    await exitObserved;
+    expect([DOCTOR_EXIT_CODES.pass, DOCTOR_EXIT_CODES.warn, DOCTOR_EXIT_CODES.fail]).toContain(
+      exitCode,
+    );
+  });
+
   test('exception in --text mode produces a one-line [fail] body', async () => {
     vi.resetModules();
     vi.doMock('../../services/doctor/index.js', () => ({

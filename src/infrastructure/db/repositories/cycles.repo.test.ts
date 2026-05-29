@@ -201,6 +201,45 @@ describe('cycles repo — byRange() default filters (D-04 + D-16)', () => {
   });
 });
 
+describe('cycles repo — countByScoreState() (Phase 5 Plan 05-01; Assumption A3)', () => {
+  let mem: InMemoryDbResult;
+
+  beforeEach(() => {
+    mem = createInMemoryDb();
+  });
+
+  afterEach(() => mem.close());
+
+  it('empty table returns all-zero counts', () => {
+    const repo = createCyclesRepo(mem.db);
+    expect(repo.countByScoreState()).toEqual({
+      scored: 0,
+      pending: 0,
+      unscorable: 0,
+      excluded: 0,
+    });
+  });
+
+  it('censuses 3 SCORED + 1 PENDING + 1 UNSCORABLE + 1 SCORED-excluded', () => {
+    // The SCORED+excluded row counts in `excluded` and NOT in `scored`.
+    const repo = createCyclesRepo(mem.db);
+    repo.upsertBatch([
+      makeScoredCycle({ id: 40001, baselineExcluded: false }),
+      makeScoredCycle({ id: 40002, baselineExcluded: false }),
+      makeScoredCycle({ id: 40003, baselineExcluded: false }),
+      makePendingCycle({ id: 40004 }),
+      makeUnscorableCycle({ id: 40005 }),
+      makeScoredCycle({ id: 40006, baselineExcluded: true, exclusionReason: 'dst_straddle' }),
+    ]);
+    expect(repo.countByScoreState()).toEqual({
+      scored: 3,
+      pending: 1,
+      unscorable: 1,
+      excluded: 1,
+    });
+  });
+});
+
 describe('cycles repo — priorBefore() tz_drift seed (D-13 Rule 2)', () => {
   let mem: InMemoryDbResult;
 

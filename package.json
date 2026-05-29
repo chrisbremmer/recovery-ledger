@@ -17,7 +17,9 @@
     "build": "tsup",
     "dev:cli": "tsx watch src/cli/index.ts",
     "dev:mcp": "tsx src/mcp/index.ts",
+    "docs:generate-api-gap": "tsx scripts/generate-api-gap-md.ts",
     "test": "vitest run",
+    "typecheck": "tsc --noEmit",
     "lint": "biome check",
     "format": "biome check --write",
     "migrate:generate": "drizzle-kit generate"

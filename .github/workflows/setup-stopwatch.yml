@@ -1,0 +1,77 @@
+name: setup-stopwatch
+
+# DOC-06 forcing function: the <20-minute setup stopwatch
+# (tests/integration/setup-stopwatch.test.ts). This workflow is the canonical
+# execution path for the Phase 5 success criterion "a new clone reaches the
+# first daily review in under 20 minutes."
+#
+# D-13 path filter: a 20-minute-budget job has no value on a doc-only or
+# unrelated-source PR, and running it on every PR burns CI minutes for
+# negligible benefit. The trigger is scoped to the paths that actually move
+# the setup-time needle: dependency manifests, the CLI command surface, the
+# bootstrap composition root, and the DB migrations the first sync replays.
+on:
+  pull_request:
+    paths:
+      - 'package.json'
+      - 'package-lock.json'
+      - 'src/cli/**'
+      - 'src/services/bootstrap.ts'
+      - 'src/infrastructure/db/migrations/**'
+
+# Read-only default token (mirrors ci.yml). The stopwatch needs no write
+# access; MSW serves fake credentials so no secrets are required either.
+permissions:
+  contents: read
+
+# Cancel an in-flight stopwatch run on the same ref when a new commit arrives;
+# the latest commit is the one we care about.
+concurrency:
+  group: stopwatch-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  stopwatch:
+    # Both supported platforms (Windows is permanently out of scope). macOS
+    # exercises the keyring backend by default; ubuntu forces the file
+    # fallback (no libsecret keychain on most Linux runners) via
+    # RECOVERY_LEDGER_FORCE_FILE_STORE=1 on the stopwatch step. fail-fast:false
+    # so a regression on one platform does not mask the result on the other.
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-latest, ubuntu-latest]
+    steps:
+      # Action SHAs pinned to match .github/workflows/ci.yml verbatim (the
+      # canonical pin source). Dependabot lifts both files in lockstep.
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Set up Node 22
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      # Build MUST precede the stopwatch step: the test spawns `npm run build`
+      # inside its cloned tmp repo, but a pre-built dist/ in the workspace also
+      # keeps the in-process service imports consistent with the rest of CI.
+      - name: Build
+        run: npm run build
+
+      - name: Stopwatch
+        # VITEST_INCLUDE_STOPWATCH=1 un-skips the env-gated describe block.
+        # RECOVERY_LEDGER_FORCE_FILE_STORE=1 on ubuntu only (Pitfall 4 — no
+        # libsecret keychain), unset on macOS so the keyring path is exercised.
+        # timeout-minutes:30 is a hard upper bound above the 20-min budget +
+        # the 25-min Vitest timeout, so a flaky cold-runner overshoot is killed
+        # rather than retried (T-05-T9).
+        env:
+          VITEST_INCLUDE_STOPWATCH: '1'
+          RECOVERY_LEDGER_FORCE_FILE_STORE: ${{ matrix.os == 'ubuntu-latest' && '1' || '' }}
+        timeout-minutes: 30
+        run: npx vitest run tests/integration/setup-stopwatch.test.ts

@@ -8,6 +8,10 @@ Recovery Ledger syncs your official WHOOP API v2 data into a local SQLite cache 
 >
 > **Not affiliated with or endorsed by WHOOP.** Bring your own WHOOP developer app.
 
+## Install
+
+See [INSTALL.md](INSTALL.md) for the WHOOP developer-app setup checklist, quickstart, per-client MCP wiring (Claude Code, Claude Desktop, Cursor), troubleshooting map, and the launchd daily-sync template.
+
 ## What it does
 
 The core loop is small and deliberate:

@@ -44,10 +44,12 @@
 
 import { existsSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
+import { performance } from 'node:perf_hooks';
 import { fileURLToPath } from 'node:url';
 import type Database from 'better-sqlite3';
 import type { Logger } from 'pino';
 import type { DailyReviewResult, WeeklyReviewResult } from '../domain/review/types.js';
+import { WhoopRawProfile } from '../domain/schemas/whoop-api.js';
 import type { Decision } from '../domain/types/entities.js';
 import type { RunSyncInput, RunSyncResult } from '../domain/types/sync.js';
 import { logger } from '../infrastructure/config/logger.js';
@@ -87,6 +89,8 @@ import {
   createWorkoutsRepo,
   type WorkoutsRepo,
 } from '../infrastructure/db/repositories/workouts.repo.js';
+import { httpGet } from '../infrastructure/whoop/client.js';
+import { WhoopApiError } from '../infrastructure/whoop/errors.js';
 import { getBodyMeasurement } from '../infrastructure/whoop/resources/body-measurements.js';
 import { listCycles } from '../infrastructure/whoop/resources/cycles.js';
 import { getProfile } from '../infrastructure/whoop/resources/profile.js';
@@ -103,7 +107,12 @@ import type {
   ReviewDecisionsInput,
   ReviewDecisionsResult,
 } from './decision/types.js';
-import { runDoctor } from './doctor/index.js';
+import {
+  type DoctorResult,
+  type RunDoctorOptions,
+  type runDoctor,
+  runDoctor as runDoctorImpl,
+} from './doctor/index.js';
 import { refreshOrchestrator } from './refresh-orchestrator.js';
 import { getDailyReview } from './review/daily.js';
 import { getWeeklyReview } from './review/weekly.js';
@@ -310,6 +319,78 @@ export function bootstrap(opts: BootstrapOptions = {}): Bootstrapped {
   };
   const cacheDeps = { repos, logger: log };
 
+  // Plan 05-06: the production whoop_roundtrip fetcher. Routes a single
+  // GET /v2/user/profile/basic through `httpGet` (ADR-0007 read-only,
+  // Gate-F-allowlisted chokepoint — NO bare fetch here). `httpGet` itself
+  // wraps the call in `callWithAuth` (ADR-0002 single-flight refresh), so a
+  // stale token triggers exactly one refresh through the three-layer gate.
+  // The probe only needs `{status, durationMs}`; `httpGet` THROWS on non-200,
+  // so the catch arm derives a representative HTTP status from the thrown
+  // error. T-05-I6: only `{status, durationMs}` flows back — no Bearer/JWT
+  // material. The `accessToken` param is unused here because the token is
+  // supplied internally by `callWithAuth` inside `httpGet`; it is present to
+  // satisfy the probe's fetcher contract.
+  //
+  // Plan 05-06 deviation (Rule 3): the plan pseudocode read
+  // `WhoopApiError.status`, but the actual error class carries a discriminated
+  // `kind` (not a numeric status — see src/infrastructure/whoop/errors.ts).
+  // We map `kind` back to a representative status so the probe's 401 / 200 /
+  // other branch logic still distinguishes the auth-revoked case. A refresh
+  // that fails entirely surfaces as an AuthError (not a WhoopApiError); that
+  // falls through to status 0, which the probe renders as a generic
+  // roundtrip-failed warn — acceptable for the doctor surface.
+  const whoopErrorKindToStatus = (kind: WhoopApiError['kind']): number => {
+    switch (kind) {
+      case 'unauthorized':
+        return 401;
+      case 'rate_limited':
+        return 429;
+      case 'server':
+        return 500;
+      default:
+        // network / validation / unknown — no meaningful HTTP status; 0
+        // routes the probe to its generic 'roundtrip failed' warn arm.
+        return 0;
+    }
+  };
+  const productionWhoopFetcher = async (
+    _accessToken: string,
+  ): Promise<{ status: number; durationMs: number }> => {
+    const start = performance.now();
+    try {
+      await httpGet('/v2/user/profile/basic', {}, WhoopRawProfile);
+      return { status: 200, durationMs: performance.now() - start };
+    } catch (err) {
+      const status = err instanceof WhoopApiError ? whoopErrorKindToStatus(err.kind) : 0;
+      return { status, durationMs: performance.now() - start };
+    }
+  };
+
+  // Plan 05-06: pre-bind the production deps into runDoctor so CLI/MCP
+  // callers get the full 14-check surface without threading sqlite + repos +
+  // refreshOrchestrator + whoopFetcher by hand. User-supplied opts win over
+  // the defaults (test seam). The `repos` shape maps the bootstrap plurals
+  // (`recoveries`/`sleeps`) to the singular keys the recency / scored-day /
+  // data-quality probes consume (`recovery`/`sleep`) — the narrow union
+  // structurally matches `RunDoctorOptions.repos`.
+  const services_runDoctor = (opts: RunDoctorOptions = {}): Promise<DoctorResult> =>
+    runDoctorImpl({
+      ...opts,
+      sqlite: opts.sqlite ?? sqlite,
+      repos: opts.repos ?? {
+        syncRuns: repos.syncRuns,
+        cycles: repos.cycles,
+        recovery: repos.recoveries,
+        sleep: repos.sleeps,
+      },
+      refreshOrchestrator: opts.refreshOrchestrator ?? refreshOrchestrator,
+      whoopFetcher: opts.whoopFetcher ?? productionWhoopFetcher,
+      // Reuse the path bootstrap already resolved for the migrator so the
+      // db_schema_version probe reads the same dir from the bundled dist tree
+      // (the probe's own import.meta.url math is wrong once flattened).
+      migrationsDir: opts.migrationsDir ?? migrationsDir,
+    });
+
   return {
     db,
     sqlite,
@@ -325,12 +406,13 @@ export function bootstrap(opts: BootstrapOptions = {}): Bootstrapped {
       reviewDecisions: (input) => reviewDecisions(input, decisionDeps),
       queryCache: (input) => queryCache(input, cacheDeps),
       getApiGap: () => getApiGap(),
-      // Phase 1+2 surfaces — direct re-export; both are pure-functional
-      // (runDoctor calls Phase 1 doctor checks; refreshOrchestrator is a
-      // policy wrapper). No DB needed; wiring through bootstrap so the
-      // MCP entry's `app.services` satisfies the full `Services`
-      // interface for the 8 Phase 4 tool registrars.
-      runDoctor,
+      // Plan 05-06: runDoctor is now pre-bound to the production deps
+      // (sqlite + repos + refreshOrchestrator + whoopFetcher) so the full
+      // 14-check surface runs end-to-end from both the CLI doctor command
+      // and the MCP whoop_doctor tool (both compose against this map).
+      // refreshOrchestrator stays a direct re-export — it is a pure policy
+      // wrapper with no DB dependency.
+      runDoctor: services_runDoctor,
       refreshOrchestrator,
     },
     close: () => {
