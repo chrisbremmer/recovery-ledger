@@ -94,19 +94,23 @@ export async function runAuthCommand(opts: {
     const clientId = process.env.WHOOP_CLIENT_ID ?? config.clientId;
     const clientSecret = process.env.WHOOP_CLIENT_SECRET ?? config.clientSecret;
 
+    // exactOptionalPropertyTypes: RunOAuthOptions' optional fields are
+    // `?: T` (not `?: T | undefined`), so omit them rather than passing
+    // explicit `undefined`.
     const tokens = await runOAuth({
       clientId,
       clientSecret,
       redirectPort: config.redirectPort,
       scopes: config.scopes,
       noBrowser: opts.noBrowser === true,
-      timeoutMs: opts.timeout !== undefined ? opts.timeout * 1000 : undefined,
-      openBrowser:
-        opts.noBrowser === true
-          ? undefined
-          : async (url: string) => {
+      ...(opts.timeout !== undefined ? { timeoutMs: opts.timeout * 1000 } : {}),
+      ...(opts.noBrowser === true
+        ? {}
+        : {
+            openBrowser: async (url: string) => {
               await open(url);
             },
+          }),
     });
 
     await tokenStore.write(tokens);

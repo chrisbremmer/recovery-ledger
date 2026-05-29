@@ -18,7 +18,7 @@
 
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { type HttpHandler, HttpResponse, http } from 'msw';
+import { type HttpHandler, HttpResponse, http, type JsonBodyType } from 'msw';
 import { type SetupServer, setupServer } from 'msw/node';
 
 export const WHOOP_TOKEN_URL = 'https://api.prod.whoop.com/oauth/oauth2/token';
@@ -26,7 +26,7 @@ export const WHOOP_TOKEN_URL = 'https://api.prod.whoop.com/oauth/oauth2/token';
 const TOKEN_200_FIXTURE_PATH = join(process.cwd(), 'tests', 'fixtures', 'oauth', 'token-200.json');
 
 interface NextResponse {
-  body: unknown;
+  body: JsonBodyType;
   status: number;
 }
 
@@ -48,7 +48,7 @@ export interface WhoopOauthHelper {
    * response. Useful for the invalid_grant / 400 arm in oauth.test.ts and
    * token-store.test.ts.
    */
-  setNextResponse(body: object, status?: number): void;
+  setNextResponse(body: JsonBodyType, status?: number): void;
 }
 
 export function createWhoopOauthHelper(): WhoopOauthHelper {
@@ -78,7 +78,7 @@ export function createWhoopOauthHelper(): WhoopOauthHelper {
     // edits the fixture mid-run will see the updated bytes — this is the
     // same pattern Phase 1's doctor fixtures use.
     const raw = readFileSync(TOKEN_200_FIXTURE_PATH, 'utf8');
-    const parsed = JSON.parse(raw) as unknown;
+    const parsed = JSON.parse(raw) as JsonBodyType;
     return HttpResponse.json(parsed);
   });
 

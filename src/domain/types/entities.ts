@@ -215,7 +215,9 @@ export type BodyMeasurement = {
 // ----------------------------------------------------------------------------
 // SyncRun — D-24 row shape. The orchestrator inserts at sync-start with
 // status='running', updates per-resource on completion, finalizes with
-// status='ok' | 'partial' | 'failed'. `perResource` is the typed map of
+// status='ok' | 'partial' | 'failed'. Crash recovery (#15/#35) can also
+// reclassify a stale 'running' row to 'aborted', so the entity carries all
+// five states the schema enum allows. `perResource` is the typed map of
 // outcomes keyed by ResourceName (imported from Plan 03-04 sync.ts).
 // `flags` is the CLI/MCP input echo (--days / --since / --resources) as a
 // JSON string for diagnostic readback.
@@ -225,7 +227,7 @@ export type SyncRun = {
   id: number;
   startedAt: string;
   finishedAt: string | null;
-  status: 'running' | 'ok' | 'partial' | 'failed';
+  status: 'running' | 'ok' | 'partial' | 'failed' | 'aborted';
   perResource: Record<ResourceName, ResourceSyncOutcome>;
   gapsDetected: number;
   flags: string | null;
