@@ -11,10 +11,18 @@ export default defineConfig({
   // emitted under `dist/<original-path>.mjs` unless explicitly listed here.
   // After `npm run build`, `dist/infrastructure/whoop/token-store.mjs` MUST
   // exist; the integration test fast-fails if missing.
+  // The concurrent-writers-stress worker (Phase 5 Plan 05-05) is forked as a
+  // child process by the `concurrent_writers_stress` doctor probe. Like
+  // token-store above, an internal module forked at runtime needs its own
+  // top-level entry or tsup won't emit a standalone bundle. The probe resolves
+  // the worker as a sibling of the bundle root (`dist/`), so the entry key has
+  // no path prefix → emits `dist/concurrent-writers-stress.worker.mjs`.
   entry: {
     cli: 'src/cli/index.ts',
     mcp: 'src/mcp/index.ts',
     'infrastructure/whoop/token-store': 'src/infrastructure/whoop/token-store.ts',
+    'concurrent-writers-stress.worker':
+      'src/services/doctor/checks/concurrent-writers-stress.worker.ts',
   },
   format: ['esm'],
   target: 'node22',

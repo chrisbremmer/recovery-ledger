@@ -385,6 +385,10 @@ export function bootstrap(opts: BootstrapOptions = {}): Bootstrapped {
       },
       refreshOrchestrator: opts.refreshOrchestrator ?? refreshOrchestrator,
       whoopFetcher: opts.whoopFetcher ?? productionWhoopFetcher,
+      // Reuse the path bootstrap already resolved for the migrator so the
+      // db_schema_version probe reads the same dir from the bundled dist tree
+      // (the probe's own import.meta.url math is wrong once flattened).
+      migrationsDir: opts.migrationsDir ?? migrationsDir,
     });
 
   return {

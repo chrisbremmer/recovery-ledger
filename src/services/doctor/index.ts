@@ -101,6 +101,14 @@ export interface RunDoctorOptions {
    */
   sqlite?: Database.Database;
   /**
+   * Optional migrations directory for the db_schema_version probe. bootstrap()
+   * supplies its already-resolved path (which probes the dev vs. bundled-dist
+   * layout) so the probe never re-derives it from import.meta.url — that
+   * re-derivation breaks once the probe is flattened into dist/cli.mjs. When
+   * absent, the probe falls back to its own location-probing resolver.
+   */
+  migrationsDir?: string;
+  /**
    * Plan 05-06: optional injected repos for the recency / scored-day /
    * data-quality probes. The inline shape is the structural union of
    * `LastSyncRecencyDeps['repos']` + `MostRecentScoredDayDeps['repos']` +
@@ -268,6 +276,13 @@ export async function runDoctor(opts: RunDoctorOptions = {}): Promise<DoctorResu
   // probe's `if (!deps?.sqlite)` / `if (!deps?.repos)` guard expects.
   const sqliteDeps = opts.sqlite != null ? { sqlite: opts.sqlite } : {};
   const reposDeps = opts.repos != null ? { repos: opts.repos } : {};
+  // db_schema_version also needs the migrations dir; bootstrap injects the
+  // already-resolved path. Omit the key when absent so the probe's own
+  // location-probing fallback runs (createServices / test path).
+  const schemaVersionDeps =
+    opts.migrationsDir != null
+      ? { ...sqliteDeps, migrationsDir: opts.migrationsDir }
+      : sqliteDeps;
   const settled = await Promise.allSettled([
     probeBetterSqlite3(),
     probeKeyring(),
@@ -277,7 +292,7 @@ export async function runDoctor(opts: RunDoctorOptions = {}): Promise<DoctorResu
     // fail. db_wal_size reads paths.dbFile directly (no injected handle).
     probeDbOpen(sqliteDeps),
     probeDbIntegrity(sqliteDeps),
-    probeDbSchemaVersion(sqliteDeps),
+    probeDbSchemaVersion(schemaVersionDeps),
     probeDbWalSize({}),
     // Plan 02-06: offline-safe probes — no subprocess gate needed.
     probeAuth(),

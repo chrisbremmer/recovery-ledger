@@ -25,7 +25,7 @@
 // Gate G: raw better-sqlite3 prepare()/get() for the COUNT query — mirrors
 // migrate.ts:169 + 262 — no `drizzle-orm` import in the services layer.
 
-import { readdirSync } from 'node:fs';
+import { existsSync, readdirSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type Database from 'better-sqlite3';
@@ -42,21 +42,28 @@ export interface DbSchemaVersionProbeDeps {
   migrationsDir?: string;
 }
 
-// Mirror the path resolution bootstrap.ts uses for the migrator. The relative
-// depth from src/services/doctor/checks/db-schema-version.ts down to
-// src/infrastructure/db/migrations/ is `../../../infrastructure/db/migrations`;
-// this holds in dev (tsx + vitest read src/) AND in built dist/ where the
-// same relative layout is emitted.
+// Fallback migrations-dir resolution for the no-deps path (createServices /
+// tests). Production callers (bootstrap) inject the already-resolved
+// `migrationsDir` so this is only hit when the probe runs without bootstrap.
+//
+// The relative layout differs between dev and the bundled dist tree, so —
+// like bootstrap.ts's resolveMigrationsDir — we PROBE candidate locations
+// rather than assume one fixed depth. In dev (tsx/vitest) this file lives at
+// src/services/doctor/checks/, so the migrations dir is `../../../infrastructure/db/migrations`.
+// In the bundle every module is flattened into dist/cli.mjs, so `import.meta.url`
+// is dist/cli.mjs and the tsup-copied payload sits at `./infrastructure/db/migrations`.
 function resolveDefaultMigrationsDir(): string {
-  return resolve(
-    dirname(fileURLToPath(import.meta.url)),
-    '..',
-    '..',
-    '..',
-    'infrastructure',
-    'db',
-    'migrations',
-  );
+  const here = dirname(fileURLToPath(import.meta.url));
+  const candidates = [
+    resolve(here, 'infrastructure', 'db', 'migrations'), // bundled: dist/infrastructure/db/migrations
+    resolve(here, '..', '..', '..', 'infrastructure', 'db', 'migrations'), // dev: src layout
+  ];
+  for (const dir of candidates) {
+    if (existsSync(resolve(dir, 'meta', '_journal.json'))) return dir;
+  }
+  // Neither probe hit — return the dev path so the error detail names a real
+  // candidate rather than an empty string.
+  return candidates[1] as string;
 }
 
 // Most-recent pre-migration backup under paths.backupsDir, or null when the
