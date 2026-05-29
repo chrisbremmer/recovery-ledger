@@ -232,16 +232,70 @@ describe('runDoctor — CR-01 skipSubprocessChecks contract', () => {
     expect(elapsed).toBeLessThan(500);
   });
 
-  // Phase 5 Wave 0 (Plan 05-01) — the RunDoctorOptions type extension
-  // (offline / stress / sqlite) must compile + be accepted at the type
-  // level WITHOUT altering the existing 5-check surface. runDoctor()'s body
-  // is unchanged in Wave 0 (no new probes ship until Plan 05-06), so this is
-  // a deliberately weak smoke test: it proves the wider options type does
-  // not break the existing checks. Deeper assertions about each option's
-  // effect land with the probes they gate.
-  test('runDoctor accepts the Phase 5 options without affecting the existing 5-check surface', async () => {
+  // Phase 5 Plan 05-06 — the surface grew from 5 probes to 14. The Wave 0
+  // smoke test (which asserted toHaveLength(5)) is superseded by the
+  // 14-check assertion below: runDoctor() now invokes all 14 probes via
+  // Promise.allSettled. The Phase 5 options (offline / stress / sqlite /
+  // repos / refreshOrchestrator / whoopFetcher) still flow through without
+  // breaking the existing 5 Phase 1+2 checks.
+  test('runDoctor accepts the Phase 5 options and runs the full 14-check surface', async () => {
     const result = await runDoctor({ offline: true, stress: false, skipSubprocessChecks: true });
-    expect(result.checks).toHaveLength(5);
+    expect(result.checks).toHaveLength(14);
     expect(['pass', 'warn', 'fail']).toContain(result.overall);
+  });
+
+  // Plan 05-06 — the 14 checks appear in the documented dependency-aware
+  // order (RESEARCH §Finding 2: load -> db -> auth -> online -> recency ->
+  // quality -> stress). Pinning the exact tuple guards against a probe being
+  // dropped, duplicated, or reordered in a future edit. The names come from
+  // the canonical CHECK_NAMES registry so a rename propagates here.
+  test('runDoctor returns 14 checks in the documented order', async () => {
+    const result = await runDoctor({ skipSubprocessChecks: true });
+    expect(result.checks.map((c) => c.name)).toEqual([
+      CHECK_NAMES.BETTER_SQLITE3_LOAD,
+      CHECK_NAMES.NAPI_KEYRING_LOAD,
+      CHECK_NAMES.MCP_STDOUT_PURITY,
+      CHECK_NAMES.DB_OPEN,
+      CHECK_NAMES.DB_INTEGRITY,
+      CHECK_NAMES.DB_SCHEMA_VERSION,
+      CHECK_NAMES.DB_WAL_SIZE,
+      CHECK_NAMES.AUTH,
+      CHECK_NAMES.TOKEN_FRESHNESS,
+      CHECK_NAMES.WHOOP_ROUNDTRIP,
+      CHECK_NAMES.LAST_SYNC_RECENCY,
+      CHECK_NAMES.MOST_RECENT_SCORED_DAY,
+      CHECK_NAMES.DATA_QUALITY_COUNTS,
+      CHECK_NAMES.CONCURRENT_WRITERS_STRESS,
+    ]);
+  });
+
+  // Plan 05-06 — when runDoctor() is invoked without the refreshOrchestrator
+  // + whoopFetcher deps (the createServices() lightweight no-DB path, or a
+  // bare test invocation), the whoop_roundtrip probe degrades to the same
+  // 'skipped (--offline)' pass as an explicit --offline run. The production
+  // bootstrap() path supplies both deps so the real roundtrip fires.
+  test('runDoctor degrades whoop_roundtrip to skipped when no orchestrator deps are passed', async () => {
+    const result = await runDoctor({ skipSubprocessChecks: true });
+    const roundtrip = result.checks.find((c) => c.name === CHECK_NAMES.WHOOP_ROUNDTRIP);
+    expect(roundtrip?.status).toBe('pass');
+    expect(roundtrip?.detail).toBe('skipped (--offline)');
+  });
+
+  // Plan 05-06 — concurrent_writers_stress is off by default (D-02 #9): only
+  // the --stress flag (opts.stress === true) flips it on. A default doctor
+  // invocation returns the 'skipped' pass without paying the 800ms+ fork cost.
+  //
+  // We invoke with `stress: false` (the default) WITHOUT skipSubprocessChecks
+  // so the stress probe's `enabled` gate — not its `skipSubprocess` gate — is
+  // what produces the skip detail. The stress probe checks `skipSubprocess`
+  // FIRST, so passing skipSubprocessChecks:true would return the MCP-transport
+  // skip string instead, masking the --stress gate this test pins. (The
+  // mcp_stdout_purity probe runs for real here; it does not affect the stress
+  // probe's detail, which is the only assertion below.)
+  test('runDoctor degrades concurrent_writers_stress to skipped by default', async () => {
+    const result = await runDoctor({ stress: false });
+    const stress = result.checks.find((c) => c.name === CHECK_NAMES.CONCURRENT_WRITERS_STRESS);
+    expect(stress?.status).toBe('pass');
+    expect(stress?.detail).toBe('skipped — run with --stress to enable');
   });
 });

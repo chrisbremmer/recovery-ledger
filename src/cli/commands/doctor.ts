@@ -5,14 +5,20 @@
 // for `src/cli/commands/doctor.ts`.
 
 import { renderDoctor } from '../../formatters/doctor.txt.js';
+import { createLogger } from '../../infrastructure/config/logger.js';
 // MR-32: route CLI invocations through the Services composition root so
 // the lite-hexagonal "CLI and MCP both consume the same Services surface"
 // pattern (CLAUDE.md §Architecture) is real instead of aspirational. The
 // MCP tool handler in src/mcp/tools/whoop-doctor.ts already calls
-// `services.runDoctor(...)`; bringing the CLI in line means a future
-// Phase 2 DB/HTTP injection lands in one place (createServices) instead
-// of both transport shims.
-import { createServices, type DoctorResult } from '../../services/index.js';
+// `services.runDoctor(...)`.
+//
+// Plan 05-06: switched from createServices() (lightweight, no DB) to
+// bootstrap() so the CLI exercises the full 14-check surface end-to-end
+// (DOC-01). bootstrap() opens the DB + runs the migrator + constructs the
+// repos + the production whoopFetcher, all of which runDoctor's db_* +
+// recency + whoop_roundtrip probes consume. The createServices() path
+// stays the no-DB surface for callers that only need the Phase 1+2 checks.
+import { bootstrap, type DoctorResult } from '../../services/index.js';
 
 // WR-06: exit-code map honors all three D-06 statuses. Reserved now per
 // DOC-02 ("doctor emits structured exit codes that map to documented
@@ -32,13 +38,36 @@ export async function runDoctorCommand(opts: {
   offline?: boolean;
   stress?: boolean;
 }): Promise<void> {
+  // Plan 05-06: bootstrap() opens the DB + migrator + repos so runDoctor
+  // runs the full 14-check surface. The handle MUST be released before
+  // process.exit — process.exit() is synchronous and skips the normal
+  // teardown, so we call close() inside the write callback (before exit)
+  // on BOTH the success and the catch path. `close()` is idempotent.
+  //
+  // bootstrap() can THROW (DB-open failure, migration failure). It runs
+  // INSIDE the try so such a failure surfaces through the MR-08 fallback
+  // render rather than escaping as an unhandled rejection. `close` is a
+  // no-op until bootstrap succeeds and assigns the real handle-releaser.
+  let close: () => void = () => {};
   try {
-    const services = createServices();
+    // Plan 05-06: pass a silent logger so bootstrap's routine
+    // `migration_started` / `migration_finished` info lines do NOT land on
+    // stderr during a `doctor` run. The doctor command's contract is a single
+    // machine-readable payload (JSON on stdout / text via the renderer); a
+    // consumer that merges streams (`doctor 2>&1 | jq`) must not have its JSON
+    // corrupted by interleaved Pino log frames. Migration FAILURES still
+    // throw — they surface through the MR-08 catch arm below, not as a log —
+    // so silencing the info lines hides progress chatter only, never errors.
+    const boot = bootstrap({ logger: createLogger({ LOG_LEVEL: 'silent' }) });
+    close = boot.close;
+    const { services } = boot;
     // Phase 5 D-03 + D-02 #9: thread the CLI flags into the doctor service.
     // `=== true` coercion turns an unset Commander flag (undefined) into a
     // consistent `false`. skipSubprocessChecks is NOT passed from the CLI
     // path — it is reserved for the MCP entry point per MR-14, so the
     // subprocess stdout-purity check still runs end-to-end from the CLI.
+    // bootstrap() supplies the sqlite + repos + refreshOrchestrator +
+    // whoopFetcher dep defaults; the CLI only threads the two user flags.
     const result = await services.runDoctor({
       offline: opts.offline === true,
       stress: opts.stress === true,
@@ -51,6 +80,7 @@ export async function runDoctorCommand(opts: {
     // drained truncates the tail. The callback fires once the kernel has
     // accepted the bytes (or the write fails).
     process.stdout.write(`${body}\n`, () => {
+      close();
       process.exit(DOCTOR_EXIT_CODES[result.overall]);
     });
   } catch (err) {
@@ -68,6 +98,7 @@ export async function runDoctorCommand(opts: {
       ? `[fail] cli — ${message}\noverall: fail`
       : JSON.stringify(fallback, null, 2);
     process.stdout.write(`${body}\n`, () => {
+      close();
       process.exit(DOCTOR_EXIT_CODES.fail);
     });
   }

@@ -68,3 +68,76 @@ snapshot in the same session was clean (the sibling agent had created the
 module). Not introduced by Plan 05-05 — its three files are tsc-clean against
 the 6-error baseline. No action for Plan 05-05; the resolution is owned by the
 Plan 05-04 / phase-close convergence once all Wave 1 agents have returned.
+
+## `db_schema_version` ENOENT in the built CLI — `db-schema-version.ts` path resolution (Plan 05-03)
+
+Discovered during Plan 05-06 Task 3 (CLI smoke test) once the CLI was switched
+from `createServices()` to `bootstrap()` (so `db_schema_version` now receives a
+real sqlite handle and runs its migrations-dir scan instead of returning the
+"no DB handle injected" fail). Running the BUILT CLI:
+
+```
+$ node dist/cli.mjs doctor --text
+[fail] db_schema_version — probe threw: ENOENT: no such file or directory, scandir '/Users/infrastructure/db/migrations'
+```
+
+Root cause: `src/services/doctor/checks/db-schema-version.ts:resolveDefaultMigrationsDir()`
+resolves the migrations dir as `../../../infrastructure/db/migrations` relative
+to `import.meta.url`. That holds for the dev/src tree and for vitest (where the
+unit test passes an explicit `migrationsDir` override), but NOT for the bundled
+`dist/cli.mjs`: tsup flattens the module graph, so `import.meta.url` is the
+bundle root and the three `..` pops climb to `/Users/infrastructure/db/migrations`.
+
+By contrast, `src/services/bootstrap.ts:resolveMigrationsDir()` already probes
+the correct built location (`dist/infrastructure/db/migrations`, copied by the
+tsup `onSuccess` hook) before falling back to the dev path. The probe does not
+share that logic.
+
+Scope: `db-schema-version.ts` is owned by Plan 05-03, NOT one of Plan 05-06's 5
+files. Per the executor SCOPE BOUNDARY rule, Plan 05-06 did not modify a sibling
+plan's file. The runDoctor() orchestrator wiring (Plan 05-06) passes the
+injected sqlite handle correctly; the dist-only path bug is internal to the
+05-03 probe. Suggested fix (for the phase-close pass or a `/gsd-quick`): give the
+probe a dist-aware `resolveDefaultMigrationsDir()` mirroring bootstrap's
+`resolveMigrationsDir()` probe (try `infrastructure/db/migrations` with no `..`
+first, then the one-`..` dev path), OR thread the bootstrap-resolved
+`migrationsDir` into `RunDoctorOptions` + the probe invocation. The vitest unit
+suite stays green either way because it injects an explicit `migrationsDir`.
+
+Note: this is a DIST-ONLY failure — `db_schema_version` passes when invoked from
+the source tree (tsx / vitest) where the relative path resolves correctly.
+
+## `concurrent_writers_stress` worker .mjs missing from dist — needs a tsup top-level entry (Plan 05-05)
+
+Discovered during Plan 05-06 Task 3 (CLI smoke test). Running the BUILT CLI with
+`--stress`:
+
+```
+$ node dist/cli.mjs doctor --stress --offline --text
+[fail] concurrent_writers_stress — probe threw: worker entry not found (build dist or run from source tree)
+```
+
+Root cause: `src/services/doctor/checks/concurrent-writers-stress.ts:resolveWorker()`
+looks for a `concurrent-writers-stress.worker.{ts,mjs}` sibling of the probe
+module. In the dev/source tree the `.ts` sibling exists (the unit test's real
+fork runs); in `dist/` no `.mjs` sibling exists because the worker is NOT a
+tsup top-level entry — `tsup.config.ts` emits only `cli`, `mcp`, and
+`infrastructure/whoop/token-store`, and the worker is not reachable as a bundled
+import (it is `fork()`-ed by path at runtime, so tsup's tree-shake never pulls
+it in). Plan 05-05's own SUMMARY flagged exactly this: the stress worker may need
+to be a tsup top-level entry so a production `.mjs` sibling exists for the forked
+child.
+
+Scope: the fix requires editing `tsup.config.ts` (add the worker as a top-level
+entry + ensure the `.mjs` lands as a sibling of the bundled probe — or adjust
+`resolveWorker()` to locate the entry under `dist/`), which is outside Plan
+05-06's 5 declared files. Per the Plan 05-06 prompt's explicit instruction, this
+is logged here rather than editing `tsup.config.ts`. Belongs to Plan 05-10 / a
+follow-up / the phase-close pass.
+
+Impact on Plan 05-06 verification: NONE. The plan's smoke test uses `--offline`
+(stress skipped via the `enabled` gate, returns the 'skipped — run with --stress
+to enable' pass), and the 14-check JSON / text surface renders correctly. The
+`--stress` arm is exercised correctly from the SOURCE tree (vitest real-fork test
+in `concurrent-writers-stress.test.ts` is green); only the BUILT-CLI `--stress`
+path is affected, and only when a user deliberately opts into the stress probe.
