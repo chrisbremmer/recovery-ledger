@@ -141,3 +141,36 @@ to enable' pass), and the 14-check JSON / text surface renders correctly. The
 `--stress` arm is exercised correctly from the SOURCE tree (vitest real-fork test
 in `concurrent-writers-stress.test.ts` is green); only the BUILT-CLI `--stress`
 path is affected, and only when a user deliberately opts into the stress probe.
+
+---
+
+## Resolution status (orchestrator convergence pass, 2026-05-29)
+
+- **RESOLVED — Gate F `db-wal-size.ts:22` comment trip.** Reworded by the Plan
+  05-03 executor before its commit; `bash scripts/ci-grep-gates.sh` exits 0 on
+  the committed Wave 1 state.
+- **RESOLVED — `db_schema_version` ENOENT in the bundled CLI.** Fixed in commit
+  `fix(05): make db_schema_version + stress worker work from bundled dist`.
+  bootstrap() now injects its already-resolved `migrationsDir` through
+  `RunDoctorOptions` (the same path the migrator uses), and the probe's own
+  fallback now probes both dev + bundled-dist layouts like
+  `bootstrap.resolveMigrationsDir()`. Verified from `dist/cli.mjs`:
+  `[pass] db_schema_version — schema at migration 1/1`.
+- **RESOLVED — `concurrent_writers_stress` worker `.mjs` missing from dist.**
+  Same fix commit added the worker as a tsup top-level entry
+  (`concurrent-writers-stress.worker`). Verified from `dist/cli.mjs`:
+  `[pass] concurrent_writers_stress — 4 workers × 50 upserts in ~80ms`.
+- **RESOLVED (transient) — `data-quality-counts.test.ts` TS2307.** Was a
+  mid-flight parallel-agent snapshot; the module landed and the full suite is
+  green (1203 passed / 1 skipped).
+- **DEFERRED to a follow-up (v1.0 known-issue) — the 6 pre-existing
+  `tsc --noEmit` errors** in `auth.ts` (×1), `sync-runs.repo.ts` (×3),
+  `msw-whoop-oauth.ts` (×2). These pre-date Phase 5 (present on `main`; Phase 4
+  closed with them). The project's CI contract is `biome check` + `vitest run` +
+  `scripts/ci-grep-gates.sh` — there is no `tsc` gate, and all three pass. The
+  `sync-runs.repo.ts` trio is the substantive one: it needs a Phase-3 domain
+  decision on whether the `'aborted'` run status (schema-enum widening #15/#35)
+  should be surfaced by `latestFinished()` / `rowToSyncRun()` or mapped/excluded
+  at those boundaries — out of scope for a doctor/docs/setup phase. Recommend a
+  dedicated `/gsd-debug` or a small follow-up phase to reconcile the `'aborted'`
+  type before tightening CI with a `tsc --noEmit` gate.
