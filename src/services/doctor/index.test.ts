@@ -231,4 +231,17 @@ describe('runDoctor — CR-01 skipSubprocessChecks contract', () => {
     expect(mcpCheck?.detail).toBe('skipped (running inside MCP transport)');
     expect(elapsed).toBeLessThan(500);
   });
+
+  // Phase 5 Wave 0 (Plan 05-01) — the RunDoctorOptions type extension
+  // (offline / stress / sqlite) must compile + be accepted at the type
+  // level WITHOUT altering the existing 5-check surface. runDoctor()'s body
+  // is unchanged in Wave 0 (no new probes ship until Plan 05-06), so this is
+  // a deliberately weak smoke test: it proves the wider options type does
+  // not break the existing checks. Deeper assertions about each option's
+  // effect land with the probes they gate.
+  test('runDoctor accepts the Phase 5 options without affecting the existing 5-check surface', async () => {
+    const result = await runDoctor({ offline: true, stress: false, skipSubprocessChecks: true });
+    expect(result.checks).toHaveLength(5);
+    expect(['pass', 'warn', 'fail']).toContain(result.overall);
+  });
 });

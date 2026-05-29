@@ -18,18 +18,31 @@ import { createServices, type DoctorResult } from '../../services/index.js';
 // DOC-02 ("doctor emits structured exit codes that map to documented
 // troubleshooting steps") so scripted wrappers (cron, launchd, CI) can
 // distinguish warn from pass at the shell level. Exit 2 is the conventional
-// POSIX "warning" code. Phase 5 may extend the map with sub-codes for
-// specific check failures; the three-status mapping is the floor contract.
+// POSIX "warning" code. Phase 5 D-04 locks the 0/1/2 floor as the v1
+// contract; finer structure ships in the JSON `checks[].name` field (the
+// troubleshooting map at docs/install/troubleshooting.md keys off that field).
 export const DOCTOR_EXIT_CODES: Readonly<Record<DoctorResult['overall'], number>> = Object.freeze({
   pass: 0,
   warn: 2,
   fail: 1,
 });
 
-export async function runDoctorCommand(opts: { text?: boolean }): Promise<void> {
+export async function runDoctorCommand(opts: {
+  text?: boolean;
+  offline?: boolean;
+  stress?: boolean;
+}): Promise<void> {
   try {
     const services = createServices();
-    const result = await services.runDoctor();
+    // Phase 5 D-03 + D-02 #9: thread the CLI flags into the doctor service.
+    // `=== true` coercion turns an unset Commander flag (undefined) into a
+    // consistent `false`. skipSubprocessChecks is NOT passed from the CLI
+    // path — it is reserved for the MCP entry point per MR-14, so the
+    // subprocess stdout-purity check still runs end-to-end from the CLI.
+    const result = await services.runDoctor({
+      offline: opts.offline === true,
+      stress: opts.stress === true,
+    });
     const body = opts.text ? renderDoctor(result) : JSON.stringify(result, null, 2);
     // MR-05: pass exit as the write callback so slow pipe consumers (e.g.,
     // `recovery-ledger doctor | (sleep 0.5; cat)`) get the full buffered

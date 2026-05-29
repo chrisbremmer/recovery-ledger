@@ -246,6 +246,108 @@ describe('recovery repo — byRange() default filters (D-04 + D-16)', () => {
   });
 });
 
+describe('recovery repo — latestScoredDate() (Phase 5 Plan 05-01; Assumption A2)', () => {
+  let mem: InMemoryDbResult;
+
+  beforeEach(() => {
+    mem = createInMemoryDb();
+  });
+
+  afterEach(() => mem.close());
+
+  it('empty table returns null', () => {
+    const repo = createRecoveryRepo(mem.db);
+    expect(repo.latestScoredDate()).toBeNull();
+  });
+
+  it('single SCORED row returns the created_at date sliced to yyyy-mm-dd', () => {
+    // Recoveries have no `start` on the wire (A4); created_at is the
+    // recovery timestamp. The parent cycle must exist (FK) and be
+    // non-excluded so the row survives the JOIN-based exclusion filter.
+    seedCycles(mem, [40001]);
+    const repo = createRecoveryRepo(mem.db);
+    repo.upsertBatch([
+      makeScoredRecovery(40001, SLEEP_1, { createdAt: '2026-04-15T07:00:00.000Z' }),
+    ]);
+    expect(repo.latestScoredDate()).toBe('2026-04-15');
+  });
+
+  it('a lone PENDING_SCORE row returns null (SCORED filter applies)', () => {
+    seedCycles(mem, [40001]);
+    const repo = createRecoveryRepo(mem.db);
+    repo.upsertBatch([makePendingRecovery(40001, SLEEP_1)]);
+    expect(repo.latestScoredDate()).toBeNull();
+  });
+
+  it('a SCORED row whose parent cycle is baseline_excluded returns null (exclusion filter applies)', () => {
+    // Recoveries carry no baseline_excluded flag — exclusion is inherited
+    // from the parent cycle via JOIN (D-14 + D-16). A SCORED recovery on a
+    // DST-flagged cycle must NOT count toward latestScoredDate.
+    const cyclesRepo = createCyclesRepo(mem.db);
+    cyclesRepo.upsertBatch([makeScoredCycle(40001, true)]);
+    const repo = createRecoveryRepo(mem.db);
+    repo.upsertBatch([
+      makeScoredRecovery(40001, SLEEP_1, { createdAt: '2026-04-15T07:00:00.000Z' }),
+    ]);
+    expect(repo.latestScoredDate()).toBeNull();
+  });
+});
+
+describe('recovery repo — countByScoreState() (Phase 5 Plan 05-01; Assumption A3)', () => {
+  let mem: InMemoryDbResult;
+
+  beforeEach(() => {
+    mem = createInMemoryDb();
+  });
+
+  afterEach(() => mem.close());
+
+  // Distinct sleep UUIDs for the 6-row census (SLEEP_1..3 are reused above).
+  const SLEEP_4 = 'c0ffee00-0000-4000-8000-000000000004';
+  const SLEEP_5 = 'c0ffee00-0000-4000-8000-000000000005';
+  const SLEEP_6 = 'c0ffee00-0000-4000-8000-000000000006';
+
+  it('empty table returns all-zero counts', () => {
+    const repo = createRecoveryRepo(mem.db);
+    expect(repo.countByScoreState()).toEqual({
+      scored: 0,
+      pending: 0,
+      unscorable: 0,
+      excluded: 0,
+    });
+  });
+
+  it('censuses 3 SCORED + 1 PENDING + 1 UNSCORABLE + 1 SCORED-excluded (exclusion via parent cycle)', () => {
+    // Recoveries carry no own baseline_excluded — the "excluded" recovery is
+    // a SCORED recovery whose PARENT cycle is baseline_excluded. Seed cycles
+    // 40001..40005 clean + 40006 DST-flagged; one recovery per cycle.
+    const cyclesRepo = createCyclesRepo(mem.db);
+    cyclesRepo.upsertBatch([
+      makeScoredCycle(40001, false),
+      makeScoredCycle(40002, false),
+      makeScoredCycle(40003, false),
+      makeScoredCycle(40004, false),
+      makeScoredCycle(40005, false),
+      makeScoredCycle(40006, true),
+    ]);
+    const repo = createRecoveryRepo(mem.db);
+    repo.upsertBatch([
+      makeScoredRecovery(40001, SLEEP_1),
+      makeScoredRecovery(40002, SLEEP_2),
+      makeScoredRecovery(40003, SLEEP_3),
+      makePendingRecovery(40004, SLEEP_4),
+      makeUnscorableRecovery(40005, SLEEP_5),
+      makeScoredRecovery(40006, SLEEP_6),
+    ]);
+    expect(repo.countByScoreState()).toEqual({
+      scored: 3,
+      pending: 1,
+      unscorable: 1,
+      excluded: 1,
+    });
+  });
+});
+
 describe('recovery repo — getRawJson() compound-key seam (D-29)', () => {
   let mem: InMemoryDbResult;
 

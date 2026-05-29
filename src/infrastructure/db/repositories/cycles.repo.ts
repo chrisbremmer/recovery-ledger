@@ -73,6 +73,13 @@ export interface CyclesRepo {
    *  sliced to yyyy-mm-dd. Returns `null` when the table is empty.
    *  Replaces a full `byRange(MIN, MAX)` walk in `resolveReviewedDate`. */
   latestScoredDate(): string | null;
+  /** Single-round-trip score-state census (Phase 5 Plan 05-01; Assumption
+   *  A3). `scored` = SCORED AND not baseline_excluded; `pending` =
+   *  PENDING_SCORE; `unscorable` = UNSCORABLE; `excluded` = baseline_excluded
+   *  rows (independent of score_state — a SCORED+excluded row counts in
+   *  `excluded` and NOT in `scored`). Feeds the Phase 5 data_quality_counts
+   *  probe (Plan 05-04) per Pitfall 19. */
+  countByScoreState(): { scored: number; pending: number; unscorable: number; excluded: number };
 }
 
 type CycleRow = typeof cyclesTable.$inferSelect;
@@ -181,6 +188,32 @@ export function createCyclesRepo(db: ReturnType<typeof drizzle>): CyclesRepo {
         .get();
       const max = row?.max ?? null;
       return max === null ? null : max.slice(0, 10);
+    },
+
+    countByScoreState(): {
+      scored: number;
+      pending: number;
+      unscorable: number;
+      excluded: number;
+    } {
+      // One CASE-WHEN aggregation round trip rather than four COUNT queries.
+      // COALESCE guards the empty-table case (SUM over zero rows is NULL in
+      // SQLite). `excluded` is independent of score_state.
+      const row = db
+        .select({
+          scored: sql<number>`COALESCE(SUM(CASE WHEN ${cyclesTable.score_state} = 'SCORED' AND ${cyclesTable.baseline_excluded} = 0 THEN 1 ELSE 0 END), 0)`,
+          pending: sql<number>`COALESCE(SUM(CASE WHEN ${cyclesTable.score_state} = 'PENDING_SCORE' THEN 1 ELSE 0 END), 0)`,
+          unscorable: sql<number>`COALESCE(SUM(CASE WHEN ${cyclesTable.score_state} = 'UNSCORABLE' THEN 1 ELSE 0 END), 0)`,
+          excluded: sql<number>`COALESCE(SUM(CASE WHEN ${cyclesTable.baseline_excluded} = 1 THEN 1 ELSE 0 END), 0)`,
+        })
+        .from(cyclesTable)
+        .get();
+      return {
+        scored: row?.scored ?? 0,
+        pending: row?.pending ?? 0,
+        unscorable: row?.unscorable ?? 0,
+        excluded: row?.excluded ?? 0,
+      };
     },
   };
 }

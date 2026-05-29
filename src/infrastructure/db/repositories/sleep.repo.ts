@@ -40,6 +40,20 @@ export interface SleepsRepo {
   cursor(): string;
   upsertBatch(rows: SleepInsertPayload[]): { changed: number };
   byRange(start: string, end: string, opts?: ByRangeOpts): Sleep[];
+  /** `MAX(start)` over SCORED sleeps, sliced to yyyy-mm-dd. Returns `null`
+   *  for an empty filtered set. Mirrors `CyclesRepo.latestScoredDate()`.
+   *  Sleeps carry no `baseline_excluded` column and (unlike recoveries) no
+   *  cheap cycle JOIN path — `byRange` already treats `includeExcluded` as a
+   *  documented no-op, so the exclusion filter is likewise a no-op here.
+   *  Phase 5 most_recent_scored_day probe (Plan 05-04) reads this across
+   *  cycles + recoveries + sleeps. */
+  latestScoredDate(): string | null;
+  /** Single-round-trip score-state census (Phase 5 Plan 05-01; Assumption
+   *  A3). Same return shape as `CyclesRepo.countByScoreState()`. Sleeps carry
+   *  no baseline_excluded column and no cheap cycle JOIN — `excluded` is
+   *  therefore always 0 (no-op, matching byRange's documented posture). Feeds
+   *  the Phase 5 data_quality_counts probe (Plan 05-04). */
+  countByScoreState(): { scored: number; pending: number; unscorable: number; excluded: number };
   getRawJson(id: string): string | null;
 }
 
@@ -109,6 +123,47 @@ export function createSleepsRepo(db: ReturnType<typeof drizzle>): SleepsRepo {
         .orderBy(asc(sleepsTable.start))
         .all();
       return rows.map(rowToSleep);
+    },
+
+    latestScoredDate(): string | null {
+      // Sleeps have a `start` column (unlike recoveries) but no own
+      // baseline_excluded flag and no cheap cycle JOIN — exclusion is a no-op
+      // here, matching byRange's documented `includeExcluded` no-op posture.
+      // MAX(start) over SCORED sleeps, sliced to yyyy-mm-dd.
+      const row = db
+        .select({ max: sql<string | null>`MAX(${sleepsTable.start})` })
+        .from(sleepsTable)
+        .where(eq(sleepsTable.score_state, 'SCORED'))
+        .get();
+      const max = row?.max ?? null;
+      return max === null ? null : max.slice(0, 10);
+      /* Tested via Plan 05-04 most_recent_scored_day probe + parity-of-shape with recovery.repo.test.ts. */
+    },
+
+    countByScoreState(): {
+      scored: number;
+      pending: number;
+      unscorable: number;
+      excluded: number;
+    } {
+      // Sleeps have no baseline_excluded column and no cheap cycle JOIN —
+      // `excluded` is always 0 (no-op, matching byRange). `scored` is just
+      // SCORED. One CASE-WHEN aggregation round trip; COALESCE guards empty.
+      const row = db
+        .select({
+          scored: sql<number>`COALESCE(SUM(CASE WHEN ${sleepsTable.score_state} = 'SCORED' THEN 1 ELSE 0 END), 0)`,
+          pending: sql<number>`COALESCE(SUM(CASE WHEN ${sleepsTable.score_state} = 'PENDING_SCORE' THEN 1 ELSE 0 END), 0)`,
+          unscorable: sql<number>`COALESCE(SUM(CASE WHEN ${sleepsTable.score_state} = 'UNSCORABLE' THEN 1 ELSE 0 END), 0)`,
+        })
+        .from(sleepsTable)
+        .get();
+      return {
+        scored: row?.scored ?? 0,
+        pending: row?.pending ?? 0,
+        unscorable: row?.unscorable ?? 0,
+        excluded: 0,
+      };
+      /* Tested via Plan 05-04 data_quality_counts probe + structural parity with cycles.repo.test.ts. */
     },
 
     getRawJson(id: string): string | null {

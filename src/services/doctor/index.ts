@@ -19,6 +19,7 @@
 // user's shell would have silently skipped the subprocess check when
 // they invoked `recovery-ledger doctor` from the CLI.
 
+import type Database from 'better-sqlite3';
 import { probeAuth } from './checks/auth.js';
 import { CHECK_NAMES } from './checks/check-names.js';
 import { probeMcpStdoutPurity } from './checks/mcp-stdout-purity.js';
@@ -60,6 +61,25 @@ export interface RunDoctorOptions {
    * end-to-end. See CR-01 in 01-REVIEW.md.
    */
   skipSubprocessChecks?: boolean;
+  /**
+   * Skip whoop_roundtrip (the only online check per D-03). Defaults to false.
+   * Read by the whoop_roundtrip probe added in Plan 05-02..05-06; the
+   * runDoctor() body is unchanged in Wave 0 so this field has no effect yet.
+   */
+  offline?: boolean;
+  /**
+   * Run concurrent_writers_stress (off by default per D-02 #9). Defaults to
+   * false. Read by the concurrent_writers_stress probe in a later Wave 1
+   * plan; the runDoctor() body is unchanged in Wave 0.
+   */
+  stress?: boolean;
+  /**
+   * Optional injected DB handle. When present, db_* probes use it; when
+   * absent, db_* probes return {status:'fail', detail:'no DB handle
+   * injected'} per RESEARCH §Open Questions §1 recommendation. Consumed by
+   * the db_* probes added in Plan 05-03..05-06; unused in Wave 0.
+   */
+  sqlite?: Database.Database;
 }
 
 // MR-27: exhaustive status switch with defense-in-depth fail arm. The

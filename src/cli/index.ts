@@ -87,6 +87,12 @@ export function buildProgram(): Command {
     .command('doctor')
     .description('Run diagnostic checks')
     .option('--text', 'render plaintext instead of JSON')
+    // Phase 5 D-03 + D-02 #9: opt-in flags wired in Plan 05-01 (Wave 0).
+    // `--offline` skips the WHOOP roundtrip check (the only online check);
+    // `--stress` enables the concurrent-writers stress check. Both default
+    // off. The probes that read these flags ship in Plans 05-02..05-06.
+    .option('--offline', 'skip the WHOOP roundtrip check (default off)')
+    .option('--stress', 'run the concurrent-writers stress check (default off)')
     // MR-22: surface the exit-code contract under `--help` so scripted
     // wrappers (cron, launchd, CI) know how to react to each status without
     // reading source. Mirrors DOCTOR_EXIT_CODES in src/cli/commands/doctor.ts.

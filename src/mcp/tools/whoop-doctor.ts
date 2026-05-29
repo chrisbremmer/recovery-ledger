@@ -1,4 +1,5 @@
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import { z } from 'zod';
 import { renderDoctor } from '../../formatters/doctor.txt.js';
 import type { Services } from '../../services/index.js';
 import { register } from '../register.js';
@@ -38,21 +39,44 @@ const TOOL_DESCRIPTION = [
   'The `mcp_stdout_purity` check is skipped when invoked via MCP',
   '(to prevent self-recursion); to validate stdout purity, invoke',
   'via the CLI: `recovery-ledger doctor`.',
+  // Phase 5 Plan 05-01 (Wave 0): the two optional inputs are accepted now;
+  // the probes that read them ship in Plans 05-02..05-06.
+  'Optional inputs: { offline?: boolean, stress?: boolean } — offline skips whoop_roundtrip; stress runs concurrent_writers_stress (off by default).',
 ].join(' ');
 
 export function registerWhoopDoctor(server: McpServer, services: Services): void {
-  // MR-35: `inputSchema: {}` declares zero arguments — the whoop_doctor
-  // tool is a zero-arg invocation. Any future argument MUST be added as
-  // an OPTIONAL Zod field. A required field would silently break existing
-  // MCP clients (Claude Code, future agents) that call the tool with no
-  // arguments — the SDK's schema validator would reject the call with a
-  // schema error that bypasses the register() try/catch (MR-13 advisory
-  // applies here too).
-  register(server, 'whoop_doctor', { description: TOOL_DESCRIPTION, inputSchema: {} }, async () => {
-    const result = await services.runDoctor({ skipSubprocessChecks: true });
-    return {
-      content: [{ type: 'text', text: renderDoctor(result) }],
-      structuredContent: toStructuredContent(result),
-    };
-  });
+  // MR-35: every whoop_doctor argument MUST be an OPTIONAL Zod field. A
+  // required field would silently break existing MCP clients (Claude Code,
+  // future agents) that call the tool with no arguments — the SDK's schema
+  // validator would reject the call with a schema error that bypasses the
+  // register() try/catch (MR-13 advisory applies here too).
+  //
+  // Phase 5 Plan 05-01 (Wave 0): the formerly-empty `inputSchema: {}` gains
+  // two optional booleans per D-03 + D-02 #9. A no-arg invocation still
+  // works — the SDK leaves `input.offline`/`input.stress` undefined, and the
+  // handler coerces each to a definite boolean via `=== true` (mirroring the
+  // CLI path in src/cli/commands/doctor.ts). Under `exactOptionalPropertyTypes`
+  // an explicit `undefined` is not assignable to `offline?: boolean`, so the
+  // coercion both satisfies the strict type and makes "flag absent" mean
+  // "false" — the documented default. The probes that read these flags ship
+  // in later plans.
+  register(
+    server,
+    'whoop_doctor',
+    {
+      description: TOOL_DESCRIPTION,
+      inputSchema: { offline: z.boolean().optional(), stress: z.boolean().optional() },
+    },
+    async (input) => {
+      const result = await services.runDoctor({
+        skipSubprocessChecks: true,
+        offline: input?.offline === true,
+        stress: input?.stress === true,
+      });
+      return {
+        content: [{ type: 'text', text: renderDoctor(result) }],
+        structuredContent: toStructuredContent(result),
+      };
+    },
+  );
 }
