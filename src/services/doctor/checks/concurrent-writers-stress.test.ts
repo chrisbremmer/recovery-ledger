@@ -18,8 +18,8 @@ import { existsSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, test } from 'vitest';
-import { probeConcurrentWritersStress } from './concurrent-writers-stress.js';
 import { CHECK_NAMES } from './check-names.js';
+import { probeConcurrentWritersStress } from './concurrent-writers-stress.js';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const WORKER_EXISTS =

@@ -36,7 +36,11 @@ export async function probeDbIntegrity(deps?: DbIntegrityProbeDeps): Promise<Doc
   try {
     const rows = deps.sqlite.pragma('integrity_check') as Array<{ integrity_check: string }>;
     if (rows.length === 1 && rows[0]?.integrity_check === 'ok') {
-      return { name: CHECK_NAMES.DB_INTEGRITY, status: 'pass', detail: 'PRAGMA integrity_check ok' };
+      return {
+        name: CHECK_NAMES.DB_INTEGRITY,
+        status: 'pass',
+        detail: 'PRAGMA integrity_check ok',
+      };
     }
     return {
       name: CHECK_NAMES.DB_INTEGRITY,

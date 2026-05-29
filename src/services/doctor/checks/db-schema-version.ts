@@ -81,9 +81,7 @@ function findLatestBackup(): string | null {
   }
 }
 
-export async function probeDbSchemaVersion(
-  deps?: DbSchemaVersionProbeDeps,
-): Promise<DoctorCheck> {
+export async function probeDbSchemaVersion(deps?: DbSchemaVersionProbeDeps): Promise<DoctorCheck> {
   if (!deps?.sqlite) {
     return {
       name: CHECK_NAMES.DB_SCHEMA_VERSION,
@@ -94,9 +92,9 @@ export async function probeDbSchemaVersion(
   try {
     const dir = deps.migrationsDir ?? resolveDefaultMigrationsDir();
     const fileCount = readdirSync(dir).filter((f) => f.endsWith('.sql')).length;
-    const row = deps.sqlite
-      .prepare('SELECT COUNT(*) AS c FROM __drizzle_migrations')
-      .get() as { c: number } | undefined;
+    const row = deps.sqlite.prepare('SELECT COUNT(*) AS c FROM __drizzle_migrations').get() as
+      | { c: number }
+      | undefined;
     const dbCount = row?.c ?? 0;
 
     if (dbCount === fileCount) {
@@ -108,7 +106,9 @@ export async function probeDbSchemaVersion(
     }
     if (dbCount < fileCount) {
       const backup = findLatestBackup();
-      const hint = backup ? `restore from ${backup}: cp ${backup} ${paths.dbFile}` : '(no backup found)';
+      const hint = backup
+        ? `restore from ${backup}: cp ${backup} ${paths.dbFile}`
+        : '(no backup found)';
       return {
         name: CHECK_NAMES.DB_SCHEMA_VERSION,
         status: 'fail',

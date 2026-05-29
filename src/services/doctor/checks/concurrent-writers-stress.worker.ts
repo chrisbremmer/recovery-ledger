@@ -70,7 +70,10 @@ try {
   // with `code: 'SQLITE_BUSY'` on the error object — check BOTH so the
   // classification is robust regardless of which surface carries the signal.
   const code = (err as { code?: unknown } | null)?.code;
-  const isBusy = code === 'SQLITE_BUSY' || message.includes('SQLITE_BUSY') || message.includes('database is locked');
+  const isBusy =
+    code === 'SQLITE_BUSY' ||
+    message.includes('SQLITE_BUSY') ||
+    message.includes('database is locked');
   if (isBusy) {
     process.stderr.write(`SQLITE_BUSY: ${message}\n`);
     process.exit(1);

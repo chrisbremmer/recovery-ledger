@@ -54,7 +54,9 @@ describe('probeDbSchemaVersion (db_schema_version)', () => {
     const { sqlite, close } = createInMemoryDb();
     try {
       sqlite
-        .prepare("INSERT INTO __drizzle_migrations (hash, created_at) VALUES ('synthetic-hash', '2026-01-01')")
+        .prepare(
+          "INSERT INTO __drizzle_migrations (hash, created_at) VALUES ('synthetic-hash', '2026-01-01')",
+        )
         .run();
       const result = await probeDbSchemaVersion({ sqlite });
       expect(result.name).toBe(CHECK_NAMES.DB_SCHEMA_VERSION);

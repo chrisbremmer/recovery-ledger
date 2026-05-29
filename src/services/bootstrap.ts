@@ -109,9 +109,9 @@ import type {
 } from './decision/types.js';
 import {
   type DoctorResult,
-  runDoctor,
-  runDoctor as runDoctorImpl,
   type RunDoctorOptions,
+  type runDoctor,
+  runDoctor as runDoctorImpl,
 } from './doctor/index.js';
 import { refreshOrchestrator } from './refresh-orchestrator.js';
 import { getDailyReview } from './review/daily.js';

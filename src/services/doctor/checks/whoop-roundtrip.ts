@@ -18,8 +18,8 @@
 // JSON-RPC boundary, so this probe deliberately does NOT call sanitize()
 // itself (avoiding duplicate sanitization).
 
-import type { DoctorCheck } from '../index.js';
 import type { RefreshOrchestrator } from '../../refresh-orchestrator.js';
+import type { DoctorCheck } from '../index.js';
 import { CHECK_NAMES } from './check-names.js';
 
 /**

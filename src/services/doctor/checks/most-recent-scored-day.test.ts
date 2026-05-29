@@ -10,16 +10,15 @@
 
 import { describe, expect, test } from 'vitest';
 import { CHECK_NAMES } from './check-names.js';
-import { type MostRecentScoredDayDeps, probeMostRecentScoredDay } from './most-recent-scored-day.js';
+import {
+  type MostRecentScoredDayDeps,
+  probeMostRecentScoredDay,
+} from './most-recent-scored-day.js';
 
 const NOW = new Date('2026-05-26T12:00:00Z');
 const clock = () => NOW;
 
-function reposFor(
-  c: string | null,
-  r: string | null,
-  s: string | null,
-): MostRecentScoredDayDeps {
+function reposFor(c: string | null, r: string | null, s: string | null): MostRecentScoredDayDeps {
   return {
     repos: {
       cycles: { latestScoredDate: () => c },

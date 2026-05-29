@@ -56,8 +56,8 @@
 // diagnostic. stderr is the load-bearing escape hatch per ADR-0001; the grep
 // gates exempt test files.
 
-import { cpSync, mkdtempSync, rmSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
+import { cpSync, mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { performance } from 'node:perf_hooks';

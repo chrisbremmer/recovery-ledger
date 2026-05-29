@@ -280,9 +280,7 @@ export async function runDoctor(opts: RunDoctorOptions = {}): Promise<DoctorResu
   // already-resolved path. Omit the key when absent so the probe's own
   // location-probing fallback runs (createServices / test path).
   const schemaVersionDeps =
-    opts.migrationsDir != null
-      ? { ...sqliteDeps, migrationsDir: opts.migrationsDir }
-      : sqliteDeps;
+    opts.migrationsDir != null ? { ...sqliteDeps, migrationsDir: opts.migrationsDir } : sqliteDeps;
   const settled = await Promise.allSettled([
     probeBetterSqlite3(),
     probeKeyring(),
