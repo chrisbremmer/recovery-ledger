@@ -246,9 +246,9 @@ Explicitly excluded. Gated behind the hard scope guardrail in PROJECT.md (≥ 12
 
 | Requirement | Phase | Issue(s) | Status |
 |-------------|-------|----------|--------|
-| SECH-01 | Phase 6 | #78 | Planned |
-| SECH-02 | Phase 6 | #79 (+ #95 init/Pino-fatal) | Planned |
-| INPV-01 | Phase 6 | #80 | Planned |
+| SECH-01 | Phase 6 | #78 | Planned (Plan 06-01) |
+| SECH-02 | Phase 6 | #79 (+ #95 init/Pino-fatal/token-store mkdir) | Planned (Plan 06-02) |
+| INPV-01 | Phase 6 | #80 (+ #95 findByPrefix min-length) | Planned (Plan 06-03) |
 | DBIN-01 | Phase 7 | #75 | Planned |
 | DBIN-02 | Phase 7 | #76 (+ #95 includeExcluded) | Planned |
 | DBIN-03 | Phase 7 | #77 | Planned |

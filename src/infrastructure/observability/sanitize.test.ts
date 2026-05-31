@@ -35,6 +35,17 @@ describe('sanitize patterns', () => {
     expect(SECRET_KEY_NAMES).toContain('code');
   });
 
+  // SECH-01 (#78): camelCase entries on top of MR-11.
+  test('SECRET_KEY_NAMES includes camelCase token-key variants (SECH-01 #78)', () => {
+    expect(SECRET_KEY_NAMES).toContain('accessToken');
+    expect(SECRET_KEY_NAMES).toContain('refreshToken');
+    expect(SECRET_KEY_NAMES).toContain('clientSecret');
+    expect(SECRET_KEY_NAMES).toContain('clientId');
+    expect(SECRET_KEY_NAMES).toContain('idToken');
+    expect(SECRET_KEY_NAMES).toContain('apiKey');
+    expect(SECRET_KEY_NAMES).toContain('bearerToken');
+  });
+
   // Pattern 1 — Authorization: Bearer <token>
   test('P1+ redacts Authorization header with bearer token', () => {
     const out = sanitize('Header is Authorization: Bearer abc.def.ghi rest');
@@ -579,6 +590,102 @@ describe('F7 — D-20 OAuth callback failure cause chain (Phase 2 Plan 02-07)', 
     expect(out).not.toContain('hunter2');
     expect(out).toContain('code=<redacted>');
     expect(out).toContain('client_secret=<redacted>');
+  });
+});
+
+// SECH-01 (#78): property-style fixture matrix proving camelCase token-key
+// coverage across the four pattern shapes (JSON, URL query, form body,
+// JS literal). Declarative + table-driven per PITFALLS.md "Sanitize
+// property-test sprawl"; one matrix, one test.each, one assertion shape.
+describe('SECH-01 matrix — camelCase token-key coverage (#78)', () => {
+  type Shape = 'json' | 'urlquery' | 'formbody' | 'jsliteral';
+  interface Row {
+    key: string;
+    shape: Shape;
+    rawValue: string;
+    rendered: string;
+  }
+
+  const CAMEL_KEYS = [
+    'accessToken',
+    'refreshToken',
+    'clientSecret',
+    'clientId',
+    'idToken',
+    'apiKey',
+    'bearerToken',
+  ] as const;
+
+  // Snake_case regression anchors: at least one per shape, so a refactor that
+  // accidentally drops underscored entries from SECRET_KEY_NAMES surfaces here.
+  const SNAKE_ANCHORS = ['access_token', 'refresh_token', 'client_secret', 'api_key'] as const;
+
+  // Mixed-case anchor: re-asserts the /i flag on the JSON-key alternation —
+  // historically PATTERNS rely on `'gi'` to fold `AccessToken` → `accessToken`,
+  // but only when the underscored OR camelCase form is in SECRET_KEY_NAMES.
+  const MIXED_ANCHORS = ['Access_Token', 'AccessToken', 'Refresh_Token'] as const;
+
+  function renderJson(key: string, value: string): string {
+    return `{"${key}":"${value}"}`;
+  }
+  function renderUrlQuery(key: string, value: string): string {
+    return `https://api.example.com/cb?${key}=${value}&state=x`;
+  }
+  function renderFormBody(key: string, value: string): string {
+    return `grant_type=refresh_token&${key}=${value}&client_id=c`;
+  }
+  function renderJsLiteral(key: string, value: string): string {
+    return `context: { ${key}: '${value}' }`;
+  }
+
+  function buildMatrix(): Row[] {
+    const rows: Row[] = [];
+    let counter = 0;
+    const allKeys: string[] = [...CAMEL_KEYS, ...SNAKE_ANCHORS, ...MIXED_ANCHORS];
+    for (const key of allKeys) {
+      for (const shape of ['json', 'urlquery', 'formbody', 'jsliteral'] as const) {
+        // Two fixture values per (key, shape) to broaden coverage without
+        // adding new behaviors.
+        for (let i = 0; i < 2; i += 1) {
+          counter += 1;
+          const rawValue = `sech01_${key}_${shape}_${counter}`;
+          let rendered: string;
+          switch (shape) {
+            case 'json':
+              rendered = renderJson(key, rawValue);
+              break;
+            case 'urlquery':
+              rendered = renderUrlQuery(key, rawValue);
+              break;
+            case 'formbody':
+              rendered = renderFormBody(key, rawValue);
+              break;
+            case 'jsliteral':
+              rendered = renderJsLiteral(key, rawValue);
+              break;
+          }
+          rows.push({ key, shape, rawValue, rendered });
+        }
+      }
+    }
+    return rows;
+  }
+
+  const SECH_01_MATRIX: ReadonlyArray<Row> = buildMatrix();
+
+  test('SECH-01 matrix has at least 50 rows (#78 — regression lock)', () => {
+    expect(SECH_01_MATRIX.length).toBeGreaterThanOrEqual(50);
+  });
+
+  test.each(SECH_01_MATRIX)('SECH-01 [$shape] redacts $key value (#78)', ({
+    rawValue,
+    rendered,
+  }) => {
+    const out = sanitize(rendered);
+    expect(out).not.toBe(rendered);
+    expect(out).not.toContain(rawValue);
+    const redacted = out.includes('<redacted>') || out.includes('<redacted-jwt>');
+    expect(redacted).toBe(true);
   });
 });
 

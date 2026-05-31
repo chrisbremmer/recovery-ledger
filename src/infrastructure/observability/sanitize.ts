@@ -27,6 +27,16 @@ export const SECRET_KEY_NAMES = [
   'password',
   'private_key',
   'code',
+  // SECH-01 (#78): camelCase variants. Real-world SDK wrappers, third-party HTTP
+  // middleware, and util.inspect output emit these without underscores; the /i
+  // flag on patterns 2/2a/2b/2c does not bridge the missing separator.
+  'accessToken',
+  'refreshToken',
+  'clientSecret',
+  'clientId',
+  'idToken',
+  'apiKey',
+  'bearerToken',
 ] as const;
 
 const SECRET_KEY_ALT = SECRET_KEY_NAMES.join('|');
