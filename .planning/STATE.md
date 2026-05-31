@@ -3,10 +3,10 @@ gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: quality hardening
 status: planning
-last_updated: "2026-05-31T20:04:38.119Z"
+last_updated: "2026-05-31T22:00:00.000Z"
 last_activity: 2026-05-31
 progress:
-  total_phases: 0
+  total_phases: 7
   completed_phases: 0
   total_plans: 0
   completed_plans: 0

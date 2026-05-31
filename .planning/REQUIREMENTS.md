@@ -241,6 +241,48 @@ Explicitly excluded. Gated behind the hard scope guardrail in PROJECT.md (≥ 12
 
 > *Note:* prior coverage lines read "26/49" / "44/49"; the actual prefix-by-prefix sum is 50 (FND=7+AUTH=6+DATA=6+SYNC=7+REV=8+DEC=4+MCP=6+DOC=6). Corrected during Phase 4 close (Plan 04-12).
 
+
+## v1.1 Traceability
+
+| Requirement | Phase | Issue(s) | Status |
+|-------------|-------|----------|--------|
+| SECH-01 | Phase 6 | #78 | Planned |
+| SECH-02 | Phase 6 | #79 (+ #95 init/Pino-fatal) | Planned |
+| INPV-01 | Phase 6 | #80 | Planned |
+| DBIN-01 | Phase 7 | #75 | Planned |
+| DBIN-02 | Phase 7 | #76 (+ #95 includeExcluded) | Planned |
+| DBIN-03 | Phase 7 | #77 | Planned |
+| DBIN-04 | Phase 7 | #88 | Planned |
+| DBIN-05 | Phase 7 | #94 | Planned |
+| ERRC-02 | Phase 8 | #87 | Planned |
+| LIFE-01 | Phase 9 | #81 | Planned |
+| LIFE-02 | Phase 9 | #82 | Planned |
+| LIFE-03 | Phase 9 | #83 | Planned |
+| LIFE-04 | Phase 9 | #91 (+ #95 inFlight-leak) | Planned |
+| ERRC-01 | Phase 9 | #89 | Planned |
+| ARCH-01 | Phase 10 | #95 sanitize placement | Planned |
+| ARCH-02 | Phase 10 | #85 | Planned |
+| ARCH-03 | Phase 10 | #84 | Planned |
+| ARCH-04 | Phase 10 | #92 | Planned |
+| ARCH-05 | Phase 10 | #93 | Planned |
+| ARCH-06 | Phase 10 | #95 doctor-wiring extract | Planned |
+| ARCH-07 | Phase 10 | #95 doctor-DI ad-hoc | Planned |
+| ARCH-08 | Phase 10 | #95 api-gap over-structured | Planned |
+| TSTC-01 | Phase 11 | #86 | Planned |
+| TSTC-02 | Phase 11 | #90 | Planned |
+| TSTC-03 | Phase 12 | #95 testing bucket | Planned |
+| BACK-01 | Phase 12 | #95 residual | Planned |
+
+**v1.1 Coverage:**
+- v1.1 requirements: 26 total (SECH=2, DBIN=5, ERRC=2, LIFE=4, INPV=1, ARCH=8, TSTC=3, BACK=1)
+- Mapped to phases: 26
+- Unmapped: 0 ✓
+- Planned: 26 / 26 (Phase 6-12 not yet started)
+- Complete: 0 / 26
+
+> *v1.1 defined: 2026-05-31 — 26 REQ-IDs mapped 1:1 across 7 phases (6-12); numbering continues from v1.0.*
+
+
 ---
 *Requirements defined: 2026-05-11*
-*Last updated: 2026-05-31 — milestone v1.1 defined: 22 new REQ-IDs (SECH/DBIN/ERRC/LIFE/INPV/ARCH/TSTC/BACK) mapped 1:1 to GitHub issues #75–#95; traceability filled by the v1.1 roadmap*
+*Last updated: 2026-05-31 — milestone v1.1 defined: 26 new REQ-IDs (SECH=2, DBIN=5, ERRC=2, LIFE=4, INPV=1, ARCH=8, TSTC=3, BACK=1) mapped 1:1 to GitHub issues #75–#95 across Phases 6-12; v1.1 traceability table appended*
