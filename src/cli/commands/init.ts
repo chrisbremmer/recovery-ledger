@@ -22,6 +22,8 @@ import { mkdir, open, rename } from 'node:fs/promises';
 import { createInterface } from 'node:readline/promises';
 import { paths } from '../../infrastructure/config/paths.js';
 import { ConfigSchema, D13_SCOPES, type InitConfig } from '../../infrastructure/config/schema.js';
+// SECH-02 (#79): outer-catch sanitization parity with auth.ts/sync.ts/doctor.ts.
+import { sanitize } from '../../infrastructure/observability/sanitize.js';
 
 export type { InitConfig } from '../../infrastructure/config/schema.js';
 
@@ -109,10 +111,11 @@ export async function runInitCommand(_opts: Record<string, unknown>): Promise<vo
       },
     );
   } catch (err) {
-    // Outer guard — never expose stack. CLI errors are NOT routed through
-    // the MCP sanitizer (those rules apply to JSON-RPC framing); String(err)
-    // keeps the message intelligible without leaking object internals.
-    process.stdout.write(`init failed: ${String(err)}\n`, () => {
+    // Outer guard — never expose stack. SECH-02 (#79): wrap String(err) in
+    // sanitize() so a token-bearing error message (e.g. an EACCES path
+    // including an inadvertent secret, or an undici body excerpt mid-init)
+    // cannot reach stdout — parity with auth.ts/sync.ts/doctor.ts.
+    process.stdout.write(`init failed: ${sanitize(String(err))}\n`, () => {
       process.exit(INIT_EXIT_CODES.write_failed);
     });
   }

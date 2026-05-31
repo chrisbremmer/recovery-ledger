@@ -219,7 +219,9 @@ export function createTokenStore(opts: TokenStoreOptions = {}): TokenStore {
   // interleave its storage-mode write with the auth file-backend write and
   // leave the marker pointing at the wrong backend.
   async function write(tokens: Tokens): Promise<void> {
-    await mkdir(resolvedPaths.configDir, { recursive: true });
+    // SECH-02 / #95: mode 0o700 parity with init.ts:102 so MCP-driven first-write
+    // creates the config dir with the same permissions as CLI-driven init.
+    await mkdir(resolvedPaths.configDir, { recursive: true, mode: 0o700 });
     await writeFile(resolvedPaths.tokensLockFile, '', { flag: 'a' });
     const release = await lockfile.lock(resolvedPaths.tokensLockFile, {
       retries: { retries: 10, factor: 1.2, minTimeout: 50 },
@@ -236,7 +238,7 @@ export function createTokenStore(opts: TokenStoreOptions = {}): TokenStore {
   // advisory lock on `tokensLockFile` for the duration of this call (the
   // refresh path does; the public `write` wraps this in a lock acquisition).
   async function writeUnderLock(tokens: Tokens): Promise<void> {
-    await mkdir(resolvedPaths.configDir, { recursive: true });
+    await mkdir(resolvedPaths.configDir, { recursive: true, mode: 0o700 });
     const blob = JSON.stringify(tokens);
     let mode: StorageMode = 'file';
 
@@ -310,7 +312,7 @@ export function createTokenStore(opts: TokenStoreOptions = {}): TokenStore {
   }
 
   async function doRefresh(stale: Tokens | null): Promise<Tokens> {
-    await mkdir(resolvedPaths.configDir, { recursive: true });
+    await mkdir(resolvedPaths.configDir, { recursive: true, mode: 0o700 });
     // proper-lockfile requires the lock target to exist before `.lock()`.
     await writeFile(resolvedPaths.tokensLockFile, '', { flag: 'a' });
 

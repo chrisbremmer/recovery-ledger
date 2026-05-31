@@ -104,4 +104,20 @@ describe('probeWhoopRoundtrip', () => {
     expect(check.detail).toMatch(/^roundtrip failed:/);
     expect(check.detail).toContain('fetch failed');
   });
+
+  // SECH-02 (#79): the catch-arm detail string must be sanitize()-wrapped so
+  // a token-bearing inner error (e.g. an undici body excerpt that surfaces an
+  // Authorization: Bearer header) cannot reach the CLI doctor's stdout via
+  // renderDoctor/JSON.stringify.
+  it('SECH-02 — catch-arm detail string is sanitize()-wrapped (#79)', async () => {
+    const err = new Error('upstream 401: Authorization: Bearer leaked_token_xxxxxxxxxx');
+    const deps: WhoopRoundtripDeps = {
+      refreshOrchestrator: rejectingOrchestrator(err),
+      fetcher: async () => ({ status: 200, durationMs: 1 }),
+    };
+    const check = await probeWhoopRoundtrip(deps);
+    expect(check.status).toBe('fail');
+    expect(check.detail).not.toContain('leaked_token_xxxxxxxxxx');
+    expect(check.detail).toContain('Bearer <redacted>');
+  });
 });

@@ -6,6 +6,8 @@
 
 import { renderDoctor } from '../../formatters/doctor.txt.js';
 import { createLogger } from '../../infrastructure/config/logger.js';
+// SECH-02 (#79): outer-catch sanitization parity with sync.ts/auth.ts/init.ts.
+import { sanitize } from '../../infrastructure/observability/sanitize.js';
 // MR-32: route CLI invocations through the Services composition root so
 // the lite-hexagonal "CLI and MCP both consume the same Services surface"
 // pattern (CLAUDE.md §Architecture) is real instead of aspirational. The
@@ -89,10 +91,11 @@ export async function runDoctorCommand(opts: {
     // cheap and prevents an unhandled rejection from escaping with no output
     // at all. JSON.stringify can also throw for cyclic or BigInt fields a
     // future probe might emit — we'd rather surface a one-line error than a
-    // silent crash. CLI errors are NOT routed through the MCP sanitizer
-    // (those rules apply to JSON-RPC framing); we use String(err) to avoid
-    // leaking object internals while keeping the message intelligible.
-    const message = String(err);
+    // silent crash. SECH-02 (#79): wrap String(err) in sanitize() so a
+    // bootstrap-time token leak in `err.message` (e.g. an underlying undici
+    // body excerpt that surfaces a refresh_token) cannot reach stdout —
+    // parity with sync.ts/auth.ts/init.ts outer catches.
+    const message = sanitize(String(err));
     const fallback = { checks: [], overall: 'fail' as const, error: message };
     const body = opts.text
       ? `[fail] cli — ${message}\noverall: fail`
