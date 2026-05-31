@@ -237,6 +237,30 @@ describe('decisions repo — findByPrefix (D-20 short-prefix lookup)', () => {
     // `%` would match all rows if unescaped. Escaped, it is a literal % that no ULID contains.
     expect(repo.findByPrefix('%')).toEqual([]);
   });
+
+  // #95: min-length guard. Short prefixes match too many rows; the caller
+  // (decision-update.ts) already arms on [] for "no match" UX.
+  it('Test 16c: prefix.length < 4 returns empty array (#95 — no SQL issued)', () => {
+    const repo = createDecisionsRepo(mem.db);
+    insertDecision(repo, { id: '01HK7AAAAAAAAAAAAAAAAAAAAA' });
+    insertDecision(repo, { id: '01HK7BBBBBBBBBBBBBBBBBBBBB' });
+    expect(repo.findByPrefix('abc')).toEqual([]);
+  });
+
+  it('Test 16d: empty prefix returns empty array (#95)', () => {
+    const repo = createDecisionsRepo(mem.db);
+    insertDecision(repo, { id: '01HK7AAAAAAAAAAAAAAAAAAAAA' });
+    expect(repo.findByPrefix('')).toEqual([]);
+  });
+
+  it('Test 16e: prefix.length === 4 executes SQL (boundary case, #95)', () => {
+    const repo = createDecisionsRepo(mem.db);
+    insertDecision(repo, { id: '01HK7AAAAAAAAAAAAAAAAAAAAA' });
+    insertDecision(repo, { id: '01JZZZZZZZZZZZZZZZZZZZZZZZ' });
+    const matches = repo.findByPrefix('01HK');
+    expect(matches).toHaveLength(1);
+    expect(matches[0]?.id).toBe('01HK7AAAAAAAAAAAAAAAAAAAAA');
+  });
 });
 
 describe('decisions repo — listAll (D-20 --all flag)', () => {

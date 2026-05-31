@@ -186,8 +186,64 @@ describe('runSyncCommand input validation', () => {
     const { runSyncCommand, SYNC_EXIT_CODES } = await import('./sync.js');
     await runSyncCommand({ since: 'not-a-date' });
     expect(runSyncSpy).not.toHaveBeenCalled();
-    expect(writtenBody.toLowerCase()).toContain('iso');
+    expect(writtenBody).toContain('YYYY-MM-DD');
+    expect(writtenBody).toContain('not-a-date');
     expect(exitCode).toBe(SYNC_EXIT_CODES.invalid_input);
+  });
+
+  // INPV-01 (#80): strict ISO rejection of locale-dependent shapes.
+  test('Test 6a: {since: "03/01/2026"} → exit invalid_input (locale-ambiguous slash form rejected)', async () => {
+    const { runSyncSpy } = mockBootstrap();
+    vi.resetModules();
+    const { runSyncCommand, SYNC_EXIT_CODES } = await import('./sync.js');
+    await runSyncCommand({ since: '03/01/2026' });
+    expect(runSyncSpy).not.toHaveBeenCalled();
+    expect(writtenBody).toContain('YYYY-MM-DD');
+    expect(writtenBody).toContain('03/01/2026');
+    expect(exitCode).toBe(SYNC_EXIT_CODES.invalid_input);
+  });
+
+  test('Test 6g: {since: "yesterday"} → exit invalid_input (English word rejected)', async () => {
+    const { runSyncSpy } = mockBootstrap();
+    vi.resetModules();
+    const { runSyncCommand, SYNC_EXIT_CODES } = await import('./sync.js');
+    await runSyncCommand({ since: 'yesterday' });
+    expect(runSyncSpy).not.toHaveBeenCalled();
+    expect(writtenBody).toContain('YYYY-MM-DD');
+    expect(exitCode).toBe(SYNC_EXIT_CODES.invalid_input);
+  });
+
+  test('Test 6h: {since: "2026-02-30"} → exit invalid_input (calendar-invalid date rejected)', async () => {
+    const { runSyncSpy } = mockBootstrap();
+    vi.resetModules();
+    const { runSyncCommand, SYNC_EXIT_CODES } = await import('./sync.js');
+    await runSyncCommand({ since: '2026-02-30' });
+    expect(runSyncSpy).not.toHaveBeenCalled();
+    expect(writtenBody).toContain('YYYY-MM-DD');
+    expect(exitCode).toBe(SYNC_EXIT_CODES.invalid_input);
+  });
+
+  test('Test 6i: {since: "2026-13-01"} → exit invalid_input (month out-of-range rejected)', async () => {
+    const { runSyncSpy } = mockBootstrap();
+    vi.resetModules();
+    const { runSyncCommand, SYNC_EXIT_CODES } = await import('./sync.js');
+    await runSyncCommand({ since: '2026-13-01' });
+    expect(runSyncSpy).not.toHaveBeenCalled();
+    expect(writtenBody).toContain('YYYY-MM-DD');
+    expect(exitCode).toBe(SYNC_EXIT_CODES.invalid_input);
+  });
+
+  test('Test 6j: {since: "2026-05-31"} succeeds (YYYY-MM-DD positive case)', async () => {
+    const { runSyncSpy } = mockBootstrap();
+    vi.resetModules();
+    const { runSyncCommand } = await import('./sync.js');
+    await runSyncCommand({ since: '2026-05-31' });
+    expect(runSyncSpy).toHaveBeenCalledOnce();
+    expect(runSyncSpy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        since: '2026-05-31',
+      }),
+    );
   });
 
   test('Test 6b: {resources: "cycles,,recoveries"} → exit invalid_input (empty token rejected)', async () => {
@@ -219,6 +275,7 @@ describe('runSyncCommand input validation', () => {
     await runSyncCommand({ since: future });
     expect(runSyncSpy).not.toHaveBeenCalled();
     expect(writtenBody.toLowerCase()).toContain('future');
+    expect(writtenBody).toContain(future);
     expect(exitCode).toBe(SYNC_EXIT_CODES.invalid_input);
   });
 });

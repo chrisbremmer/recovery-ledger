@@ -129,6 +129,9 @@ export function createDecisionsRepo(db: ReturnType<typeof drizzle>): DecisionsRe
     },
 
     findByPrefix(prefix): Decision[] {
+      // #95: min-length guard — short prefixes match too many rows; caller
+      // (decision-update.ts) already arms on [] for "no match".
+      if (prefix.length < 4) return [];
       // Escape LIKE meta-characters (`%`, `_`, `\`) so caller-controlled prefixes
       // cannot match more rows than intended (e.g. `_` matches any single char).
       const escaped = prefix.toUpperCase().replace(/[\\%_]/g, '\\$&');
