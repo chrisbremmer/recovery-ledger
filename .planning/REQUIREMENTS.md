@@ -81,6 +81,60 @@ Requirements for the initial release. Each maps to roadmap phases.
 - [x] **DOC-05**: launchd `.plist` template for macOS is shipped as documentation (not auto-installed) for users who want a scheduled local sync
 - [x] **DOC-06**: Clean-clone-to-first-daily-review measured at < 20 minutes on a fresh macOS image, asserted by a CI stopwatch test
 
+## v1.1 Requirements
+
+Quality-hardening milestone surfaced by the post-v1.0 `/ce-code-review` deep-review pass. Each requirement maps to one or more GitHub issues (#75–#95). NO new user-facing features — pure defensive correctness. Source research: `.planning/research-v1.1/SUMMARY.md`.
+
+### Secret hygiene
+
+- [ ] **SECH-01**: Token sanitizer covers camelCase keys (`accessToken`, `refreshToken`, `clientSecret`, `clientId`, `idToken`) in addition to snake_case — every sanitized record path is property-test-covered (#78)
+- [ ] **SECH-02**: `whoop_roundtrip` doctor probe sanitizes raw error messages on every code path; the CLI doctor's outer catch wraps `sanitize()` consistently with `auth.ts`/`sync.ts` (#79, plus #95 init.ts outer-catch + Pino-fatal sanitize)
+
+### Data integrity at the DB layer
+
+- [ ] **DBIN-01**: `'aborted'` sync-run status defined ONCE in a single source-of-truth module; Zod entity schema, Drizzle column type, and `QueryCache` input share that definition with `madge --circular src/` CI gate (#75)
+- [ ] **DBIN-02**: `sleeps.byRange` and `workouts.byRange` inherit `baseline_excluded` via FK JOIN on `cycle_id`; opt-in `includeExcluded` flag preserves opt-out path (#76, plus #95 recovery.byRange JOIN sibling)
+- [ ] **DBIN-03**: SQLite CHECK constraints on `cycles`/`recoveries`/`sleeps`/`workouts` enforce the `score_state` discriminated union (PENDING_SCORE ⇒ score columns NULL; UNSCORABLE ⇒ score columns NULL; SCORED ⇒ score columns NOT NULL); migration is two-step (data-cleanup backfill, then CHECK add) with pre-flight count assertion (#77, ADR-0003)
+- [ ] **DBIN-04**: `decisions.updateOutcome` returns `{changed: 0 | 1}`; service layer throws on `changed === 0` so silently-discarded outcomes are impossible (#88)
+- [ ] **DBIN-05**: `wal_checkpoint(TRUNCATE)` failures during sync are escalated — added to the partial-failure manifest in `sync_runs` and surfaced by `doctor` (#94)
+
+### Error-message coherence
+
+- [ ] **ERRC-01**: `whoop_roundtrip` produces ONE user-facing message per failure condition — `AuthError` and `WhoopApiError({status:401})` for the "token dead" case route through a shared classification so the CLI doctor and MCP probe say the same thing (#89)
+- [ ] **ERRC-02**: Refresh-orchestrator crashes between WHOOP refresh-response and disk-write surface a typed `AuthError({kind:'refresh_failed'})` that triggers a re-auth prompt — no silent retry with stale tokens; ADR-0002 §Enforcement updated to make this rule explicit (#87)
+
+### Lifecycle / resource safety
+
+- [ ] **LIFE-01**: Bootstrap pairs `openDb()` with `try/finally db.close()` so a `migrate()` throw never leaks the SQLite handle; covered by a unit test that forces `migrate()` to throw and asserts no leftover wal/shm handles (#81)
+- [ ] **LIFE-02**: `reclassifyStaleRunning` uses the injected `nowIso` (Clock) on every code path; clock-skew tests assert in-flight syncs are not falsely flipped to `aborted` (#82)
+- [ ] **LIFE-03**: `concurrent_writers_stress` doctor probe has an `AbortSignal.timeout(30_000)` watchdog with CI-aware SIGKILL fallback (5s in `process.env.CI`, 2s local); regression test exercises the watchdog path (#83)
+- [ ] **LIFE-04**: `RateLimitSemaphore.acquire()` accepts an `AbortSignal` and rejects in-flight slot waits with `AbortError`; the abort-during-deferred-throttle inFlight-leak (tracker #95) is fixed in the same PR via a `granted` boolean gate on the listener (#91 + #95 rate-limit semaphore leak)
+
+### CLI input validation
+
+- [ ] **INPV-01**: `--since` flag accepts only ISO-8601 (`YYYY-MM-DD`) dates via `z.iso.date()` — rejects locale-dependent inputs (`03/01/2026`, `yesterday`) with a clear error pointing at the supported format; CHANGELOG notes this as the only v1.1 user-visible breaking change (#80)
+
+### Architectural hygiene
+
+- [ ] **ARCH-01**: `sanitize` and `serializeError` live under `src/domain/observability/` (pure string transforms; no I/O) — transports stop importing from `infrastructure/observability/` (#95 sanitize placement)
+- [ ] **ARCH-02**: Module-load singletons (`tokenStore` in `token-store.ts:496`, `refreshOrchestrator`/`callWithAuth` in `refresh-orchestrator.ts:131,140`) are removed; `bootstrap()` constructs each exactly once and threads them via DI; `logger`/`paths`/`rate-limit` retain module state with justification comments (#85, ADR-0002 §Enforcement update)
+- [ ] **ARCH-03**: `src/infrastructure/whoop/client.ts` no longer imports from `src/services/`; `authedCall` is injected at `httpGet`'s signature; resource modules become factories wired in `bootstrap.ts:261-270` (#84)
+- [ ] **ARCH-04**: `AuthError` and `MigrationError` have a single canonical import path — `infrastructure/whoop/errors` re-exports removed; codemod assertion `rg "from '.*infrastructure/whoop/errors'" src tests` returns zero (#92)
+- [ ] **ARCH-05**: CLI command shims share one `withBootstrap(handler)` helper (in `src/cli/run.ts` or `src/cli/lib/`); ~30 lines of duplicated bootstrap-error handling × 8 files collapsed to a single source (#93)
+- [ ] **ARCH-06**: Doctor production wiring (`productionWhoopFetcher`, `whoopErrorKindToStatus`, `services_runDoctor`) extracted from `bootstrap.ts:320-392` into `src/services/doctor/wiring.ts`; bootstrap stays under 250 lines (#95 doctor-wiring extract)
+- [ ] **ARCH-07**: Doctor checks use required-deps DI matching the non-doctor services; `deps?.read ?? (() => tokenStore.read())` fallbacks removed (#95 doctor-DI ad-hoc)
+- [ ] **ARCH-08**: `src/services/api-gap/` collapsed into a single `src/services/api-gap.ts`; `API_GAP_ENTRIES` promoted to `src/domain/api-gap/catalog.ts` (#95 api-gap over-structured)
+
+### Test coverage hardening
+
+- [ ] **TSTC-01**: Doctor `latestFinished()` aborted-skip regression test + `native_modules` failure-path test land; covers Phase 5 gaps (#86)
+- [ ] **TSTC-02**: Gate F (`/scripts/ci-grep-gates.sh`) regex hardened against alias bypasses — `noRestrictedGlobals` Biome rule on `fetch` re-export aliases plus stronger pattern coverage prevents ADR-0007 enforcement evasion (#90)
+- [ ] **TSTC-03**: #95 backlog test items folded in as scope allows: FDR↔weekly-review fixture integration; DST fixture hard-coded ids; stopwatch env-gate polarity guard; auth-concurrency I-01 typed assertion; concurrent_writers_stress detail regex; doctor/index integration detail regex; body_measurements concurrent-readers test; refresh-orchestrator behavioral assertions (#95 testing bucket)
+
+### Backlog drain
+
+- [ ] **BACK-01**: Remaining tracker #95 items NOT folded into the above (decisions/sync_runs indexes; decisions.findByPrefix min-length guard; body_measurements float tolerance; cycles.cursor() score-state-aware comment; token-store mkdir 0o700; OAuth callback `.unref()`; Pino flush on signals + start-of-sync) — landed as a final quality-sweep PR (#95 residual)
+
 ## v2 Requirements
 
 Deferred to future release. Acknowledged but not in current roadmap.
@@ -189,4 +243,4 @@ Explicitly excluded. Gated behind the hard scope guardrail in PROJECT.md (≥ 12
 
 ---
 *Requirements defined: 2026-05-11*
-*Last updated: 2026-05-29 — Phase 5 closed (6 REQ-IDs flipped to Complete: DOC-01..06); 50 / 50 requirements done — milestone v1.0 complete*
+*Last updated: 2026-05-31 — milestone v1.1 defined: 22 new REQ-IDs (SECH/DBIN/ERRC/LIFE/INPV/ARCH/TSTC/BACK) mapped 1:1 to GitHub issues #75–#95; traceability filled by the v1.1 roadmap*
