@@ -163,3 +163,178 @@ Concerns originate in the phase where the first vulnerable code is introduced; t
 ---
 *Roadmap created: 2026-05-11*
 *Last updated: 2026-05-29 — Phase 5 closed (11/11 plans executed across 5 waves). 50 / 50 plans complete across Phases 1+2+3+4+5. 50 / 50 v1 requirements complete — milestone v1.0 complete.*
+
+---
+
+## v1.1 Roadmap
+
+**Defined:** 2026-05-31
+**Milestone:** v1.1 quality hardening
+**Granularity:** standard
+**Mode:** yolo
+**Source research:** `.planning/research-v1.1/SUMMARY.md` (FEATURES, STACK, ARCHITECTURE, PITFALLS streams)
+**Scope:** 21 GitHub issues (#75-#95) surfaced by the post-v1.0 `/ce-code-review` deep-review pass. Zero new user-facing features; defensive correctness only. No new runtime or dev dependencies.
+
+> **Numbering continues from v1.0** (Phases 1-5 closed). v1.1 starts at Phase 6.
+
+### Phases
+
+- [ ] **Phase 6: Secret Hygiene & Input Validation** - Sanitizer covers camelCase token keys, doctor catches harmonised, `--since` strict ISO 8601 (#78, #79, #80, plus #95 init/Pino-fatal items)
+- [ ] **Phase 7: DB Integrity Gate** - `aborted` enum dedup with `madge` CI gate, score-state CHECK constraints with two-step migration, JOIN gap closed, decisions/WAL silent failures escalated (#75, #76, #77, #88, #94)
+- [ ] **Phase 8: Refresh Atomicity** - Refresh-orchestrator crash between WHOOP response and disk-write surfaces typed `AuthError({kind:'refresh_failed'})`; ADR-0002 §Enforcement updated (#87)
+- [ ] **Phase 9: Lifecycle & Concurrency** - Bootstrap try/finally on `openDb()`, Clock injection for `reclassifyStaleRunning`, stress-probe watchdog with CI-aware SIGKILL, `AbortSignal` plumbed through rate-limit semaphore, single-message auth-failure routing (#81, #82, #83, #91, #89, plus #95 inFlight-leak)
+- [ ] **Phase 10: Architecture Refactor Cluster** - 6-step build order: sanitize→domain, drop singletons, invert client.ts DI, extract doctor wiring, standardize doctor DI, inline api-gap; single import path for AuthError/MigrationError; `withBootstrap` helper (#84, #85, #92, #93, plus #95 placement items)
+- [ ] **Phase 11: Regression Net** - Doctor `latestFinished()` aborted-skip + native-modules failure-path tests; Gate F hardened against `fetch` alias bypass via Biome `noRestrictedGlobals` (#86, #90)
+- [ ] **Phase 12: Backlog Drain** - Remaining #95 residual items folded into one final quality-sweep PR: indexes, float quantize, FDR↔weekly integration, DST fixture ids, stopwatch env-gate guard, refresh-orchestrator behavioral assertions (#95 residual)
+
+### Phase Details
+
+#### Phase 6: Secret Hygiene & Input Validation
+**Goal**: Land defensive fixes for #78, #79, #80 (and the #95 init.ts outer-catch + token-store mkdir 0o700 + Pino-fatal sanitize items) so no live token material reaches stderr/stdout and `--since` rejects locale-dependent dates with a clear error. Ships as **3 sub-PRs**: (a) SECH-01 sanitizer camelCase + property tests, (b) SECH-02 doctor catches + #95 init/Pino-fatal hygiene, (c) INPV-01 `--since` strict ISO.
+**Depends on**: Phase 5 (v1.0 closed — all touched files exist; no v1.0 requirement regresses)
+**Requirements**: SECH-01, SECH-02, INPV-01
+**Success Criteria** (what must be TRUE):
+  1. A grep of stderr capture + log dir after inducing every error path that walks a stored-tokens blob (WHOOP 401/500, `init` failure, `doctor` roundtrip failure, MCP transport fatal) yields zero matches for `Bearer`, JWT shape, `accessToken`, `refreshToken`, or `clientSecret` — verified by a property-test-style fixture matrix covering ≥ 50 token-key shapes.
+  2. `recovery-ledger doctor` (CLI) and `whoop_doctor` (MCP) emit identically-sanitized error text on `whoop_roundtrip` failure; the CLI doctor's outer catch wraps `sanitize()` consistently with `auth.ts`/`sync.ts`/`init.ts`.
+  3. `recovery-ledger sync --since 2026-02-30` and `--since 03/01/2026` and `--since yesterday` exit non-zero with a clear error pointing at `YYYY-MM-DD` ISO format; previously-valid `--since 2026-05-31` and `--since 2026-05-31T00:00:00Z` still succeed.
+  4. CHANGELOG entry calls out #80 as the only user-visible breaking change in v1.1.
+**Plans**: TBD
+**PR boundaries**: 3 PRs (one per HIGH issue + #95 hygiene fold-ins)
+**UI hint**: no
+
+#### Phase 7: DB Integrity Gate
+**Goal**: Land defensive fixes for #75, #76, #77, #88, #94 (and the #95 recovery.byRange JOIN sibling) so `score_state` discriminated-union invariants are enforced at the SQL layer, `aborted` rows flow correctly through Zod/Drizzle/QueryCache, and silent data-integrity failures (JOIN gap, decisions no-op, WAL checkpoint failures) escalate visibly. Ships as **5 sub-PRs in build order**: DBIN-01 (#75 enum dedup + `madge --circular` CI gate) → DBIN-03 (#77 CHECK + two-step migration) → DBIN-02 (#76 JOIN gap + #95 includeExcluded sibling) → DBIN-04 (#88 changed:0|1 surfaced) → DBIN-05 (#94 WAL escalation). CRITICAL: the `madge --circular src/` gate must land with DBIN-01 — ESM cycles in the `aborted` enum dedup surface at runtime as `undefined`, not at compile time.
+**Depends on**: Phase 6 (any new error messages from #77 migration aborts or #88 service-layer throws must be sanitized; landing this after Phase 6 means the sanitizer is already in place)
+**Requirements**: DBIN-01, DBIN-02, DBIN-03, DBIN-04, DBIN-05
+**Success Criteria** (what must be TRUE):
+  1. `whoop_query_cache resource=sync_runs status=aborted` returns aborted rows through the typed repo without Zod errors; the enum is defined ONCE in a single source-of-truth module imported by Drizzle column, Zod schema, and `QueryCache` input, with `madge --circular src/` green in CI.
+  2. Inserting a row with `score_state='SCORED'` and any score column NULL (or `score_state='PENDING_SCORE'`/`'UNSCORABLE'` with any score column NOT NULL) is rejected at SQL write-time by a CHECK constraint; the migration ran in two steps (data-cleanup backfill of legacy NULLs, then CHECK add) with a pre-flight count-violators assertion documented in the user CHANGELOG.
+  3. `sleeps.byRange` and `workouts.byRange` exclude DST/tz-flagged rows by default via FK JOIN on `cycle_id`; the `includeExcluded` opt-in path round-trips the same rows; medians and baseline aggregations shift accordingly in fixture tests.
+  4. `recovery-ledger decision update --id <typo>` exits non-zero with a typed `DecisionNotFound` error surfaced by the service layer; the repo returns `{changed: 0 | 1}` (no throw at the data layer) so repo semantics stay data-only.
+  5. A `wal_checkpoint(TRUNCATE)` failure during sync appends a flag to the `sync_runs` partial-failure manifest; `recovery-ledger doctor` surfaces the flag.
+**Plans**: TBD
+**PR boundaries**: 5 PRs in build order (DBIN-01 → DBIN-03 → DBIN-02 → DBIN-04 → DBIN-05)
+**UI hint**: no
+
+#### Phase 8: Refresh Atomicity
+**Goal**: Land defensive fix for #87 (refresh-orchestrator crash between WHOOP refresh-response and disk-write) so the user is loudly forced to re-auth instead of silently retrying with a stale token; ADR-0002 §Enforcement is updated to make this rule explicit. Ships as **1 sub-PR** (#87 alone — highest-stakes correctness work in the milestone; isolated so the contract test surface stays small). ERRC-01 (#89) is deferred to Phase 9 because it depends on this phase's new typed error shape.
+**Depends on**: Phase 6 (the new `refresh_failed` AuthError message must be sanitized — no token material in the user-visible re-auth prompt) and Phase 7 (`aborted` rows from earlier crash-recovery paths already flow through the typed repo by the time this lands)
+**Requirements**: ERRC-02
+**Success Criteria** (what must be TRUE):
+  1. A contract test forces `writeFileAtomic` to throw after WHOOP returns rotated tokens (MSW `once: true`); the call site surfaces `AuthError({kind:'refresh_failed', detail:'rotated tokens received but write failed — run \`recovery-ledger auth\`'})`; the next process invocation receives the same error rather than presenting the stale on-disk token.
+  2. All new logic inside `doRefresh` executes inside `writeUnderLock`'s critical section; a `proper-lockfile.lock()` held-continuously assertion gates the test.
+  3. ADR-0002 §Enforcement contains a new sentence: "A refresh response that succeeds at the HTTP layer but fails to persist MUST surface `AuthError({kind:'refresh_failed'})` and force re-auth — silent retry with the stale on-disk token is forbidden."
+  4. The "1-hour grace" behavior (in-flight request continues with the rotated access token even though disk write failed) is documented and tested.
+**Plans**: TBD
+**PR boundaries**: 1 PR (#87)
+**UI hint**: no
+
+#### Phase 9: Lifecycle & Concurrency
+**Goal**: Land defensive fixes for #81, #82, #83, #91 (and the #95 inFlight-leak sibling) plus #89 (auth-failure message coherence — depends on Phase 8's new error shape) so SQLite handles never leak on migration failure, in-flight syncs are not falsely flipped to `aborted` after laptop sleep, the stress probe always bounds-fails within ~35s, and the rate-limit semaphore honours cancellation without leaking slots. Ships as **5 sub-PRs**: LIFE-01 (#81 try/finally), LIFE-02 (#82 Clock wiring), LIFE-03 (#83 watchdog), LIFE-04 (#91 + #95 inFlight-leak paired — landing #91 alone creates a slot leak under the new abort path), ERRC-01 (#89 single-message routing for AuthError vs WhoopApiError(401)).
+**Depends on**: Phase 8 (ERRC-01 references Phase 8's `refresh_failed` AuthError kind in its classification table; #82 also depends on Phase 7's `aborted` enum dedup having landed via Phase 7)
+**Requirements**: LIFE-01, LIFE-02, LIFE-03, LIFE-04, ERRC-01
+**Success Criteria** (what must be TRUE):
+  1. A regression test forces `migrate()` to throw mid-flight; no leftover `.sqlite-wal`/`-shm` handles exist after the test; bootstrap pairs `openDb()` with `try/finally db.close()`.
+  2. A clock-skew test injects a stale `nowIso` and asserts in-flight `sync_runs` rows are NOT flipped to `aborted` by `reclassifyStaleRunning` — the injected `Clock` is honoured on every code path.
+  3. `recovery-ledger doctor --stress` bounds-fails within ~35s (5s SIGKILL in `process.env.CI`, 2s local) even when a stuck worker would otherwise hang; the watchdog regression test uses `await vi.advanceTimersByTimeAsync(...)` to exercise the SIGKILL path.
+  4. `RateLimitSemaphore.acquire(signal)` rejects in-flight slot waits with `AbortError` when the signal aborts; the abort-during-deferred-throttle path does NOT leak an `inFlight` decrement (verified by a listener-count assertion after the test); the `granted` boolean gate on the listener is exercised.
+  5. `recovery-ledger doctor` and `whoop_doctor` emit one classification message for "token dead" regardless of whether the underlying error is `AuthError` or `WhoopApiError({status:401})`; the classification table is single-sourced.
+**Plans**: TBD
+**PR boundaries**: 5 PRs (LIFE-01, LIFE-02, LIFE-03, LIFE-04, ERRC-01)
+**UI hint**: no
+
+#### Phase 10: Architecture Refactor Cluster
+**Goal**: Land architectural-hygiene fixes for #84, #85, #92, #93 (and the #95 placement debates) in the 6-step build order from `.planning/research-v1.1/ARCHITECTURE.md` §Recommended build order so the composition root `bootstrap()` owns every runtime collaborator and the layering rule (`transports → services → domain ∪ infrastructure`) is enforceable by codemod assertion. Ships as a **coordinated cluster of 6 sub-PRs**: ARCH-01 (sanitize→domain mechanical move) → ARCH-02 (drop tokenStore + refreshOrchestrator singletons; bootstrap owns construction) → ARCH-03 (invert client.ts via `authedCall` DI; resource modules become factories) → ARCH-06 (extract doctor production wiring from bootstrap.ts:320-392 into `src/services/doctor/wiring.ts`) → ARCH-07 (drop `deps?.read ?? (() => tokenStore.read())` fallbacks; required deps only) → ARCH-08 (inline `src/services/api-gap/` into single file; promote catalog to `src/domain/api-gap/catalog.ts`). ARCH-04 (#92 single-import-path codemod for AuthError/MigrationError) and ARCH-05 (#93 `withBootstrap` helper) fold in here because the codemod hits the same 8 CLI files as ARCH-02/03.
+**Depends on**: Phase 9 (the DI surface defined here makes future lifecycle tests cleaner; landing it after Phase 9 means no lifecycle regression rides on a refactored composition root)
+**Requirements**: ARCH-01, ARCH-02, ARCH-03, ARCH-04, ARCH-05, ARCH-06, ARCH-07, ARCH-08
+**Success Criteria** (what must be TRUE):
+  1. `src/domain/observability/sanitize.ts` exists; no file under `src/cli/`, `src/mcp/`, or `src/services/` imports from `src/infrastructure/observability/`; the layering rule is enforceable via grep.
+  2. `bootstrap()` constructs `tokenStore` and `refreshOrchestrator` exactly once via injected defaults; `export const tokenStore` (token-store.ts:496) and `export const refreshOrchestrator`/`callWithAuth` (refresh-orchestrator.ts:131,140) are deleted; `logger`/`paths`/`rate-limit` retain documented module-state exceptions; ADR-0002 §Enforcement adds the "exactly one tokenStore per process, wired by bootstrap" rule.
+  3. `src/infrastructure/whoop/client.ts` no longer imports from `src/services/`; `httpGet`'s signature includes an `authedCall: AuthedCall` parameter; resource modules are factories wired in `bootstrap.ts:261-270`; test fakes simplify to `(op) => op('test-token')`.
+  4. `rg "from '.*infrastructure/whoop/errors'" src tests` returns zero matches for `AuthError|MigrationError`; the codemod ran in the same commit as the re-export deletion; CLI command shims share one `withBootstrap(handler)` helper and ~30 lines of duplicated bootstrap-error handling × 8 files collapses to a single source.
+  5. `bootstrap.ts` is under 250 lines; `productionWhoopFetcher`, `whoopErrorKindToStatus`, and `services_runDoctor` live in `src/services/doctor/wiring.ts`; doctor checks use required-deps DI matching non-doctor services; `src/services/api-gap.ts` is a single file (no directory) and `API_GAP_ENTRIES` lives at `src/domain/api-gap/catalog.ts`.
+**Plans**: TBD
+**PR boundaries**: 6 PRs in build order (ARCH-01 → ARCH-02 → ARCH-03 → ARCH-06 → ARCH-07 → ARCH-08; ARCH-04 + ARCH-05 fold into ARCH-02/03)
+**UI hint**: no
+
+#### Phase 11: Regression Net
+**Goal**: Land defensive fixes for #86 and #90 so the doctor `latestFinished()` aborted-skip filter and `native_modules` failure-path are covered by tests (closing Phase 5 gaps), and Gate F's `fetch` enforcement cannot be silently bypassed by an alias re-export. Ships as **2 sub-PRs**: TSTC-01 (#86 doctor tests — depends on DBIN-01 having landed because the test inserts an `aborted` row through the typed repo), TSTC-02 (#90 Biome `noRestrictedGlobals` + stronger Gate F regex).
+**Depends on**: Phase 10 (refactored DI surface lets the new doctor tests use the same factory shape as production wiring) and Phase 7 (DBIN-01 must have landed for TSTC-01's typed-repo insert to compile)
+**Requirements**: TSTC-01, TSTC-02
+**Success Criteria** (what must be TRUE):
+  1. `services/doctor/checks/last-sync-recency.test.ts` includes a regression test that inserts an `aborted` `sync_runs` row through the typed repo and asserts `latestFinished()` skips it (i.e. uses the row PRIOR to the aborted one); the test compiles only after DBIN-01's enum widening.
+  2. `services/doctor/checks/native-modules.test.ts` includes a failure-path test that simulates a `better-sqlite3`/`@napi-rs/keyring` load failure and asserts the probe surfaces `status: fail` with the expected error class (not a swallowed exception).
+  3. A new Biome `noRestrictedGlobals` rule on `fetch` aliases (`const f = globalThis.fetch`, `const f = global.fetch`) fails CI on import; `scripts/ci-grep-gates.sh` Gate F regex is hardened to match `globalThis.fetch`/`global.fetch`/`(fetch)` patterns; the test suite includes a positive-control file that intentionally violates the rule (under `tests/fixtures/`) to prove the rule fires.
+**Plans**: TBD
+**PR boundaries**: 2 PRs (TSTC-01, TSTC-02)
+**UI hint**: no
+
+#### Phase 12: Backlog Drain
+**Goal**: Land remaining #95 residual items (those NOT folded into Phases 6-11) as a final coordinated quality-sweep PR: decisions/sync_runs covering indexes; `decisions.findByPrefix` min-length guard; body_measurements REAL == quantize tolerance; cycles.cursor() score-state-aware comment; token-store `mkdir` 0o700; OAuth callback server `.unref()`; Pino `flush()` on signals + start-of-sync. Plus TSTC-03 (the #95 testing backlog: FDR↔weekly-review fixture integration; DST fixture hard-coded ids; stopwatch env-gate polarity guard; auth-concurrency I-01 typed assertion; concurrent_writers_stress detail regex; doctor/index integration detail regex; body_measurements concurrent-readers test; refresh-orchestrator behavioral assertions). Ships as **1 omnibus PR** (low-risk, all-or-nothing — backlog drain is opportunistic but useful).
+**Depends on**: Phase 11 (regression-net tests are in place, so the final sweep cannot regress an uncovered surface) and Phase 10 (architecture refactor done, so no #95 item is invalidated mid-flight by a layering move)
+**Requirements**: TSTC-03, BACK-01
+**Success Criteria** (what must be TRUE):
+  1. All #95 residual items (decisions/sync_runs indexes; `findByPrefix` min-length guard; body_measurements float quantize; cycles.cursor() comment; token-store mkdir 0o700; OAuth callback `.unref()`; Pino flush signal handlers) ship in one PR; CHANGELOG enumerates each.
+  2. All #95 testing backlog items (FDR↔weekly integration, DST fixture hard-coded ids, stopwatch env-gate polarity guard, auth-concurrency I-01 typed assertion, concurrent_writers_stress detail regex, doctor/index integration detail regex, body_measurements concurrent-readers test, refresh-orchestrator behavioral assertions) land in the same PR; full-suite green; suite still finishes under 60 seconds locally.
+  3. Phase-close gate: every one of the 26 v1.1 REQ-IDs is flipped to Complete in the REQUIREMENTS.md v1.1 Traceability table; milestone v1.1 close is appended to STATE.md.
+**Plans**: TBD
+**PR boundaries**: 1 PR (residual + TSTC-03 fold-in)
+**UI hint**: no
+
+### Progress (v1.1)
+
+| Phase | Plans Complete | Status | Completed |
+|-------|----------------|--------|-----------|
+| 6. Secret Hygiene & Input Validation | 0/? | Not started | - |
+| 7. DB Integrity Gate | 0/? | Not started | - |
+| 8. Refresh Atomicity | 0/? | Not started | - |
+| 9. Lifecycle & Concurrency | 0/? | Not started | - |
+| 10. Architecture Refactor Cluster | 0/? | Not started | - |
+| 11. Regression Net | 0/? | Not started | - |
+| 12. Backlog Drain | 0/? | Not started | - |
+
+### Coverage (v1.1)
+
+- **v1.1 requirements:** 26 total (SECH=2, DBIN=5, ERRC=2, LIFE=4, INPV=1, ARCH=8, TSTC=3, BACK=1)
+- **Mapped to phases:** 26
+- **Unmapped:** 0
+- **Complete:** 0 / 26 (Phase 6-12 not yet started)
+
+### Cross-Phase Dependency Graph
+
+```
+Phase 6 (sanitizer + ISO) ──► Phase 7 (DB integrity) ──► Phase 8 (refresh atomicity)
+                                          │                            │
+                                          ▼                            ▼
+                                Phase 9 (lifecycle + ERRC-01) ◄────────┘
+                                          │
+                                          ▼
+                                Phase 10 (architecture refactor)
+                                          │
+                                          ▼
+                                Phase 11 (regression net)
+                                          │
+                                          ▼
+                                Phase 12 (backlog drain)
+```
+
+Key cross-phase chains (from PITFALLS.md):
+- `DBIN-01 → DBIN-03 → LIFE-02 → TSTC-01` — `aborted` enum dedup must land first; CHECK references the corrected enum; reclassify tests insert through typed repo; doctor `latestFinished()` test does the same.
+- `SECH-01/02 → ERRC-02 → ERRC-01` — sanitizer first so refresh-failed message stays clean; refresh-failed AuthError surfaces in Phase 8; Phase 9's ERRC-01 routing depends on the Phase 8 shape.
+- `ARCH-01 → ARCH-02 → ARCH-03` — sanitize-move ratchets the layering rule; singletons drop so bootstrap owns construction; client.ts DI invert lands cleanly because bootstrap already owns the orchestrator.
+
+### v1.1 Cross-Cutting Concerns (Test Origin Map)
+
+| Concern | Originates In | How It's Tested From Then On |
+|---------|---------------|------------------------------|
+| Sanitizer property-test matrix (camelCase coverage) | Phase 6 | Fixture matrix ≥ 50 token-key shapes against every error path; grep-for-`Bearer`/JWT against stderr + log dir |
+| `madge --circular src/` ESM cycle gate | Phase 7 | CI gate runs on every PR; required-green branch protection |
+| SQL-layer score_state CHECK enforcement | Phase 7 | Two-step migration + pre-flight count-violators assertion + post-migration doctor probe |
+| `proper-lockfile` held-continuously contract | Phase 8 | Contract test asserts lock held from `callRefreshEndpoint` resolution through `AuthError({kind:'refresh_failed'})` surface |
+| CI-aware SIGKILL watchdog (5s CI, 2s local) | Phase 9 | `process.env.CI` branch + `await vi.advanceTimersByTimeAsync(...)` test |
+| AbortSignal listener cleanup invariant | Phase 9 | Listener-count assertion after each `acquire(signal)` test |
+| Composition-root single-construction invariant | Phase 10 | `rg "import.*tokenStore"` zero-matches in `src/` outside `bootstrap.ts` + ADR-0002 §Enforcement update |
+| Biome `noRestrictedGlobals` on `fetch` aliases | Phase 11 | Positive-control fixture file under `tests/fixtures/` that intentionally violates the rule |
+
+---
+*v1.1 roadmap created: 2026-05-31 — 7 phases (Phase 6-12), 26 v1.1 requirements mapped, 0 unmapped. Continues numbering from v1.0 (Phases 1-5 closed).*

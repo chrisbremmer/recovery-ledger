@@ -10,6 +10,17 @@ Not affiliated with or endorsed by WHOOP. Bring your own WHOOP developer app.
 
 Turn WHOOP data into a daily and weekly review loop that ends in 3 concrete decisions and a record of whether they helped — useful enough that Chris keeps using it.
 
+## Current Milestone: v1.1 quality hardening
+
+**Goal:** Ship code fixes for all 21 open GitHub issues surfaced by the post-v1.0 deep-review pass — defensive hardening across security/sanitizer, OAuth/refresh, DB/schema, doctor probes, CLI/UX, architecture, and testing — without regressing v1.0's 50/50 requirement validation.
+
+**Target features:**
+- 10 HIGH-severity bug fixes (one PR per HIGH issue)
+- 10 MEDIUM-severity bug fixes (grouped into themed PRs)
+- Tracker #95 v1.1 quality-hardening backlog (~28 small items)
+
+**Source:** GitHub issues #75-#95, all labeled `code-review`. No new user-facing features; pure quality work.
+
 ## Requirements
 
 ### Validated
@@ -112,4 +123,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-05-13 after Phase 2 (oauth-token-store-single-flight-refresh) completion*
+*Last updated: 2026-05-31 — milestone v1.1 (quality hardening) started after v1.0 close (50/50 reqs validated)*
