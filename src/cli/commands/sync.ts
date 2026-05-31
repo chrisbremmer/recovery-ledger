@@ -24,6 +24,7 @@
 //                            was not parseable as ISO 8601
 //   bootstrap_failed  = 1   openDb or migrate threw before sync started
 
+import { z } from 'zod';
 import { RESOURCE_NAMES_SET, type ResourceName } from '../../domain/types/sync.js';
 import { formatBootstrapError, formatSyncResult } from '../../formatters/sync.txt.js';
 import { paths } from '../../infrastructure/config/paths.js';
@@ -38,6 +39,9 @@ import {
   isWhoopApiError,
 } from '../../infrastructure/whoop/errors.js';
 import { type Bootstrapped, bootstrap } from '../../services/index.js';
+
+// INPV-01 (#80): strict YYYY-MM-DD or full ISO 8601 — no locale-dependent coercion.
+const SinceSchema = z.union([z.iso.date(), z.iso.datetime()]);
 
 export const SYNC_EXIT_CODES: Readonly<Record<string, number>> = Object.freeze({
   ok: 0,
@@ -108,21 +112,24 @@ function isResourceName(token: string): token is ResourceName {
 }
 
 /**
- * Validate --since as ISO 8601 (T-03.12-03). Date.parse + isNaN check is
- * the cheapest gate that catches the obvious failure modes (`not-a-date`,
- * `2026-13-99`, empty string). The WHOOP HTTP client would otherwise
- * surface this as a 400 several layers in.
+ * Validate --since (INPV-01 #80). Strict ISO 8601 via Zod v4 `z.iso.date()` ∪
+ * `z.iso.datetime()` — regex-based, no `Date.parse` fallback, so locale-dependent
+ * inputs (`03/01/2026`, `yesterday`) and calendar-invalid dates (`2026-02-30`,
+ * `2026-13-01`) reject at the CLI boundary instead of producing a wrong-window
+ * sync silently. The WHOOP HTTP client would otherwise surface this as a 400
+ * several layers in. T-03.12-03 future-guard preserved.
  */
 function parseSinceFlag(raw: string | undefined): { ok: true } | { ok: false; message: string } {
   if (raw === undefined) return { ok: true };
-  const parsed = new Date(raw);
-  if (Number.isNaN(parsed.getTime())) {
-    return { ok: false, message: `Invalid --since value: not parseable as ISO 8601.` };
+  const parsed = SinceSchema.safeParse(raw);
+  if (!parsed.success) {
+    return {
+      ok: false,
+      message: `Invalid --since value: ${raw} — must be YYYY-MM-DD or full ISO 8601 (e.g., 2026-05-31 or 2026-05-31T00:00:00Z).`,
+    };
   }
-  // A --since in the future produces a window where since > until — the
-  // resource pages return zero rows and the run silently looks like a no-op.
-  // Reject at the CLI boundary so the user sees what is actually wrong.
-  if (parsed.getTime() > Date.now()) {
+  // Zod proved the shape; Date(raw) now safely yields a finite getTime().
+  if (new Date(raw).getTime() > Date.now()) {
     return {
       ok: false,
       message: `Invalid --since value: ${raw} is in the future (since must be ≤ now).`,
