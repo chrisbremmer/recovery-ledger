@@ -64,6 +64,14 @@ jobs:
       - name: Typecheck
         run: npm run typecheck
 
+      # DBIN-01 (#75): madge cycle detection. The SYNC_RUN_STATUSES single
+      # source of truth is imported by Drizzle / Zod / QueryCache / repo —
+      # a future ESM cycle through these would resolve to `undefined` at
+      # runtime, not at compile time. Type-only imports are skipped via
+      # .madgerc so pre-existing intra-doctor type cycles do not gate CI.
+      - name: Circular-dependency check
+        run: npm run check:circular
+
       # Build MUST precede test — the integration test in
       # tests/integration/mcp-stdout-purity.test.ts spawns `dist/mcp.mjs` as a
       # subprocess (Pattern 5(b) caveat + Pitfall 7).

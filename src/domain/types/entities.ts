@@ -40,6 +40,8 @@
 
 import type { ScoreState } from './score.js';
 import type { ResourceName, ResourceSyncOutcome } from './sync.js';
+// DBIN-01 (#75): single source of truth for sync_runs status values.
+import type { SyncRunStatus } from './sync-run-status.js';
 
 // ----------------------------------------------------------------------------
 // Cycle — physiological cycle. Discriminated union on `scoreState`.
@@ -227,7 +229,8 @@ export type SyncRun = {
   id: number;
   startedAt: string;
   finishedAt: string | null;
-  status: 'running' | 'ok' | 'partial' | 'failed' | 'aborted';
+  // DBIN-01 (#75): derived from the shared SYNC_RUN_STATUSES constant.
+  status: SyncRunStatus;
   perResource: Record<ResourceName, ResourceSyncOutcome>;
   gapsDetected: number;
   flags: string | null;

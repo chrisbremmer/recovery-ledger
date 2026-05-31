@@ -19,6 +19,8 @@
 
 import { z } from 'zod';
 import { RESOURCES } from '../types/sync.js';
+// DBIN-01 (#75): shared 5-state enum (running|ok|partial|failed|aborted).
+import { SYNC_RUN_STATUSES } from '../types/sync-run-status.js';
 
 // ============================================================================
 // CYCLE — discriminated union on `scoreState` (camelCase).
@@ -235,7 +237,9 @@ export const SyncRunEntitySchema = z.object({
   id: z.number().int(),
   startedAt: z.string(),
   finishedAt: z.string().nullable(),
-  status: z.enum(['running', 'ok', 'partial', 'failed']),
+  // DBIN-01 (#75): derived from the shared SYNC_RUN_STATUSES constant so
+  // Drizzle / Zod / QueryCache / repo stay in lockstep on the 5-state enum.
+  status: z.enum(SYNC_RUN_STATUSES),
   // Zod 4's `z.record(KeySchema, ValueSchema)` validates that every enum key
   // is present — but the sync_runs row stores partial maps mid-run. Use a
   // string-keyed record with a runtime guard (refine) that every key is one

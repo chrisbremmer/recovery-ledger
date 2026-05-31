@@ -29,6 +29,8 @@ import {
   type ResourceSyncOutcome,
   type RunSyncStatus,
 } from '../../../domain/types/sync.js';
+// DBIN-01 (#75): 5-state status union — running|ok|partial|failed|aborted.
+import type { SyncRunStatus } from '../../../domain/types/sync-run-status.js';
 import { logger } from '../../config/logger.js';
 import { sync_runs as syncRunsTable } from '../schema.js';
 
@@ -69,11 +71,10 @@ export interface SyncRunsRepo {
    *  filters are combined with AND; both undefined returns every row up
    *  to `limit`. SQLite lexicographic compare on ISO-8601 timestamps
    *  gives correct chronology. */
-  byStatus(
-    status: 'ok' | 'partial' | 'failed' | 'running' | undefined,
-    since: string | undefined,
-    limit: number,
-  ): SyncRun[];
+  // DBIN-01 (#75): accept all 5 statuses (including 'aborted') so
+  // `whoop_query_cache resource=sync_runs status=aborted` returns crash-
+  // recovery rows. The shared SyncRunStatus type is the single source.
+  byStatus(status: SyncRunStatus | undefined, since: string | undefined, limit: number): SyncRun[];
   /** #35 — bootstrap-time crash recovery. Marks any `running` row whose
    *  `started_at` is older than `thresholdMs` as `aborted`. Returns the
    *  number of rows reclassified. Called by `bootstrap()` after the

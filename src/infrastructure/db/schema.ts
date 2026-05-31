@@ -47,6 +47,10 @@
 // schema declaration only.
 
 import { index, integer, primaryKey, real, sqliteTable, text } from 'drizzle-orm/sqlite-core';
+// DBIN-01 (#75): cross-layer import (infrastructure → domain) for the single
+// source of truth on sync_runs.status values. Allowed by the lite-hexagonal
+// dependency direction (infrastructure may depend on domain).
+import { SYNC_RUN_STATUSES } from '../../domain/types/sync-run-status.js';
 
 // ----------------------------------------------------------------------------
 // 1. cycles — physiological cycle (WHOOP v2; integer int64 id per A6).
@@ -220,10 +224,13 @@ export const sync_runs = sqliteTable('sync_runs', {
   started_at: text('started_at').notNull(),
   finished_at: text('finished_at'),
   status: text('status', {
-    // 'aborted' added (#15 + #35) for crash recovery — sync_runs rows
-    // whose process died (SIGINT/SIGTERM/hard kill) are reclassified by
-    // the signal handler or by bootstrap's stale-row sweep.
-    enum: ['running', 'ok', 'partial', 'failed', 'aborted'],
+    // DBIN-01 (#75): the five-state enum lives in domain/types/sync-run-status.ts;
+    // Drizzle / Zod / QueryCache / repo byStatus all import the same constant so
+    // a future addition lands in every consumer in lockstep. madge --circular
+    // src/ in CI guards against an ESM cycle that would resolve to undefined.
+    // 'aborted' was added (#15 + #35) for crash recovery. The spread preserves
+    // the literal types Drizzle needs for column-type inference.
+    enum: [...SYNC_RUN_STATUSES],
   }).notNull(),
   per_resource: text('per_resource').notNull().default('{}'),
   gaps_detected: integer('gaps_detected').notNull().default(0),
