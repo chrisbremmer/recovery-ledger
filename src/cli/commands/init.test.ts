@@ -225,6 +225,35 @@ describe('runInitCommand', () => {
     expect(src).not.toMatch(/z\.object\(/);
   });
 
+  // SECH-02 (#79): the outer catch arm must wrap String(err) in sanitize()
+  // so a token-bearing error message (e.g. an EACCES path that interpolates
+  // a secret) cannot reach stdout. Mock node:fs/promises so mkdir throws
+  // with a synthetic accessToken= leak.
+  test('I-11 SECH-02 — outer-catch sanitizes thrown error message (#79)', async () => {
+    process.env.WHOOP_CLIENT_ID = 'envid';
+    process.env.WHOOP_CLIENT_SECRET = 'envsec';
+    mockReadline([]);
+    vi.doMock('node:fs/promises', async () => {
+      const actual = await vi.importActual<typeof import('node:fs/promises')>('node:fs/promises');
+      return {
+        ...actual,
+        mkdir: vi.fn(async () => {
+          throw new Error(
+            "EACCES: permission denied, mkdir '/home/user/.recovery-ledger': accessToken=secret_value_xyz",
+          );
+        }),
+      };
+    });
+    vi.resetModules();
+    const { runInitCommand } = await import('./init.js');
+    await runInitCommand({});
+
+    expect(exitCode).not.toBe(0);
+    expect(writtenBody).not.toContain('secret_value_xyz');
+    expect(writtenBody).toContain('accessToken=<redacted>');
+    vi.doUnmock('node:fs/promises');
+  });
+
   test('INIT_EXIT_CODES is frozen', async () => {
     vi.resetModules();
     const { INIT_EXIT_CODES } = await import('./init.js');

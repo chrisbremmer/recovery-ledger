@@ -18,7 +18,8 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { logger } from '../infrastructure/config/logger.js';
 import { isMigrationError } from '../infrastructure/db/migrate.js';
-import { serializeError } from '../infrastructure/observability/sanitize.js';
+// SECH-02 (#79): logger.fatal `err` field wrapped in sanitize() before Pino.
+import { sanitize, serializeError } from '../infrastructure/observability/sanitize.js';
 import { bootstrap } from '../services/index.js';
 import { registerDailyDecisionBrief } from './prompts/daily-decision-brief.js';
 import { registerDeloadOrTrain } from './prompts/deload-or-train.js';
@@ -61,13 +62,13 @@ try {
         event: 'bootstrap_failed',
         kind: err.kind,
         backupPath: err.backupPath,
-        err: serializeError(err),
+        err: sanitize(serializeError(err)),
       },
       'MCP startup failed (migration error); pre-migration backup at the path above. Run `recovery-ledger doctor` for diagnostics.',
     );
   } else {
     logger.fatal(
-      { event: 'bootstrap_failed', err: serializeError(err) },
+      { event: 'bootstrap_failed', err: sanitize(serializeError(err)) },
       'MCP startup failed; run `recovery-ledger doctor` for diagnostics.',
     );
   }

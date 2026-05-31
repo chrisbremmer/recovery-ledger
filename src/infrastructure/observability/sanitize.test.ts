@@ -689,6 +689,67 @@ describe('SECH-01 matrix — camelCase token-key coverage (#78)', () => {
   });
 });
 
+// SECH-02 (#79): error-path fixtures for the doctor / init / MCP / token-store
+// sites that now call sanitize(). Each fixture mirrors a real error shape
+// observed at the trust boundary the new wrap protects.
+describe('SECH-02 error-path fixtures — doctor/init/MCP/token-store (#79)', () => {
+  test('F-SECH-02-01 — whoop-roundtrip 401 cause chain redacts Bearer token from err.message', () => {
+    const err = new Error('roundtrip outer', {
+      cause: new Error('Authorization: Bearer leaked_token_xxxxxxxxxx'),
+    });
+    const out = sanitize(serializeError(err));
+    expect(out).not.toContain('leaked_token_xxxxxxxxxx');
+    expect(out).toContain('Bearer <redacted>');
+  });
+
+  test('F-SECH-02-02 — init outer-catch redacts accessToken= leaked via mkdir EACCES', () => {
+    const err = new Error(
+      "EACCES: permission denied, mkdir '/home/user/.recovery-ledger': accessToken=leaked_secret_value_xyz",
+    );
+    const out = sanitize(String(err));
+    expect(out).not.toContain('leaked_secret_value_xyz');
+    expect(out).toContain('accessToken=<redacted>');
+  });
+
+  test('F-SECH-02-03 — MCP fatal MigrationError cause chain redacts clientSecret=hunter2', () => {
+    const err: Error & { kind?: string; backupPath?: string } = Object.assign(
+      new Error('migrate failed'),
+      {
+        kind: 'migration_failed',
+        backupPath: '/tmp/x',
+        cause: new Error('schema drift: clientSecret=hunter2'),
+      },
+    );
+    const out = sanitize(serializeError(err));
+    expect(out).not.toContain('hunter2');
+    expect(out).toContain('clientSecret=<redacted>');
+  });
+
+  test('F-SECH-02-04 — token-store doRefresh body excerpt redacts refreshToken + clientSecret, preserves grant_type', () => {
+    const err = new Error(
+      'UND_ERR_CONNECT_TIMEOUT — body: grant_type=refresh_token&refreshToken=rt_xyz_secret&clientSecret=cs_xyz_secret',
+    );
+    const out = sanitize(String(err));
+    expect(out).not.toContain('rt_xyz_secret');
+    expect(out).not.toContain('cs_xyz_secret');
+    expect(out).toContain('refreshToken=<redacted>');
+    expect(out).toContain('clientSecret=<redacted>');
+    // The non-secret grant_type marker survives as an audit anchor.
+    expect(out).toContain('grant_type=refresh_token');
+  });
+
+  test('F-SECH-02-05 — sanitize is idempotent (SECH-02 defense — double-wrap matches single-wrap)', () => {
+    for (const c of [
+      'Bearer abcdef1234567890',
+      '{"accessToken":"sec"}',
+      '?refresh_token=rt&x=1',
+      "{ clientSecret: 'shh' }",
+    ]) {
+      expect(sanitize(sanitize(c))).toBe(sanitize(c));
+    }
+  });
+});
+
 // Phase 2 Plan 02-07: Negative cases. Pin the length-guard and
 // word-boundary behavior so a future regex change doesn't silently start
 // stripping legitimate words. P4- precedent already covers the bare-Bearer

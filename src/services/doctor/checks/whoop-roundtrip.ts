@@ -13,11 +13,13 @@
 //
 // ADR-0001 (CLAUDE.md §Critical Rules): no console calls, no direct stdout
 // writes from this module. The probe returns a structured DoctorCheck and
-// nothing else. Error-path sanitization happens at the chokepoint: the MCP
-// register() wrapper sanitizes the detail string before it leaves the
-// JSON-RPC boundary, so this probe deliberately does NOT call sanitize()
-// itself (avoiding duplicate sanitization).
-
+// nothing else. SECH-02 (#79): the catch-arm detail string is now wrapped
+// in sanitize() here because CLI doctor's outer catch serializes the detail
+// directly to stdout via renderDoctor/JSON.stringify — the MCP path keeps
+// double-sanitizing (idempotent, locked by sanitize.test.ts).
+//
+// SECH-02 (#79): sanitize wrapper at the catch arm.
+import { sanitize } from '../../../infrastructure/observability/sanitize.js';
 import type { RefreshOrchestrator } from '../../refresh-orchestrator.js';
 import type { DoctorCheck } from '../index.js';
 import { CHECK_NAMES } from './check-names.js';
@@ -77,7 +79,7 @@ export async function probeWhoopRoundtrip(
     return {
       name: CHECK_NAMES.WHOOP_ROUNDTRIP,
       status: 'fail',
-      detail: `roundtrip failed: ${err instanceof Error ? err.message : String(err)}`,
+      detail: `roundtrip failed: ${sanitize(err instanceof Error ? err.message : String(err))}`,
     };
   }
 }
