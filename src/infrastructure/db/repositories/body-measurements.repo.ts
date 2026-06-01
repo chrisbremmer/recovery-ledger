@@ -64,10 +64,19 @@ export function createBodyMeasurementsRepo(db: ReturnType<typeof drizzle>): Body
             .limit(1)
             .get();
 
+          // BACK-01 (#95): SQLite REAL stores 64-bit floats but the wire
+          // shape can re-serialize values with rounding differences below
+          // 6 decimal places, so strict === can flag a no-op write as a
+          // change and emit a duplicate row. A 1e-6 tolerance covers normal
+          // float round-trip noise without masking real measurement deltas
+          // (smallest meaningful change is ~0.01 kg / 0.001 m).
+          const FLOAT_TOL = 1e-6;
+          const closeEnough = (a: number, b: number): boolean =>
+            Math.abs(a - b) < FLOAT_TOL;
           if (
             latestRow &&
-            latestRow.height_meter === measurement.heightMeter &&
-            latestRow.weight_kilogram === measurement.weightKilogram &&
+            closeEnough(latestRow.height_meter, measurement.heightMeter) &&
+            closeEnough(latestRow.weight_kilogram, measurement.weightKilogram) &&
             latestRow.max_heart_rate === measurement.maxHeartRate
           ) {
             return { inserted: false };
