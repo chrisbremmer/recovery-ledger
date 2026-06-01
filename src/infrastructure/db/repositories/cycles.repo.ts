@@ -87,6 +87,13 @@ type CycleRow = typeof cyclesTable.$inferSelect;
 export function createCyclesRepo(db: ReturnType<typeof drizzle>): CyclesRepo {
   return {
     cursor(): string {
+      // BACK-01 (#95): cursor() is intentionally NOT score-state-aware.
+      // The sync loop uses this watermark to ask WHOOP for rows newer
+      // than updated_at; a PENDING_SCORE row whose score lands later
+      // bumps updated_at and gets re-fetched + upserted (promoted to
+      // SCORED). Filtering on score_state here would lose visibility
+      // into late-scoring rows. Documented per #95 tracker so a future
+      // refactor doesn't "fix" this by adding the filter.
       const row = db
         .select({
           cursor: sql<string>`COALESCE(MAX(${cyclesTable.updated_at}), ${EPOCH_ZERO_ISO})`,
