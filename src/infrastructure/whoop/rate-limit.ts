@@ -78,11 +78,22 @@ export function acquire(signal?: AbortSignal): Promise<void> {
     inFlight += 1;
     if (waitMs > 0) {
       return new Promise<void>((resolve, reject) => {
-        const timer = setTimeout(resolve, waitMs);
+        // LIFE-04 + #95 inFlight-leak: gate the abort listener with a
+        // `granted` boolean so the listener is a no-op once the timer
+        // has already resolved the slot. Pre-fix, an abort that fired
+        // AFTER the timer would re-decrement inFlight (because the
+        // listener unconditionally ran), permanently leaking a slot
+        // from the semaphore budget.
+        let granted = false;
+        const timer = setTimeout(() => {
+          granted = true;
+          resolve();
+        }, waitMs);
         if (signal !== undefined) {
           signal.addEventListener(
             'abort',
             () => {
+              if (granted) return;
               clearTimeout(timer);
               // The slot was already accounted for; release it back since
               // the caller never got it.

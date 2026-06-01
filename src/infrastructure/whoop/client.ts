@@ -73,11 +73,24 @@ export async function httpGet<T>(
   schema: z.ZodSchema<T>,
 ): Promise<T> {
   const url = buildUrl(path, query);
-  await acquire();
+  // LIFE-04 (#91): construct the AbortController + timeout BEFORE acquire()
+  // so the same signal also bounds the wait-for-slot. Pre-LIFE-04 the
+  // controller lived inside withRetry, after acquire() already blocked
+  // indefinitely. With 4 concurrent requests stuck in a 30s pre-abort
+  // fetch and the semaphore full, the 5th caller's acquire() had no
+  // deadline. Now both phases share the 30s bound.
+  const slotController = new AbortController();
+  const slotTimeoutId = setTimeout(() => slotController.abort(), HTTP_REQUEST_TIMEOUT_MS);
+  try {
+    await acquire(slotController.signal);
+  } catch (err) {
+    clearTimeout(slotTimeoutId);
+    throw err;
+  }
   let lastRemainingHeader: string | null = null;
   try {
     const result = await withRetry<Response>(async () => {
-      // Fresh AbortController per attempt — a 30s timeout that fires fires
+      // Fresh AbortController per attempt — a 30s timeout that fires
       // a synthesized AbortError so retry.ts can distinguish timeout from
       // a network error and refuse to retry timeouts.
       const controller = new AbortController();
@@ -123,6 +136,10 @@ export async function httpGet<T>(
       });
     }
   } finally {
+    // LIFE-04 (#91): clear the slot-wait timeout once the request lifecycle
+    // is over — the abort would otherwise fire after release() and merely
+    // be a no-op, but clearing keeps the event loop tidy.
+    clearTimeout(slotTimeoutId);
     release(lastRemainingHeader);
   }
 }
