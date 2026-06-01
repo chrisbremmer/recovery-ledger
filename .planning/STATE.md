@@ -1,16 +1,16 @@
 ---
 gsd_state_version: 1.0
 milestone: v1.1
-milestone_name: quality hardening
-status: planning
-last_updated: "2026-05-31T22:00:00.000Z"
-last_activity: 2026-05-31
+milestone_name: Roadmap
+status: Defining requirements
+last_updated: "2026-06-01T18:45:04.392Z"
+last_activity: 2026-05-31 — Milestone v1.1 started
 progress:
-  total_phases: 7
-  completed_phases: 0
-  total_plans: 0
-  completed_plans: 0
-  percent: 0
+  total_phases: 12
+  completed_phases: 1
+  total_plans: 3
+  completed_plans: 9
+  percent: 8
 ---
 
 # State: Recovery Ledger
