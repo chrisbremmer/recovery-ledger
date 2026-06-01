@@ -16,6 +16,8 @@
 
 import type { Logger } from 'pino';
 import { ulid } from 'ulid';
+// DBIN-04 (#88): typed error for missing-id update.
+import { DecisionNotFound } from '../../domain/errors/decision.js';
 import type { Decision } from '../../domain/types/entities.js';
 import type { DecisionsRepo } from '../../infrastructure/db/repositories/decisions.repo.js';
 import type { AddDecisionInput, ReviewDecisionsInput, ReviewDecisionsResult } from './types.js';
@@ -102,10 +104,19 @@ export async function reviewDecisions(
     return { mode: 'list', decisions };
   }
   // input.mode === 'update'
-  deps.repos.decisions.updateOutcome(input.id, input.status, input.notes ?? null);
+  // DBIN-04 (#88): updateOutcome now returns {changed: 0|1}. Throw a typed
+  // DecisionNotFound on 0 so an irreplaceable user write cannot be silently
+  // discarded (Pitfall 7). The byId roundtrip is gone — the repo's UPDATE
+  // changes count is the same signal without the extra read.
+  const result = deps.repos.decisions.updateOutcome(input.id, input.status, input.notes ?? null);
+  if (result.changed === 0) {
+    throw new DecisionNotFound(input.id);
+  }
   const decision = deps.repos.decisions.byId(input.id);
   if (decision === null) {
-    throw new Error(`reviewDecisions: decision not found after update: ${input.id}`);
+    // Defensive: should be unreachable now that changed > 0 implies the row
+    // exists, but the byId read is needed to return the post-update entity.
+    throw new DecisionNotFound(input.id);
   }
   deps.logger.info({ event: 'decision_updated', id: input.id, status: input.status });
   return { mode: 'update', decision };

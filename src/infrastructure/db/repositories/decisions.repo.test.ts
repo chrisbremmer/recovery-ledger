@@ -108,12 +108,20 @@ describe('decisions repo — updateOutcome (DEC-02)', () => {
     expect(row?.outcomeNotes).toBe('slept better, hrv up 8 ms');
   });
 
-  it('Test 5: updateOutcome on a non-existent id is silent (no throw, no row written)', () => {
+  it('Test 5: updateOutcome on a non-existent id is silent at the repo layer (no throw) — DBIN-04 (#88) returns {changed: 0}', () => {
     const repo = createDecisionsRepo(mem.db);
     insertDecision(repo);
-    expect(() => repo.updateOutcome('01HK7XXXXXXXXXXXXXXXXXXXXX', 'abandoned', null)).not.toThrow();
+    const result = repo.updateOutcome('01HK7XXXXXXXXXXXXXXXXXXXXX', 'abandoned', null);
+    expect(result).toEqual({ changed: 0 });
     const count = mem.sqlite.prepare('SELECT COUNT(*) AS c FROM decisions').get() as { c: number };
     expect(count.c).toBe(1);
+  });
+
+  it('Test 5a: updateOutcome on an existing id returns {changed: 1} — DBIN-04 (#88)', () => {
+    const repo = createDecisionsRepo(mem.db);
+    const id = insertDecision(repo);
+    const result = repo.updateOutcome(id, 'followed_up', 'ok');
+    expect(result).toEqual({ changed: 1 });
   });
 
   it('Test 6: repeated updateOutcome with identical args is idempotent', () => {
