@@ -279,7 +279,15 @@ export function createSyncRunsRepo(db: ReturnType<typeof drizzle>): SyncRunsRepo
       // #35 — sweep 'running' rows whose started_at is older than the
       // threshold. The SQLite text column accepts 'aborted' (the schema
       // enum was widened in #15 to include it).
-      const cutoffIso = new Date(Date.now() - thresholdMs).toISOString();
+      //
+      // LIFE-02 (#82): use the injected nowIso for the cutoff math too —
+      // pre-LIFE-02 the cutoff was `new Date(Date.now() - thresholdMs)`
+      // which ignored the injected clock. A test-time fake clock became a
+      // no-op for the WHERE-clause cutoff, masking clock-skew bugs.
+      // Date.parse on an ISO 8601 string is well-defined; subtracting a ms
+      // delta and toISOString'ing preserves the canonical UTC shape.
+      const nowMs = Date.parse(nowIso);
+      const cutoffIso = new Date(nowMs - thresholdMs).toISOString();
       // Go direct via the better-sqlite3 handle on `db.$client` to keep the
       // UPDATE outside any outer transaction (bootstrap calls this before
       // any other write).
