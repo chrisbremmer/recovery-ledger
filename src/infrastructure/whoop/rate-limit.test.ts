@@ -200,4 +200,34 @@ describe('rate-limit semaphore', () => {
     const fresh = [acquire(), acquire(), acquire(), acquire()];
     await expect(Promise.all(fresh)).resolves.toEqual([undefined, undefined, undefined, undefined]);
   });
+
+  // LIFE-04 (#91) + #95 inFlight-leak: abort-after-timer must NOT
+  // re-decrement inFlight. Pre-fix, the deferred-throttle branch
+  // unconditionally ran the abort listener even when the timer had
+  // already granted the slot, permanently leaking one slot per leaked
+  // abort. The `granted` boolean guard fixes it.
+  test('R-10: abort-after-timer (deferred-throttle) does NOT leak inFlight (#91 + #95)', async () => {
+    // Fill the semaphore to capacity, then release one to set
+    // nextAllowedAcquireAt > Date.now(). The next acquire takes the
+    // deferred-throttle branch (waitMs > 0).
+    await Promise.all([acquire(), acquire(), acquire(), acquire()]);
+    release('100'); // remaining=100 → no extra defer (we just need a 0ms-ish gap)
+
+    const ctrl = new AbortController();
+    const next = acquire(ctrl.signal);
+    await next; // timer (waitMs > 0 OR fast-path) granted the slot
+
+    // LATE abort: should be a no-op for inFlight bookkeeping.
+    ctrl.abort();
+
+    // Release all 4 slots; subsequent 4 acquires resolve immediately.
+    // If inFlight had leaked, one of these would be stuck.
+    release(null);
+    release(null);
+    release(null);
+    release(null);
+
+    const fresh = await Promise.all([acquire(), acquire(), acquire(), acquire()]);
+    expect(fresh).toEqual([undefined, undefined, undefined, undefined]);
+  });
 });
