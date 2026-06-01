@@ -276,14 +276,26 @@ export function bootstrap(opts: BootstrapOptions = {}): Bootstrapped {
   // in-flight run to 'aborted'. 6h covers the largest plausible sync
   // (multi-year backfill including 429 backoff) with margin.
   const RECLASSIFY_THRESHOLD_MS = 6 * 60 * 60 * 1000;
-  const reclassified = repos.syncRuns.reclassifyStaleRunning(
-    RECLASSIFY_THRESHOLD_MS,
-    new Date().toISOString(),
-  );
-  if (reclassified > 0) {
-    // LIFE-02 (#82): log includes count so a future doctor probe can
-    // correlate the bootstrap sweep with subsequent recency anomalies.
-    log.warn({ event: 'sync_runs_stale_reclassified', count: reclassified });
+  // BACK-01 (#95): wrap reclassifyStaleRunning in try/catch — a missed
+  // sweep is non-fatal (the orphan rows just stay 'running' for another
+  // boot cycle) and must not block bootstrap. Pre-fix any throw here
+  // (locked-DB write, schema drift, prepared-statement failure)
+  // bubbled up and prevented bootstrap from completing.
+  try {
+    const reclassified = repos.syncRuns.reclassifyStaleRunning(
+      RECLASSIFY_THRESHOLD_MS,
+      new Date().toISOString(),
+    );
+    if (reclassified > 0) {
+      // LIFE-02 (#82): log includes count so a future doctor probe can
+      // correlate the bootstrap sweep with subsequent recency anomalies.
+      log.warn({ event: 'sync_runs_stale_reclassified', count: reclassified });
+    }
+  } catch (err) {
+    log.warn({
+      event: 'sync_runs_stale_reclassify_failed',
+      err: err instanceof Error ? err.message : String(err),
+    });
   }
 
   const whoop: RunSyncDeps['whoop'] = {
