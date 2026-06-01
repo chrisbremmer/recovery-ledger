@@ -17,6 +17,8 @@
 
 import type { Cycle, Decision, Recovery, Sleep, Workout } from '../../domain/types/entities.js';
 import type { ResourceName } from '../../domain/types/sync.js';
+// DBIN-01 (#75): shared 5-state SyncRunStatus type.
+import type { SyncRunStatus } from '../../domain/types/sync-run-status.js';
 
 /**
  * Per-resource typed input for `services.queryCache(input)`. D-24
@@ -94,7 +96,9 @@ export type QueryCacheInput =
     }
   | {
       resource: 'sync_runs';
-      status?: 'ok' | 'partial' | 'failed' | 'running';
+      // DBIN-01 (#75): use the shared SyncRunStatus union so a future enum
+      // change (e.g., 'cancelled') lands in every consumer in lockstep.
+      status?: SyncRunStatus;
       since?: string;
       limit?: number;
     }

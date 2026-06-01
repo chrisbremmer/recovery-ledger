@@ -223,3 +223,40 @@ describe('sync-runs repo — latestFinished() D-03 data-status anchor', () => {
     expect(repo.latestFinished()?.status).toBe('partial');
   });
 });
+
+// DBIN-01 (#75): round-trip an 'aborted' row through the typed repo and
+// re-parse it via SyncRunEntitySchema. Before DBIN-01 the Zod enum lacked
+// 'aborted' and this parse would have thrown, silently hiding crash-recovery
+// rows from MCP / data-quality probes / contract validation.
+describe("sync-runs repo — DBIN-01 'aborted' enum round-trip (#75)", () => {
+  let mem: InMemoryDbResult;
+  beforeEach(() => {
+    mem = createInMemoryDb();
+  });
+  afterEach(() => mem.close());
+
+  it("byStatus('aborted') returns a reclassified row, parseable via SyncRunEntitySchema", async () => {
+    const repo = createSyncRunsRepo(mem.db);
+    const id = repo.insertRunning({ startedAt: '2026-05-16T10:00:00.000Z', flags: null });
+    // Reclassify with a 0ms threshold so the in-flight row immediately
+    // becomes 'aborted'.
+    const reclassified = repo.reclassifyStaleRunning(0, '2026-05-16T11:00:00.000Z');
+    expect(reclassified).toBe(1);
+
+    const rows = repo.byStatus('aborted', undefined, 10);
+    expect(rows).toHaveLength(1);
+    expect(rows[0]?.id).toBe(id);
+    expect(rows[0]?.status).toBe('aborted');
+
+    // Re-parse via the Zod entity schema. Pre-DBIN-01 this would have
+    // thrown because the enum lacked 'aborted'.
+    const { SyncRunEntitySchema } = await import('../../../domain/schemas/entities.js');
+    expect(() => SyncRunEntitySchema.parse(rows[0])).not.toThrow();
+  });
+
+  it('SYNC_RUN_STATUSES is the single source of truth for Drizzle / Zod / QueryCache (#75)', async () => {
+    const { SYNC_RUN_STATUSES } = await import('../../../domain/types/sync-run-status.js');
+    expect(SYNC_RUN_STATUSES).toEqual(['running', 'ok', 'partial', 'failed', 'aborted']);
+    expect(SYNC_RUN_STATUSES).toContain('aborted');
+  });
+});
