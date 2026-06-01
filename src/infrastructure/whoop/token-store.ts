@@ -369,7 +369,30 @@ export function createTokenStore(opts: TokenStoreOptions = {}): TokenStore {
       // GATE 3: atomic write. Call writeUnderLock — the cross-process lock is
       // already held by `doRefresh`'s outer scope; the public `write()` would
       // try to re-acquire the same lock and deadlock.
-      await writeUnderLock(next);
+      try {
+        await writeUnderLock(next);
+      } catch (writeErr) {
+        // ERRC-02 (#87): the rotated token landed in memory but persistence
+        // failed (mkdir EACCES, EROFS, disk full, keyring setPassword threw,
+        // atomic-rename error). WHOOP has already consumed the prior refresh
+        // token, so leaving the OLD refreshToken on disk would burn the
+        // family on the NEXT process start. Surface a loud typed
+        // `refresh_failed` so the caller forces re-auth instead of silently
+        // retrying with the stale on-disk token. ADR-0002 §Enforcement makes
+        // this rule explicit: a refresh whose HTTP response succeeded but
+        // whose write failed MUST force re-auth.
+        //
+        // The in-flight session can still use `next` from memory — that
+        // window is intentional (the rotated access token works for ~1h),
+        // but the caller can prefer the loud error if it'd rather re-auth
+        // immediately. We throw here so the typed signal reaches the
+        // refresh-orchestrator chokepoint unambiguously.
+        throw new AuthError({
+          kind: 'refresh_failed',
+          detail: 'rotated tokens received but write failed — run `recovery-ledger auth`',
+          cause: writeErr,
+        });
+      }
       return next;
     } finally {
       await release();

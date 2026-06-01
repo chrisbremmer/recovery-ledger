@@ -978,3 +978,76 @@ describe('real lockfile smoke-test (WR-A correction of WR-05)', () => {
     });
   });
 });
+
+// =============================================================================
+// describe('ERRC-02 refresh-write atomicity (#87)') — refresh response landed
+// but writeUnderLock failed → loud AuthError({kind:'refresh_failed'}) so the
+// caller forces re-auth instead of letting next sync burn the family.
+// =============================================================================
+
+describe('ERRC-02 refresh-write atomicity (#87)', () => {
+  test('R-01: writeUnderLock failure inside doRefresh throws AuthError({kind:refresh_failed})', async () => {
+    // setThrows=true makes the keyring fail; getMismatch=true makes the
+    // round-trip read mismatch (defense-in-depth). Together they force the
+    // file-fallback path; we then make node:fs/promises.writeFile throw so
+    // the atomic-rename pipeline cannot persist the rotated tokens.
+    const kr = installKeyringMock({ setThrows: true });
+    installLockfileMock();
+    const now = Date.UTC(2026, 4, 12, 0, 0, 0);
+    seedExpiredKeyringToken(kr, now);
+
+    // Mock fs/promises.rename to throw for the canonical tokens.json
+    // path. The token-store writes via writeFileAtomic (open + fd.writeFile
+    // + sync + rename); failing the final rename surfaces as a thrown error
+    // that propagates back out of writeUnderLock.
+    vi.doMock('node:fs/promises', async () => {
+      const actual = await vi.importActual<typeof import('node:fs/promises')>('node:fs/promises');
+      return {
+        ...actual,
+        rename: vi.fn(async (from: string | URL, to: string | URL) => {
+          const toStr = typeof to === 'string' ? to : to.toString();
+          if (toStr.endsWith('tokens.json')) {
+            throw Object.assign(new Error('synthetic rename failure (EROFS)'), {
+              code: 'EROFS',
+            });
+          }
+          return actual.rename(from, to);
+        }),
+      };
+    });
+
+    const mod = await loadTokenStore();
+    const store = mod.createTokenStore({ paths, now: () => now });
+    await writeFile(paths.storageModeFile, 'keychain\n', { mode: 0o600 });
+
+    let caught: unknown = null;
+    try {
+      await store.getValidAccessToken();
+    } catch (err) {
+      caught = err;
+    }
+
+    const { AuthError, isAuthError } = await import('../../domain/errors/auth.js');
+    // Diagnostic: surface the shape if the test fails so the cause is
+    // visible without re-running.
+    if (!isAuthError(caught)) {
+      throw new Error(
+        `expected AuthError(refresh_failed), got: ${
+          caught instanceof Error ? `${caught.name}: ${caught.message}` : String(caught)
+        }`,
+      );
+    }
+    expect(caught).toBeInstanceOf(AuthError);
+    if (caught instanceof AuthError) {
+      expect(caught.kind).toBe('refresh_failed');
+      expect(caught.message).toMatch(/rotated tokens received but write failed/);
+      expect(caught.cause).toBeDefined();
+    }
+    // The WHOOP refresh endpoint WAS hit — the rotated token landed in
+    // memory but the persistence step failed; this is the race the bug
+    // describes.
+    expect(helper.getRefreshHitCount()).toBe(1);
+
+    vi.doUnmock('node:fs/promises');
+  });
+});
