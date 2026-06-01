@@ -17,7 +17,7 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { isMigrationError } from '../domain/errors/migration.js';
-import { logger } from '../infrastructure/config/logger.js';
+import { flushLoggerSync, logger } from '../infrastructure/config/logger.js';
 // SECH-02 (#79): logger.fatal `err` field wrapped in sanitize() before Pino.
 import { sanitize, serializeError } from '../infrastructure/observability/sanitize.js';
 import { bootstrap } from '../services/index.js';
@@ -72,6 +72,11 @@ try {
       'MCP startup failed; run `recovery-ledger doctor` for diagnostics.',
     );
   }
+  // BACK-01 (#95): flush the buffered SonicBoom destination before
+  // process.exit so the fatal log frame always reaches stderr — without
+  // this the buffered transport may drop the record under fast-exit
+  // conditions.
+  flushLoggerSync();
   process.exit(1);
 }
 

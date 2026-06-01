@@ -90,3 +90,22 @@ export function createLogger(env: LoggerEnv): Logger {
 // via `createLogger({ NODE_ENV: 'development' })` to exercise the dev arm
 // without setting NODE_ENV on the test process itself.
 export const logger = createLogger(process.env);
+
+// BACK-01 (#95): explicit synchronous flush helper for shutdown paths.
+// Pino's `sync: false` SonicBoom destination buffers writes; the buffer
+// drains on graceful exit and `process.on('beforeExit')`, but a hard
+// kill or pre-exit fatal skips that path. Production callers that own
+// the shutdown sequence (sync.ts's installAbortHandlers, MCP's
+// logger.fatal hot-paths) can invoke this before process.exit so
+// structured fatals always reach stderr. We deliberately do NOT install
+// signal handlers in this module — that would conflict with sync.ts's
+// installAbortHandlers which has its own sync_runs cleanup semantics.
+// Each shutdown owner is responsible for calling logger.flush() at
+// the right moment.
+export function flushLoggerSync(): void {
+  try {
+    logger.flush();
+  } catch {
+    // best-effort — never let a flush error mask the shutdown path.
+  }
+}
