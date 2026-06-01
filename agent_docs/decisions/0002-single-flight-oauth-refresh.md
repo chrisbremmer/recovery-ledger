@@ -80,6 +80,14 @@ all callers go through it.
 - Contract test that spawns two concurrent calls to
   `getValidAccessToken()` and asserts the WHOOP refresh endpoint is hit
   exactly once.
+- **ERRC-02 (#87) — refresh-write atomicity:** a refresh response whose
+  HTTP succeeded but whose `writeUnderLock` failed (mkdir EACCES, EROFS,
+  disk full, keyring `setPassword` threw, rename failure) MUST surface
+  `AuthError({kind: 'refresh_failed'})` so the caller forces re-auth.
+  Silently retrying with the stale on-disk refresh token after the
+  rotated pair was already consumed by WHOOP burns the family on the
+  next process invocation. Locked by
+  `src/infrastructure/whoop/token-store.test.ts` R-01.
 
 ## Cross-references
 
