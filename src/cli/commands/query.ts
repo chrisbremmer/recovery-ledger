@@ -11,14 +11,13 @@
 //   invalid_input    = 1   unknown resource OR flag/resource mismatch
 //   bootstrap_failed = 1
 
-import { isMigrationError } from '../../domain/errors/migration.js';
+// ARCH-04+ARCH-05 path imports left below; see tryBootstrap import.
 import { renderQueryCache } from '../../formatters/query-cache.txt.js';
-import { formatBootstrapError } from '../../formatters/sync.txt.js';
 import { logger } from '../../infrastructure/config/logger.js';
-import { paths } from '../../infrastructure/config/paths.js';
 import { sanitize, serializeError } from '../../infrastructure/observability/sanitize.js';
 import type { QueryCacheInput } from '../../services/cache/types.js';
-import { type Bootstrapped, bootstrap } from '../../services/index.js';
+// ARCH-05 (#93): shared bootstrap-error rendering.
+import { tryBootstrap } from '../lib/with-bootstrap.js';
 
 export const QUERY_EXIT_CODES: Readonly<Record<string, number>> = Object.freeze({
   ok: 0,
@@ -287,19 +286,15 @@ export async function runQueryCommand(resource: string, opts: RunQueryCommandOpt
     return;
   }
 
-  // 3. Bootstrap.
-  let app: Bootstrapped;
-  try {
-    app = bootstrap();
-  } catch (err) {
-    const body = isMigrationError(err)
-      ? formatBootstrapError(err, paths.dbFile)
-      : `Bootstrap failed: ${sanitize(String(err))}`;
-    process.stdout.write(`${body}\n`, () => {
-      process.exit(QUERY_EXIT_CODES.bootstrap_failed);
+  // 3. Bootstrap (ARCH-05 #93: shared try-helper).
+  const boot = tryBootstrap(QUERY_EXIT_CODES.bootstrap_failed ?? 1);
+  if (!boot.ok) {
+    process.stdout.write(`${boot.body}\n`, () => {
+      process.exit(boot.exitCode);
     });
     return;
   }
+  const app = boot.app;
 
   // 4 & 5. Service + render. Wrap in try/catch so a repo or
   // formatter failure surfaces a structured log on stderr and a non-zero

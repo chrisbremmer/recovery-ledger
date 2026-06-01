@@ -31,13 +31,13 @@ import { z } from 'zod';
 // WhoopApiError helpers. Pre-ARCH-04 both pulled from the infrastructure
 // re-export — two class identities under vi.resetModules + drift risk.
 import { formatAuthError, isAuthError } from '../../domain/errors/auth.js';
-import { isMigrationError } from '../../domain/errors/migration.js';
 import { RESOURCE_NAMES_SET, type ResourceName } from '../../domain/types/sync.js';
-import { formatBootstrapError, formatSyncResult } from '../../formatters/sync.txt.js';
-import { paths } from '../../infrastructure/config/paths.js';
+import { formatSyncResult } from '../../formatters/sync.txt.js';
 import { sanitize } from '../../infrastructure/observability/sanitize.js';
 import { formatWhoopApiError, isWhoopApiError } from '../../infrastructure/whoop/errors.js';
-import { type Bootstrapped, bootstrap } from '../../services/index.js';
+// ARCH-05 (#93): shared bootstrap-error rendering.
+import type { Bootstrapped } from '../../services/index.js';
+import { tryBootstrap } from '../lib/with-bootstrap.js';
 
 // INPV-01 (#80): strict YYYY-MM-DD or full ISO 8601 — no locale-dependent coercion.
 const SinceSchema = z.union([z.iso.date(), z.iso.datetime()]);
@@ -168,21 +168,17 @@ export async function runSyncCommand(opts: RunSyncCommandOpts): Promise<void> {
     return;
   }
 
-  // 3. Bootstrap (open DB + run migrator). MigrationError is the typed
-  // failure shape; surface via formatBootstrapError which includes the
-  // `cp <backupPath>` remediation per D-08.
-  let app: Bootstrapped;
-  try {
-    app = bootstrap();
-  } catch (err) {
-    const body = isMigrationError(err)
-      ? formatBootstrapError(err, paths.dbFile)
-      : `Bootstrap failed: ${sanitize(String(err))}`;
-    process.stdout.write(`${body}\n`, () => {
-      process.exit(SYNC_EXIT_CODES.bootstrap_failed);
+  // 3. Bootstrap (open DB + run migrator). ARCH-05 (#93): shared
+  // try-helper renders MigrationError via formatBootstrapError + the
+  // generic fallback in lockstep with the other CLI shims.
+  const boot = tryBootstrap(SYNC_EXIT_CODES.bootstrap_failed ?? 1);
+  if (!boot.ok) {
+    process.stdout.write(`${boot.body}\n`, () => {
+      process.exit(boot.exitCode);
     });
     return;
   }
+  const app = boot.app;
 
   // 3a. Install SIGINT / SIGTERM handlers so a Ctrl-C mid-sync flips the
   // in-flight `sync_runs.status='running'` row to `'aborted'` instead of
