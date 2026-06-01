@@ -266,7 +266,19 @@ rm -f /tmp/gate-e.$$
 # fixtures, and that is fine; the chokepoint applies to production
 # modules, not their unit tests.
 # ----------------------------------------------------------------------------
-FETCH_RE='\bfetch\s*\('
+# TSTC-02 (#90): widen the regex to catch alias-bypass shapes.
+# Pre-TSTC-02 `\bfetch\s*\(` only matched literal `fetch(`. Trivial
+# bypass: `const f = globalThis.fetch; f(url, ...)`. The token-store
+# already uses a variant of this pattern as a test seam
+# (`const fetchFn = opts.fetch ?? globalThis.fetch; fetchFn(URL, ...)`),
+# so a future module could copy it and silently bypass the chokepoint.
+# Three patterns now caught:
+#   1. literal `fetch(`
+#   2. `globalThis.fetch` or `global.fetch` references (anywhere — covers
+#      aliasing AND direct call sites like `globalThis.fetch(url)`)
+#   3. `= fetch` aliasing (`const f = fetch;`) — bare identifier on the
+#      right-hand side of an assignment
+FETCH_RE='(\bfetch\s*\(|\b(globalThis|global)\.fetch\b|=\s*fetch\b)'
 
 if "$GREP" -rEn "$FETCH_RE" --include='*.ts' src/ 2>/dev/null \
    | "$GREP" -Ev '^src/infrastructure/whoop/client\.ts:' \
@@ -275,7 +287,7 @@ if "$GREP" -rEn "$FETCH_RE" --include='*.ts' src/ 2>/dev/null \
    | "$GREP" -Ev '\.test\.ts:' \
    > /tmp/gate-f.$$; then
   if [ -s /tmp/gate-f.$$ ]; then
-    echo "::error::Gate F — fetch( outside src/infrastructure/whoop/{client,token-store,oauth}.ts:"
+    echo "::error::Gate F — fetch (or globalThis.fetch alias) outside src/infrastructure/whoop/{client,token-store,oauth}.ts:"
     cat /tmp/gate-f.$$
     rm -f /tmp/gate-f.$$
     exit 1
