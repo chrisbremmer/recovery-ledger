@@ -259,18 +259,25 @@ export function bootstrap(opts: BootstrapOptions = {}): Bootstrapped {
   };
 
   // #35 — sweep any `sync_runs.status='running'` rows that are older
-  // than 1 hour. These are orphans from a crashed prior process: SIGINT
-  // / SIGTERM is now handled (#15) but a hard kill (`kill -9`, OOM,
-  // power loss) cannot install a cleanup, so the running row stays
-  // forever and masks subsequent failures. 1 hour is comfortably above
-  // the largest plausible sync time (full multi-year backfill at p99
-  // WHOOP latency) so we will not reclassify an actually-in-flight run.
-  const RECLASSIFY_THRESHOLD_MS = 60 * 60 * 1000;
+  // than the threshold. These are orphans from a crashed prior process:
+  // SIGINT / SIGTERM is now handled (#15) but a hard kill (`kill -9`,
+  // OOM, power loss) cannot install a cleanup, so the running row stays
+  // forever and masks subsequent failures.
+  //
+  // LIFE-02 (#82): widened threshold from 1h to 6h. A long-running CLI
+  // `sync --since 2020-01-01` (full backfill) plausibly exceeds 1h at p99
+  // WHOOP latency; if an MCP server started during the backfill, the 1h
+  // threshold would race the CLI's eventual finalize() and flip a still-
+  // in-flight run to 'aborted'. 6h covers the largest plausible sync
+  // (multi-year backfill including 429 backoff) with margin.
+  const RECLASSIFY_THRESHOLD_MS = 6 * 60 * 60 * 1000;
   const reclassified = repos.syncRuns.reclassifyStaleRunning(
     RECLASSIFY_THRESHOLD_MS,
     new Date().toISOString(),
   );
   if (reclassified > 0) {
+    // LIFE-02 (#82): log includes count so a future doctor probe can
+    // correlate the bootstrap sweep with subsequent recency anomalies.
     log.warn({ event: 'sync_runs_stale_reclassified', count: reclassified });
   }
 

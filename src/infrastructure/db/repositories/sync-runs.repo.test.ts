@@ -261,6 +261,40 @@ describe("sync-runs repo — DBIN-01 'aborted' enum round-trip (#75)", () => {
   });
 });
 
+describe('sync-runs repo — LIFE-02 reclassifyStaleRunning honors injected nowIso (#82)', () => {
+  let mem: InMemoryDbResult;
+  beforeEach(() => {
+    mem = createInMemoryDb();
+  });
+  afterEach(() => mem.close());
+
+  it('cutoff is computed from the injected nowIso (not Date.now)', () => {
+    const repo = createSyncRunsRepo(mem.db);
+    // Seed a running row at 2026-05-15T00:00:00Z.
+    repo.insertRunning({ startedAt: '2026-05-15T00:00:00.000Z', flags: null });
+
+    // Inject a "now" of 2026-05-15T00:30:00Z with 1h threshold.
+    // cutoff = 2026-05-14T23:30:00Z. The row's started_at (00:00:00) is
+    // AFTER the cutoff, so it must NOT be reclassified — the injected
+    // clock proves the time window even though wall-clock Date.now is
+    // months ahead and would otherwise sweep this row.
+    const ONE_HOUR_MS = 60 * 60 * 1000;
+    const reclassified = repo.reclassifyStaleRunning(ONE_HOUR_MS, '2026-05-15T00:30:00.000Z');
+    expect(reclassified).toBe(0);
+  });
+
+  it('reclassifies when the injected nowIso minus threshold passes the started_at', () => {
+    const repo = createSyncRunsRepo(mem.db);
+    repo.insertRunning({ startedAt: '2026-05-15T00:00:00.000Z', flags: null });
+
+    // Inject "now" 2h later with 1h threshold; cutoff is 2026-05-15T01:00:00Z,
+    // strictly after the row's 00:00:00 start.
+    const ONE_HOUR_MS = 60 * 60 * 1000;
+    const reclassified = repo.reclassifyStaleRunning(ONE_HOUR_MS, '2026-05-15T02:00:00.000Z');
+    expect(reclassified).toBe(1);
+  });
+});
+
 describe('sync-runs repo — DBIN-05 wal_checkpoint incomplete escalation (#94)', () => {
   let mem: InMemoryDbResult;
   beforeEach(() => {
