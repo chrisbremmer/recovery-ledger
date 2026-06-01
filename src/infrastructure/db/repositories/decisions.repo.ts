@@ -40,13 +40,16 @@ export interface DecisionsRepo {
    *  count as a data-quality signal. */
   listOpen(): Decision[];
   /** DEC-02 outcome write. Idempotent: writing the same status + notes
-   *  twice is a no-op. A non-existent id silently no-ops (0 rows changed);
-   *  the caller verifies via `byId(id)` if surfacing an error is desired. */
+   *  twice is a no-op. DBIN-04 (#88): returns `{ changed: 0 | 1 }` so the
+   *  service layer can throw a typed `DecisionNotFound` when the id is
+   *  missing — pre-DBIN-04 the caller detected the miss via a racy
+   *  `byId(id)` roundtrip. Repo stays data-only (no thrown errors here);
+   *  the caller wraps with the typed throw. */
   updateOutcome(
     id: string,
     status: 'open' | 'followed_up' | 'abandoned',
     notes: string | null,
-  ): void;
+  ): { changed: number };
   /** D-22 weekly-prompt gating. Returns the count of rows whose
    *  `created_at >= date`. `date` is any ISO-8601 string (yyyy-mm-dd or
    *  full timestamp) — SQLite lexicographic comparison gives correct
@@ -104,16 +107,19 @@ export function createDecisionsRepo(db: ReturnType<typeof drizzle>): DecisionsRe
       return rows.map(rowToDecision);
     },
 
-    updateOutcome(id, status, notes): void {
+    updateOutcome(id, status, notes): { changed: number } {
       // Pitfall 13: explicit `behavior: 'immediate'` so the BEGIN locks
       // the database up front. A deferred BEGIN can upgrade mid-flight
-      // and defeat the per-connection busy_timeout.
-      db.transaction(
+      // and defeat the per-connection busy_timeout. DBIN-04 (#88): returns
+      // the changes count so the service layer can throw on a missing id.
+      return db.transaction(
         (tx) => {
-          tx.update(decisionsTable)
+          const result = tx
+            .update(decisionsTable)
             .set({ status, outcome_notes: notes })
             .where(eq(decisionsTable.id, id))
             .run();
+          return { changed: result.changes };
         },
         { behavior: 'immediate' },
       );

@@ -185,6 +185,24 @@ describe('services/decision — reviewDecisions update mode (D-21)', () => {
       reviewDecisions({ mode: 'update', id: '01HK7XXXXXXXXXXXXXXXXXXXXX', status: 'open' }, h.deps),
     ).rejects.toThrow(/not found/);
   });
+
+  it('Test 8a: update mode on a missing id throws DecisionNotFound with the id (DBIN-04 #88)', async () => {
+    const { DecisionNotFound, isDecisionNotFound } = await import(
+      '../../domain/errors/decision.js'
+    );
+    const missing = '01HK7XXXXXXXXXXXXXXXXXXXXX';
+    try {
+      await reviewDecisions({ mode: 'update', id: missing, status: 'open' }, h.deps);
+      throw new Error('expected DecisionNotFound, got success');
+    } catch (err) {
+      expect(err).toBeInstanceOf(DecisionNotFound);
+      expect(isDecisionNotFound(err)).toBe(true);
+      if (err instanceof DecisionNotFound) {
+        expect(err.id).toBe(missing);
+        expect(err.kind).toBe('decision_not_found');
+      }
+    }
+  });
 });
 
 describe('services/decision — T-04-S2 injection-style payloads round-trip', () => {
