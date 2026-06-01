@@ -75,6 +75,17 @@ export interface SyncRunsRepo {
   // `whoop_query_cache resource=sync_runs status=aborted` returns crash-
   // recovery rows. The shared SyncRunStatus type is the single source.
   byStatus(status: SyncRunStatus | undefined, since: string | undefined, limit: number): SyncRun[];
+  /** DBIN-05 (#94): record a `walCheckpointIncomplete:true` marker in this
+   *  run's `flags` JSON so the doctor can surface back-to-back checkpoint
+   *  failures alongside the existing db_wal_size probe. Repo stays data-only;
+   *  the orchestrator decides when to mark. Merge-preserving — existing
+   *  CLI-input echo keys (days/since/resources) survive the update. */
+  markCheckpointIncomplete(id: number): void;
+  /** DBIN-05 (#94): true iff the most recent finished sync_run (status ∈
+   *  {ok, partial}, excluding any in-flight `running` rows) carries the
+   *  `walCheckpointIncomplete:true` marker in its flags JSON. Used to detect
+   *  the "twice-in-a-row" escalation signal. */
+  previousCheckpointWasIncomplete(): boolean;
   /** #35 — bootstrap-time crash recovery. Marks any `running` row whose
    *  `started_at` is older than `thresholdMs` as `aborted`. Returns the
    *  number of rows reclassified. Called by `bootstrap()` after the
@@ -164,6 +175,63 @@ export function createSyncRunsRepo(db: ReturnType<typeof drizzle>): SyncRunsRepo
         .limit(limit)
         .all();
       return rows.map(rowToSyncRun);
+    },
+
+    markCheckpointIncomplete(id): void {
+      // DBIN-05 (#94): merge `{walCheckpointIncomplete: true}` into the
+      // flags JSON in-place. Existing CLI-input echo keys
+      // (days/since/resources) survive — drop-in for the orchestrator's
+      // existing flags shape.
+      db.transaction(
+        (tx) => {
+          const row = tx
+            .select({ flags: syncRunsTable.flags })
+            .from(syncRunsTable)
+            .where(eq(syncRunsTable.id, id))
+            .get();
+          let parsed: Record<string, unknown> = {};
+          if (row?.flags) {
+            try {
+              const candidate = JSON.parse(row.flags) as unknown;
+              if (
+                candidate !== null &&
+                typeof candidate === 'object' &&
+                !Array.isArray(candidate)
+              ) {
+                parsed = candidate as Record<string, unknown>;
+              }
+            } catch {
+              // Non-JSON flags string — treat as empty and overwrite. The
+              // CLI orchestrator always writes a JSON object; this only
+              // matters if a future contributor changes the shape.
+            }
+          }
+          parsed.walCheckpointIncomplete = true;
+          tx.update(syncRunsTable)
+            .set({ flags: JSON.stringify(parsed) })
+            .where(eq(syncRunsTable.id, id))
+            .run();
+        },
+        { behavior: 'immediate' },
+      );
+    },
+
+    previousCheckpointWasIncomplete(): boolean {
+      // DBIN-05 (#94): "twice in a row" detection — return true iff the
+      // IMMEDIATELY-PRECEDING finished run (status ∈ {ok, partial, failed},
+      // excluding `running` and `aborted`) carries the marker. Sort by
+      // started_at DESC + id DESC and take the first match against
+      // `flags LIKE '%"walCheckpointIncomplete":true%'` only when it IS the
+      // immediate predecessor — older incomplete runs don't escalate today's.
+      const row = db
+        .select({ flags: syncRunsTable.flags })
+        .from(syncRunsTable)
+        .where(and(ne(syncRunsTable.status, 'running'), ne(syncRunsTable.status, 'aborted')))
+        .orderBy(desc(syncRunsTable.started_at), desc(syncRunsTable.id))
+        .limit(1)
+        .get();
+      if (row?.flags === null || row?.flags === undefined) return false;
+      return /"walCheckpointIncomplete"\s*:\s*true/.test(row.flags);
     },
 
     byStatus(status, since, limit): SyncRun[] {

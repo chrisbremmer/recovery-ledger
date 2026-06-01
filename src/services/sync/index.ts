@@ -269,6 +269,13 @@ export async function runSync(input: RunSyncInput, deps: RunSyncDeps): Promise<R
     }>;
     const ckpt = ckptResult[0];
     if (ckpt !== undefined && (ckpt.busy === 1 || ckpt.checkpointed < ckpt.log)) {
+      // DBIN-05 (#94): the existing warn-level event is the per-run signal;
+      // detect "twice in a row" against the immediately-preceding finished
+      // run BEFORE we mark this one. If the predecessor already carries the
+      // marker, this is the second consecutive incomplete checkpoint — log
+      // at error level so the doctor's `db_wal_size` probe finds escalating
+      // company in the structured logs.
+      const previousWasIncomplete = deps.repos.syncRuns.previousCheckpointWasIncomplete();
       deps.logger.warn({
         event: 'wal_checkpoint_incomplete',
         syncRunId,
@@ -276,6 +283,15 @@ export async function runSync(input: RunSyncInput, deps: RunSyncDeps): Promise<R
         log: ckpt.log,
         checkpointed: ckpt.checkpointed,
       });
+      deps.repos.syncRuns.markCheckpointIncomplete(syncRunId);
+      if (previousWasIncomplete) {
+        deps.logger.error({
+          event: 'wal_checkpoint_incomplete_consecutive',
+          syncRunId,
+          remediation:
+            'Run `recovery-ledger doctor` to check WAL size; concurrent reader holding the WAL may need to release.',
+        });
+      }
     }
   }
 
