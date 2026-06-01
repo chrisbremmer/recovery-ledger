@@ -46,26 +46,12 @@ import type Database from 'better-sqlite3';
 
 // -----------------------------------------------------------------------------
 // MigrationError lives in `src/domain/errors/migration.ts` (#18). Imported
-// here so the `new MigrationError(...)` throw sites below resolve, and
-// re-exported so existing `import { MigrationError, isMigrationError } from
-// '../../infrastructure/db/migrate.js'` continues to work.
+// here so the `new MigrationError(...)` throw sites below resolve. ARCH-04
+// (#92) deleted the re-exports — every consumer now imports from the
+// canonical domain path. This module owns only the migrator implementation.
 // -----------------------------------------------------------------------------
 
-import {
-  isMigrationError,
-  MIGRATION_ERROR_KINDS,
-  MigrationError,
-  type MigrationErrorInit,
-  type MigrationErrorKind,
-} from '../../domain/errors/migration.js';
-
-export {
-  isMigrationError,
-  MIGRATION_ERROR_KINDS,
-  MigrationError,
-  type MigrationErrorInit,
-  type MigrationErrorKind,
-};
+import { MigrationError } from '../../domain/errors/migration.js';
 
 // -----------------------------------------------------------------------------
 // migrate() — the public entry point. Reads the canonical migration list

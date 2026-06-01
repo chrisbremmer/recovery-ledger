@@ -29,8 +29,11 @@
 // orchestrator (sync/index.ts) owns logging via Pino → stderr.
 
 import { ZodError } from 'zod';
+// ARCH-04 (#92): AuthError helpers from domain; WhoopApiError helper stays
+// in infrastructure.
+import { isAuthError } from '../../domain/errors/auth.js';
 import type { ResourceName, ResourceSyncOutcome, RunSyncStatus } from '../../domain/types/sync.js';
-import { isAuthError, isWhoopApiError } from '../../infrastructure/whoop/errors.js';
+import { isWhoopApiError } from '../../infrastructure/whoop/errors.js';
 
 /**
  * Classify a thrown error from a per-resource pipeline into a D-25

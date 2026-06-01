@@ -26,10 +26,10 @@
 // The decision-add.test.ts T-04-S2 fixtures verify (a) + (b) by asserting
 // the decision text round-trips through the service unchanged.
 
+import { isMigrationError } from '../../domain/errors/migration.js';
 import { renderDecisionDetail } from '../../formatters/decision.txt.js';
 import { formatBootstrapError } from '../../formatters/sync.txt.js';
 import { paths } from '../../infrastructure/config/paths.js';
-import { isMigrationError } from '../../infrastructure/db/migrate.js';
 import { sanitize } from '../../infrastructure/observability/sanitize.js';
 import { type Bootstrapped, bootstrap } from '../../services/index.js';
 

@@ -19,10 +19,10 @@
 //   failed            = 1   getDailyReview threw after bootstrap succeeded
 //   bootstrap_failed  = 1   openDb / migrate threw before service ran
 
+import { isMigrationError } from '../../domain/errors/migration.js';
 import { renderDailyReview } from '../../formatters/daily-review.txt.js';
 import { formatBootstrapError } from '../../formatters/sync.txt.js';
 import { paths } from '../../infrastructure/config/paths.js';
-import { isMigrationError } from '../../infrastructure/db/migrate.js';
 // Cross-layer import: src/infrastructure/observability/sanitize.ts is the single source of truth for
 // secret-bearing pattern redaction. Mirrors the sync.ts cross-layer import.
 import { sanitize } from '../../infrastructure/observability/sanitize.js';

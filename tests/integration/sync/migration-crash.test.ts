@@ -37,8 +37,9 @@ import type { Readable } from 'node:stream';
 import { fileURLToPath } from 'node:url';
 import Database from 'better-sqlite3';
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
+import type { MigrationError } from '../../../src/domain/errors/migration.js';
 import { openDb } from '../../../src/infrastructure/db/connection.js';
-import { type MigrationError, migrate } from '../../../src/infrastructure/db/migrate.js';
+import { migrate } from '../../../src/infrastructure/db/migrate.js';
 
 vi.setConfig({ testTimeout: 15_000 });
 

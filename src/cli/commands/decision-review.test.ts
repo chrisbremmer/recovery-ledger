@@ -240,7 +240,7 @@ describe('runDecisionReviewCommand --interactive (Pitfall 10 stderr discipline)'
 
 describe('runDecisionReviewCommand failure paths', () => {
   test('bootstrap MigrationError → exit bootstrap_failed', async () => {
-    const { MigrationError } = await import('../../infrastructure/db/migrate.js');
+    const { MigrationError } = await import('../../domain/errors/migration.js');
     mockBootstrap(undefined, () => {
       throw new MigrationError({
         kind: 'inconsistent_state',

@@ -19,7 +19,7 @@ import {
   WHOOP_TOKEN_URL,
   type WhoopOauthHelper,
 } from '../../../tests/helpers/msw-whoop-oauth.js';
-import { AuthError } from './errors.js';
+import { AuthError } from '../../domain/errors/auth.js';
 import {
   buildAuthorizeUrl,
   exchangeCode,

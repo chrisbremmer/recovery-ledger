@@ -16,8 +16,8 @@
 
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
+import { isMigrationError } from '../domain/errors/migration.js';
 import { logger } from '../infrastructure/config/logger.js';
-import { isMigrationError } from '../infrastructure/db/migrate.js';
 // SECH-02 (#79): logger.fatal `err` field wrapped in sanitize() before Pino.
 import { sanitize, serializeError } from '../infrastructure/observability/sanitize.js';
 import { bootstrap } from '../services/index.js';

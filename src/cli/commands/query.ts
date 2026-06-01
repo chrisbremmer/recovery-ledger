@@ -11,11 +11,11 @@
 //   invalid_input    = 1   unknown resource OR flag/resource mismatch
 //   bootstrap_failed = 1
 
+import { isMigrationError } from '../../domain/errors/migration.js';
 import { renderQueryCache } from '../../formatters/query-cache.txt.js';
 import { formatBootstrapError } from '../../formatters/sync.txt.js';
 import { logger } from '../../infrastructure/config/logger.js';
 import { paths } from '../../infrastructure/config/paths.js';
-import { isMigrationError } from '../../infrastructure/db/migrate.js';
 import { sanitize, serializeError } from '../../infrastructure/observability/sanitize.js';
 import type { QueryCacheInput } from '../../services/cache/types.js';
 import { type Bootstrapped, bootstrap } from '../../services/index.js';

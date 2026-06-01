@@ -334,7 +334,7 @@ describe('runSyncCommand result-status mapping', () => {
 
 describe('runSyncCommand failure paths', () => {
   test('Test 9: bootstrap throws MigrationError → exit 1 + remediation includes `cp <backupPath>`', async () => {
-    const { MigrationError } = await import('../../infrastructure/db/migrate.js');
+    const { MigrationError } = await import('../../domain/errors/migration.js');
     const err = new MigrationError({
       kind: 'inconsistent_state',
       backupPath: '/tmp/recovery-ledger-test/backups/db.2026-05-16-pre-0001.sqlite',
@@ -354,7 +354,7 @@ describe('runSyncCommand failure paths', () => {
   });
 
   test('Test 10: runSync throws AuthError → formatAuthError remediation; exit 1', async () => {
-    const { AuthError } = await import('../../infrastructure/whoop/errors.js');
+    const { AuthError } = await import('../../domain/errors/auth.js');
     mockBootstrap(() => {
       throw new AuthError({ kind: 'auth_expired' });
     });
