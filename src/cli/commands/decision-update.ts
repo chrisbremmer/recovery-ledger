@@ -18,12 +18,10 @@
 //   invalid_input    = 1
 //   bootstrap_failed = 1
 
-import { isMigrationError } from '../../domain/errors/migration.js';
 import { renderDecisionUpdate } from '../../formatters/decision.txt.js';
-import { formatBootstrapError } from '../../formatters/sync.txt.js';
-import { paths } from '../../infrastructure/config/paths.js';
 import { sanitize } from '../../infrastructure/observability/sanitize.js';
-import { type Bootstrapped, bootstrap } from '../../services/index.js';
+// ARCH-05 (#93): shared bootstrap-error rendering.
+import { tryBootstrap } from '../lib/with-bootstrap.js';
 
 export const DECISION_UPDATE_EXIT_CODES: Readonly<Record<string, number>> = Object.freeze({
   ok: 0,
@@ -85,19 +83,15 @@ export async function runDecisionUpdateCommand(
     return;
   }
 
-  // 2. Bootstrap.
-  let app: Bootstrapped;
-  try {
-    app = bootstrap();
-  } catch (err) {
-    const body = isMigrationError(err)
-      ? formatBootstrapError(err, paths.dbFile)
-      : `Bootstrap failed: ${sanitize(String(err))}`;
-    process.stdout.write(`${body}\n`, () => {
-      process.exit(DECISION_UPDATE_EXIT_CODES.bootstrap_failed);
+  // 2. Bootstrap (ARCH-05 #93: shared try-helper).
+  const boot = tryBootstrap(DECISION_UPDATE_EXIT_CODES.bootstrap_failed ?? 1);
+  if (!boot.ok) {
+    process.stdout.write(`${boot.body}\n`, () => {
+      process.exit(boot.exitCode);
     });
     return;
   }
+  const app = boot.app;
 
   // 3. Prefix lookup arms (Pitfall 11). The repo `findByPrefix` normalizes
   // the input to upper-case before the LIKE-scan (ULID alphabet is upper-

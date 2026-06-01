@@ -19,14 +19,10 @@
 //   failed            = 1   getDailyReview threw after bootstrap succeeded
 //   bootstrap_failed  = 1   openDb / migrate threw before service ran
 
-import { isMigrationError } from '../../domain/errors/migration.js';
 import { renderDailyReview } from '../../formatters/daily-review.txt.js';
-import { formatBootstrapError } from '../../formatters/sync.txt.js';
-import { paths } from '../../infrastructure/config/paths.js';
-// Cross-layer import: src/infrastructure/observability/sanitize.ts is the single source of truth for
-// secret-bearing pattern redaction. Mirrors the sync.ts cross-layer import.
 import { sanitize } from '../../infrastructure/observability/sanitize.js';
-import { type Bootstrapped, bootstrap } from '../../services/index.js';
+// ARCH-05 (#93): shared bootstrap-error rendering.
+import { tryBootstrap } from '../lib/with-bootstrap.js';
 
 export const REVIEW_EXIT_CODES: Readonly<Record<string, number>> = Object.freeze({
   ok: 0,
@@ -53,18 +49,14 @@ export interface RunReviewDailyCommandOpts {
  * getDailyReview, format, write, exit — is 5 lines.
  */
 export async function runReviewDailyCommand(opts: RunReviewDailyCommandOpts): Promise<void> {
-  let app: Bootstrapped;
-  try {
-    app = bootstrap();
-  } catch (err) {
-    const body = isMigrationError(err)
-      ? formatBootstrapError(err, paths.dbFile)
-      : `Bootstrap failed: ${sanitize(String(err))}`;
-    process.stdout.write(`${body}\n`, () => {
-      process.exit(REVIEW_EXIT_CODES.bootstrap_failed);
+  const boot = tryBootstrap(REVIEW_EXIT_CODES.bootstrap_failed ?? 1);
+  if (!boot.ok) {
+    process.stdout.write(`${boot.body}\n`, () => {
+      process.exit(boot.exitCode);
     });
     return;
   }
+  const app = boot.app;
 
   try {
     const result = await app.services.getDailyReview({
