@@ -222,6 +222,36 @@ describe('sync-runs repo — latestFinished() D-03 data-status anchor', () => {
     repo.finalize(b, 'partial', 0, '2026-05-16T10:05:00.000Z');
     expect(repo.latestFinished()?.status).toBe('partial');
   });
+
+  // TSTC-01 (#86): regression coverage for the `'aborted'` filter on
+  // latestFinished(). Pre-TSTC-01 the WHERE clause excluded both 'running'
+  // and 'aborted' but no test inserted an aborted row — a refactor that
+  // dropped the `'aborted'` filter would still pass every prior test.
+  it('Test 14: aborted row is skipped — latestFinished returns the previous ok row (#86)', () => {
+    const repo = createSyncRunsRepo(mem.db);
+    const a = repo.insertRunning({ startedAt: '2026-05-15T10:00:00.000Z', flags: null });
+    repo.finalize(a, 'ok', 0, '2026-05-15T10:05:00.000Z');
+    // Newer aborted row — must NOT shadow the prior ok.
+    const b = repo.insertRunning({ startedAt: '2026-05-16T10:00:00.000Z', flags: null });
+    repo.finalize(b, 'ok', 0, '2026-05-16T10:05:00.000Z');
+    repo.reclassifyStaleRunning(0, '2026-05-16T11:00:00.000Z');
+    // The reclassify above only sweeps 'running' rows; finalize'd rows stay.
+    // Insert + reclassify a separate running row to get an aborted entry.
+    repo.insertRunning({ startedAt: '2026-05-17T10:00:00.000Z', flags: null });
+    repo.reclassifyStaleRunning(0, '2026-05-17T11:00:00.000Z');
+
+    const result = repo.latestFinished();
+    expect(result).not.toBeNull();
+    expect(result?.finished_at).toBe('2026-05-16T10:05:00.000Z');
+    expect(result?.status).toBe('ok');
+  });
+
+  it('Test 15: only-aborted DB returns null (#86)', () => {
+    const repo = createSyncRunsRepo(mem.db);
+    repo.insertRunning({ startedAt: '2026-05-15T10:00:00.000Z', flags: null });
+    repo.reclassifyStaleRunning(0, '2026-05-15T11:00:00.000Z');
+    expect(repo.latestFinished()).toBeNull();
+  });
 });
 
 // DBIN-01 (#75): round-trip an 'aborted' row through the typed repo and
