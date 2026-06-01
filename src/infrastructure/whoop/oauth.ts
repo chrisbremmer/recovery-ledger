@@ -275,6 +275,11 @@ export function listenForCallback(opts: ListenForCallbackOptions): Promise<{ cod
       logger.info({ event: 'auth_started', port: addr.port });
       opts.onListening?.({ port: addr.port, address: '127.0.0.1' });
     });
+    // BACK-01 (#95): .unref() the listening socket so SIGINT between
+    // listen() and the callback can exit the event loop cleanly. Without
+    // this, ^C after `recovery-ledger auth` started its callback server
+    // hangs until the 5-minute timer fires or the user kills -9.
+    server.unref();
 
     timer = setTimeout(() => {
       finaliseReject(new AuthError({ kind: 'auth_timeout' }));
