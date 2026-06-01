@@ -46,7 +46,16 @@
 // stay under this directory. No direct stdout writes / no Pino calls here —
 // schema declaration only.
 
-import { index, integer, primaryKey, real, sqliteTable, text } from 'drizzle-orm/sqlite-core';
+import { sql } from 'drizzle-orm';
+import {
+  check,
+  index,
+  integer,
+  primaryKey,
+  real,
+  sqliteTable,
+  text,
+} from 'drizzle-orm/sqlite-core';
 // DBIN-01 (#75): cross-layer import (infrastructure → domain) for the single
 // source of truth on sync_runs.status values. Allowed by the lite-hexagonal
 // dependency direction (infrastructure may depend on domain).
@@ -86,7 +95,17 @@ export const cycles = sqliteTable(
     }),
     raw_json: text('raw_json').notNull(),
   },
-  (t) => [index('cycles_score_state_start_idx').on(t.score_state, t.start)],
+  (t) => [
+    index('cycles_score_state_start_idx').on(t.score_state, t.start),
+    // DBIN-03 (#77): SQL-level enforcement of ADR-0003 score_state discipline.
+    // SCORED requires all 4 metric columns non-null; PENDING_SCORE/UNSCORABLE
+    // require all 4 null. Migration 0001 added this to existing DBs after a
+    // pre-flight count assertion; new DBs inherit it from the initial create.
+    check(
+      'cycles_score_state_invariant',
+      sql`(score_state = 'SCORED' AND strain IS NOT NULL AND kilojoule IS NOT NULL AND average_heart_rate IS NOT NULL AND max_heart_rate IS NOT NULL) OR (score_state IN ('PENDING_SCORE', 'UNSCORABLE') AND strain IS NULL AND kilojoule IS NULL AND average_heart_rate IS NULL AND max_heart_rate IS NULL)`,
+    ),
+  ],
 );
 
 // ----------------------------------------------------------------------------
@@ -121,6 +140,11 @@ export const recoveries = sqliteTable(
   (t) => [
     primaryKey({ columns: [t.cycle_id, t.sleep_id] }),
     index('recoveries_score_state_start_idx').on(t.score_state, t.created_at),
+    // DBIN-03 (#77): ADR-0003 enforcement.
+    check(
+      'recoveries_score_state_invariant',
+      sql`(score_state = 'SCORED' AND recovery_score IS NOT NULL AND resting_heart_rate IS NOT NULL AND hrv_rmssd_milli IS NOT NULL AND spo2_percentage IS NOT NULL AND skin_temp_celsius IS NOT NULL AND user_calibrating IS NOT NULL) OR (score_state IN ('PENDING_SCORE', 'UNSCORABLE') AND recovery_score IS NULL AND resting_heart_rate IS NULL AND hrv_rmssd_milli IS NULL AND spo2_percentage IS NULL AND skin_temp_celsius IS NULL AND user_calibrating IS NULL)`,
+    ),
   ],
 );
 
@@ -150,7 +174,14 @@ export const sleeps = sqliteTable(
     respiratory_rate: real('respiratory_rate'),
     raw_json: text('raw_json').notNull(),
   },
-  (t) => [index('sleeps_score_state_start_idx').on(t.score_state, t.start)],
+  (t) => [
+    index('sleeps_score_state_start_idx').on(t.score_state, t.start),
+    // DBIN-03 (#77): ADR-0003 enforcement.
+    check(
+      'sleeps_score_state_invariant',
+      sql`(score_state = 'SCORED' AND total_in_bed_time_milli IS NOT NULL AND total_awake_time_milli IS NOT NULL AND sleep_performance_percentage IS NOT NULL AND sleep_consistency_percentage IS NOT NULL AND sleep_efficiency_percentage IS NOT NULL AND respiratory_rate IS NOT NULL) OR (score_state IN ('PENDING_SCORE', 'UNSCORABLE') AND total_in_bed_time_milli IS NULL AND total_awake_time_milli IS NULL AND sleep_performance_percentage IS NULL AND sleep_consistency_percentage IS NULL AND sleep_efficiency_percentage IS NULL AND respiratory_rate IS NULL)`,
+    ),
+  ],
 );
 
 // ----------------------------------------------------------------------------
@@ -181,7 +212,16 @@ export const workouts = sqliteTable(
     altitude_change_meter: real('altitude_change_meter'),
     raw_json: text('raw_json').notNull(),
   },
-  (t) => [index('workouts_score_state_start_idx').on(t.score_state, t.start)],
+  (t) => [
+    index('workouts_score_state_start_idx').on(t.score_state, t.start),
+    // DBIN-03 (#77): ADR-0003 enforcement. distance_meter / altitude_gain_meter
+    // / altitude_change_meter stay nullable on SCORED rows — WHOOP omits them
+    // for non-distance sports.
+    check(
+      'workouts_score_state_invariant',
+      sql`(score_state = 'SCORED' AND strain IS NOT NULL AND average_heart_rate IS NOT NULL AND max_heart_rate IS NOT NULL AND kilojoule IS NOT NULL) OR (score_state IN ('PENDING_SCORE', 'UNSCORABLE') AND strain IS NULL AND average_heart_rate IS NULL AND max_heart_rate IS NULL AND kilojoule IS NULL AND distance_meter IS NULL AND altitude_gain_meter IS NULL AND altitude_change_meter IS NULL)`,
+    ),
+  ],
 );
 
 // ----------------------------------------------------------------------------

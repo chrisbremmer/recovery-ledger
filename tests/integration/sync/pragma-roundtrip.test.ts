@@ -87,7 +87,9 @@ describe('SYNC-06 — wal_checkpoint(TRUNCATE) folds WAL back; six D-30 pragmas 
       '2026-05-01T01:00:00.000Z',
       '2026-04-30T07:00:00.000Z',
       '-08:00',
-      'SCORED',
+      // DBIN-03 (#77): use PENDING_SCORE so we don't need to fabricate
+      // score columns. This test exercises WAL behavior, not score_state.
+      'PENDING_SCORE',
       '{"id":1}',
     );
 
@@ -121,7 +123,8 @@ describe('SYNC-06 — wal_checkpoint(TRUNCATE) folds WAL back; six D-30 pragmas 
         '2026-05-01T01:00:00.000Z',
         '2026-04-30T07:00:00.000Z',
         '-08:00',
-        'SCORED',
+        // DBIN-03 (#77): PENDING_SCORE — WAL behavior is independent of score state.
+        'PENDING_SCORE',
         `{"id":${id}}`,
       );
     }
@@ -147,7 +150,7 @@ describe('SYNC-06 — wal_checkpoint(TRUNCATE) folds WAL back; six D-30 pragmas 
     expect(statSync(walPath).size).toBe(0);
   });
 
-  test('Test 4: migrator applied exactly 1 row to __drizzle_migrations (Plan 03-02 single 0000_initial)', () => {
+  test('Test 4: migrator applies the current migration set to __drizzle_migrations (Plan 03-02 + DBIN-03)', () => {
     handle = openDb(dbFile);
     migrate(handle.sqlite, {
       migrationsDir: REAL_MIGRATIONS_DIR,
@@ -158,8 +161,14 @@ describe('SYNC-06 — wal_checkpoint(TRUNCATE) folds WAL back; six D-30 pragmas 
     const rows = handle.sqlite.prepare('SELECT hash FROM __drizzle_migrations').all() as Array<{
       hash: string;
     }>;
-    expect(rows).toHaveLength(1);
-    expect(rows[0]?.hash).toMatch(/^[a-f0-9]{64}$/);
+    // DBIN-03 (#77): added 0001_score_state_check_constraints; assertion
+    // now counts journal entries (= 2 as of v1.1). Originally Plan 03-02
+    // expected exactly 1 — kept the spirit of the test (every entry has a
+    // sha256 hash) while allowing the journal to grow.
+    expect(rows.length).toBeGreaterThanOrEqual(2);
+    for (const row of rows) {
+      expect(row.hash).toMatch(/^[a-f0-9]{64}$/);
+    }
   });
 
   test('Test 5: re-running migrate against the same DB is a no-op (hash match)', () => {
@@ -170,9 +179,14 @@ describe('SYNC-06 — wal_checkpoint(TRUNCATE) folds WAL back; six D-30 pragmas 
       dbFile,
     });
 
-    // Second call: no-op. The journal hash matches the recorded one, so
-    // the loop skips the apply and exits cleanly. __drizzle_migrations
-    // row count stays at 1.
+    const firstCount = (
+      handle.sqlite.prepare('SELECT COUNT(*) AS n FROM __drizzle_migrations').get() as { n: number }
+    ).n;
+
+    // Second call: no-op. The journal hash matches the recorded one(s),
+    // so the loop skips the apply and exits cleanly. __drizzle_migrations
+    // row count stays the same regardless of how many migrations are in
+    // the journal.
     migrate(handle.sqlite, {
       migrationsDir: REAL_MIGRATIONS_DIR,
       backupsDir,
@@ -180,6 +194,6 @@ describe('SYNC-06 — wal_checkpoint(TRUNCATE) folds WAL back; six D-30 pragmas 
     });
 
     const rows = handle.sqlite.prepare('SELECT hash FROM __drizzle_migrations').all();
-    expect(rows).toHaveLength(1);
+    expect(rows).toHaveLength(firstCount);
   });
 });
