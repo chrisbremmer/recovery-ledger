@@ -90,7 +90,9 @@ import {
   type WorkoutsRepo,
 } from '../infrastructure/db/repositories/workouts.repo.js';
 import { httpGet } from '../infrastructure/whoop/client.js';
-import { WhoopApiError } from '../infrastructure/whoop/errors.js';
+// ERRC-01 (#89): isAuthError maps refresh-side AuthError to the same
+// status 401 the WhoopApiError(unauthorized) path emits.
+import { isAuthError, WhoopApiError } from '../infrastructure/whoop/errors.js';
 import { getBodyMeasurement } from '../infrastructure/whoop/resources/body-measurements.js';
 import { listCycles } from '../infrastructure/whoop/resources/cycles.js';
 import { getProfile } from '../infrastructure/whoop/resources/profile.js';
@@ -384,6 +386,18 @@ export function bootstrap(opts: BootstrapOptions = {}): Bootstrapped {
       await httpGet('/v2/user/profile/basic', {}, WhoopRawProfile);
       return { status: 200, durationMs: performance.now() - start };
     } catch (err) {
+      // ERRC-01 (#89): a refresh-side AuthError ('auth_expired',
+      // 'refresh_failed', 'auth_missing') is the same condition the
+      // user experiences as "your token is dead — re-auth". Map all of
+      // them to status 401 so the doctor's whoop_roundtrip probe emits
+      // the SAME "run `recovery-ledger auth`" remediation as the
+      // WhoopApiError({kind:'unauthorized'}) path. Pre-ERRC-01 these
+      // routed to status 0 → the probe's generic 'roundtrip failed'
+      // warn, which gave the user two different messages for one
+      // condition.
+      if (isAuthError(err)) {
+        return { status: 401, durationMs: performance.now() - start };
+      }
       const status = err instanceof WhoopApiError ? whoopErrorKindToStatus(err.kind) : 0;
       return { status, durationMs: performance.now() - start };
     }
