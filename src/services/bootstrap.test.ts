@@ -59,6 +59,32 @@ describe('bootstrap() — Phase 4 service wiring', () => {
     expect(result.truncated).toBe(false);
     expect(result.rows).toHaveLength(0);
   });
+
+  // LIFE-01 (#81): bootstrap pairs openDb with try/catch closing the
+  // sqlite handle when migrate() throws. A second open on the same dbFile
+  // immediately after the throw must succeed without SQLITE_BUSY.
+  it('Test 4: bootstrap closes the SQLite handle when migrate() throws (#81)', () => {
+    const dbFile = resolve(tmpDir, 'life01.sqlite');
+    // Point at a migrationsDir that does not exist — migrate() will
+    // throw a MigrationError before any apply.
+    const missingMigrationsDir = resolve(tmpDir, 'does-not-exist');
+
+    let firstErr: unknown = null;
+    try {
+      app = bootstrap({ dbFile, migrationsDir: missingMigrationsDir });
+    } catch (err) {
+      firstErr = err;
+    }
+    expect(firstErr).not.toBeNull();
+    expect(app).toBeNull();
+
+    // Second open on the SAME dbFile must succeed. Pre-LIFE-01 the
+    // first open's handle was never closed and this would SQLITE_BUSY
+    // (or hang) until GC.
+    expect(() => {
+      app = bootstrap({ dbFile });
+    }).not.toThrow();
+  });
 });
 
 describe('createServices() — DB-dependent methods are absent from the type (D-31)', () => {

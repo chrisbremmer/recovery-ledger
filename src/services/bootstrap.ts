@@ -220,11 +220,27 @@ export function bootstrap(opts: BootstrapOptions = {}): Bootstrapped {
   // (large WAL replay, large pre-migration backup) is not silently waiting.
   // Observability only; no behavior change.
   log.info({ event: 'migration_started', migrationsDir });
-  migrate(sqlite, {
-    migrationsDir,
-    backupsDir: paths.backupsDir,
-    dbFile,
-  });
+  // LIFE-01 (#81): pair openDb with try/catch so a MigrationError throw
+  // does not leak the better-sqlite3 file handle. The OS reclaims on
+  // process.exit, but any caller that catches to continue degraded
+  // (tests, doctor → fix → retry loops, future embedded callers) would
+  // otherwise see SQLITE_BUSY on retry until GC.
+  try {
+    migrate(sqlite, {
+      migrationsDir,
+      backupsDir: paths.backupsDir,
+      dbFile,
+    });
+  } catch (err) {
+    try {
+      sqlite.close();
+    } catch {
+      // best-effort — close on a partially-opened handle can throw if
+      // the migrator left WAL state ambiguous; swallow and let the
+      // original MigrationError surface unchanged.
+    }
+    throw err;
+  }
   log.info({ event: 'migration_finished' });
 
   const repos = {
