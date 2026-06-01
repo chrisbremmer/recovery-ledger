@@ -46,6 +46,19 @@ export interface ConcurrentWritersStressOpts {
    * `pass` "skipped" result without paying the fork cost.
    */
   enabled?: boolean;
+  /**
+   * LIFE-03 (#83): per-worker watchdog deadline in ms. Defaults to 30s; the
+   * test suite can lower this to verify the watchdog actually fires on a
+   * hanging worker without the test itself waiting 30s.
+   */
+  watchdogMs?: number;
+  /**
+   * LIFE-03 (#83): grace period between SIGTERM and SIGKILL on a hung worker.
+   * Defaults to 5s in CI (`process.env.CI`), 2s locally — free-tier GitHub
+   * Actions can pause a child for >2s during snapshot-mount, which would
+   * race the SIGKILL fallback. Test suite can lower this for fast iteration.
+   */
+  sigkillDelayMs?: number;
 }
 
 const HERE = dirname(fileURLToPath(import.meta.url));
@@ -66,6 +79,15 @@ function resolveWorker(): { path: string; isTs: boolean } | null {
 
 const WORKERS = 4;
 const UPSERTS = 50;
+// LIFE-03 (#83): per-worker watchdog. A worker that hangs (DB lock acquired
+// but never released, native binding deadlock, fork failing under tsx-loader
+// hiccup) pends the promise forever and the doctor command — and any vitest
+// run exercising this path — hangs indefinitely. CI-aware SIGKILL fallback:
+// 5s in `process.env.CI` (snapshot mounts on free-tier runners can pause a
+// child for >2s), 2s locally. Threshold defaults are overridable in tests
+// via the second argument to probeConcurrentWritersStress for fast iteration.
+const WORKER_WATCHDOG_MS_DEFAULT = 30_000;
+const SIGKILL_DELAY_MS_DEFAULT = process.env.CI ? 5_000 : 2_000;
 
 interface WorkerResult {
   exitCode: number;
@@ -126,6 +148,11 @@ export async function probeConcurrentWritersStress(
     // the `.mjs` case.
     const execArgv = worker.isTs ? ['--import', 'tsx'] : [];
 
+    // LIFE-03 (#83): per-worker watchdog wired here. SIGTERM at the
+    // deadline; SIGKILL `sigkillDelayMs` later if the child still has
+    // not exited. Mirrors mcp-stdout-purity.ts:143-167 in spirit.
+    const watchdogMs = opts.watchdogMs ?? WORKER_WATCHDOG_MS_DEFAULT;
+    const sigkillDelayMs = opts.sigkillDelayMs ?? SIGKILL_DELAY_MS_DEFAULT;
     const start = performance.now();
     const runs = Array.from(
       { length: WORKERS },
@@ -136,14 +163,46 @@ export async function probeConcurrentWritersStress(
             execArgv,
           });
           let stderrBuf = '';
+          let settled = false;
+          const finish = (result: WorkerResult): void => {
+            if (settled) return;
+            settled = true;
+            clearTimeout(watchdog);
+            clearTimeout(sigkillTimer);
+            resolveRun(result);
+          };
+          // LIFE-03 (#83): if the child has not exited by `watchdogMs`,
+          // send SIGTERM. If it still has not exited `sigkillDelayMs`
+          // later, escalate to SIGKILL and synthesize a fail result.
+          let sigkillTimer: NodeJS.Timeout = setTimeout(() => undefined, 0);
+          clearTimeout(sigkillTimer);
+          const watchdog = setTimeout(() => {
+            try {
+              child.kill('SIGTERM');
+            } catch {
+              // best-effort
+            }
+            sigkillTimer = setTimeout(() => {
+              try {
+                child.kill('SIGKILL');
+              } catch {
+                // best-effort
+              }
+              finish({
+                exitCode: -1,
+                stderr:
+                  `${stderrBuf}\nwatchdog: worker did not exit within ${watchdogMs}ms (SIGTERM + SIGKILL fallback)`.trim(),
+              });
+            }, sigkillDelayMs);
+          }, watchdogMs);
           child.stderr?.on('data', (chunk: Buffer) => {
             stderrBuf += chunk.toString('utf8');
           });
           child.on('error', (err) => {
-            resolveRun({ exitCode: -1, stderr: `${stderrBuf}${err.message}`.trim() });
+            finish({ exitCode: -1, stderr: `${stderrBuf}${err.message}`.trim() });
           });
           child.on('exit', (code) => {
-            resolveRun({ exitCode: code ?? -1, stderr: stderrBuf.trim() });
+            finish({ exitCode: code ?? -1, stderr: stderrBuf.trim() });
           });
         }),
     );
