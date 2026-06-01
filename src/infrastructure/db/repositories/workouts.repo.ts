@@ -13,7 +13,7 @@ import type { drizzle } from 'drizzle-orm/better-sqlite3';
 import type { Workout } from '../../../domain/types/entities.js';
 import type { ByRangeOpts } from '../../../domain/types/repos.js';
 import { EPOCH_ZERO_ISO } from '../../../domain/types/sync.js';
-import { workouts as workoutsTable } from '../schema.js';
+import { cycles as cyclesTable, workouts as workoutsTable } from '../schema.js';
 
 export type { ByRangeOpts };
 
@@ -89,6 +89,15 @@ export function createWorkoutsRepo(db: ReturnType<typeof drizzle>): WorkoutsRepo
       const conditions = [gte(workoutsTable.start, start), lte(workoutsTable.start, end)];
       if (!opts?.includeUnscored) {
         conditions.push(eq(workoutsTable.score_state, 'SCORED'));
+      }
+      if (!opts?.includeExcluded) {
+        // DBIN-02 (#76): NOT EXISTS subquery — orphan workouts (no parent
+        // cycle synced yet) are kept; a workout is excluded only if a
+        // covering cycle exists AND that cycle is baseline_excluded.
+        // Mirrors sleep.repo.ts:byRange.
+        conditions.push(
+          sql`NOT EXISTS (SELECT 1 FROM ${cyclesTable} WHERE ${cyclesTable.start} <= ${workoutsTable.start} AND COALESCE(${cyclesTable.end}, ${workoutsTable.start}) >= ${workoutsTable.start} AND ${cyclesTable.baseline_excluded} = 1)`,
+        );
       }
       const rows = db
         .select()

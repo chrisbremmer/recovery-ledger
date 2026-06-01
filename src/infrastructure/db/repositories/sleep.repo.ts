@@ -25,7 +25,7 @@ import type { drizzle } from 'drizzle-orm/better-sqlite3';
 import type { Sleep } from '../../../domain/types/entities.js';
 import type { ByRangeOpts } from '../../../domain/types/repos.js';
 import { EPOCH_ZERO_ISO } from '../../../domain/types/sync.js';
-import { sleeps as sleepsTable } from '../schema.js';
+import { cycles as cyclesTable, sleeps as sleepsTable } from '../schema.js';
 
 export type { ByRangeOpts };
 
@@ -114,8 +114,18 @@ export function createSleepsRepo(db: ReturnType<typeof drizzle>): SleepsRepo {
       if (!opts?.includeUnscored) {
         conditions.push(eq(sleepsTable.score_state, 'SCORED'));
       }
-      // includeExcluded is accepted for symmetry but is a no-op until Phase 4
-      // adds a cycle_id denormalization.
+      if (!opts?.includeExcluded) {
+        // DBIN-02 (#76): sleeps have no cycle_id on the wire, so exclusion is
+        // resolved via NOT EXISTS on a time-overlap subquery onto cycles.
+        // A sleep is excluded ONLY IF a covering cycle exists AND that cycle
+        // is baseline_excluded — orphan sleeps (no parent cycle synced yet)
+        // are kept, since absence-of-evidence is not evidence-of-exclusion.
+        // cycles.end is nullable for the in-progress cycle, COALESCE'd so an
+        // open cycle still covers its sleep rows.
+        conditions.push(
+          sql`NOT EXISTS (SELECT 1 FROM ${cyclesTable} WHERE ${cyclesTable.start} <= ${sleepsTable.start} AND COALESCE(${cyclesTable.end}, ${sleepsTable.start}) >= ${sleepsTable.start} AND ${cyclesTable.baseline_excluded} = 1)`,
+        );
+      }
       const rows = db
         .select()
         .from(sleepsTable)
