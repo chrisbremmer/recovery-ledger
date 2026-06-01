@@ -26,8 +26,9 @@
 // ADR-0001 §Decision: no console calls, no direct stdout writes from this
 // module — structured logger.warn only, never the response body or tokens.
 
+// ARCH-04 (#92): single canonical import path for AuthError.
+import { AuthError } from '../domain/errors/auth.js';
 import { logger } from '../infrastructure/config/logger.js';
-import { AuthError } from '../infrastructure/whoop/errors.js';
 import {
   tokenStore as defaultTokenStore,
   REFRESH_BUFFER_MS,

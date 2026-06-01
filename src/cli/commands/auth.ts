@@ -23,6 +23,8 @@
 import { readFile } from 'node:fs/promises';
 import open from 'open';
 import { z } from 'zod';
+// ARCH-04 (#92): single canonical import path for AuthError + helpers.
+import { AuthError, formatAuthError, isAuthError } from '../../domain/errors/auth.js';
 import { paths } from '../../infrastructure/config/paths.js';
 import { ConfigSchema } from '../../infrastructure/config/schema.js';
 // Cross-layer import: src/infrastructure/observability/sanitize.ts is the single source of truth for
@@ -34,7 +36,6 @@ import { ConfigSchema } from '../../infrastructure/config/schema.js';
 // relocating sanitize to src/infrastructure/observability/ is tracked as
 // deferred work (PLAN-03-CROSS-LAYER).
 import { sanitize } from '../../infrastructure/observability/sanitize.js';
-import { AuthError, formatAuthError, isAuthError } from '../../infrastructure/whoop/errors.js';
 import { runOAuth } from '../../infrastructure/whoop/oauth.js';
 import { tokenStore } from '../../infrastructure/whoop/token-store.js';
 

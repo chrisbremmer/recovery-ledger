@@ -25,19 +25,18 @@
 //   bootstrap_failed  = 1   openDb or migrate threw before sync started
 
 import { z } from 'zod';
+// Cross-layer import: src/infrastructure/observability/sanitize.ts is the single source of truth for
+// secret-bearing pattern redaction. Mirrors the auth.ts cross-layer import.
+// ARCH-04 (#92): domain-layer AuthError helpers; infrastructure-layer
+// WhoopApiError helpers. Pre-ARCH-04 both pulled from the infrastructure
+// re-export — two class identities under vi.resetModules + drift risk.
+import { formatAuthError, isAuthError } from '../../domain/errors/auth.js';
+import { isMigrationError } from '../../domain/errors/migration.js';
 import { RESOURCE_NAMES_SET, type ResourceName } from '../../domain/types/sync.js';
 import { formatBootstrapError, formatSyncResult } from '../../formatters/sync.txt.js';
 import { paths } from '../../infrastructure/config/paths.js';
-import { isMigrationError } from '../../infrastructure/db/migrate.js';
-// Cross-layer import: src/infrastructure/observability/sanitize.ts is the single source of truth for
-// secret-bearing pattern redaction. Mirrors the auth.ts cross-layer import.
 import { sanitize } from '../../infrastructure/observability/sanitize.js';
-import {
-  formatAuthError,
-  formatWhoopApiError,
-  isAuthError,
-  isWhoopApiError,
-} from '../../infrastructure/whoop/errors.js';
+import { formatWhoopApiError, isWhoopApiError } from '../../infrastructure/whoop/errors.js';
 import { type Bootstrapped, bootstrap } from '../../services/index.js';
 
 // INPV-01 (#80): strict YYYY-MM-DD or full ISO 8601 — no locale-dependent coercion.

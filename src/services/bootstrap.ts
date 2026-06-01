@@ -48,6 +48,11 @@ import { performance } from 'node:perf_hooks';
 import { fileURLToPath } from 'node:url';
 import type Database from 'better-sqlite3';
 import type { Logger } from 'pino';
+// ARCH-04 (#92): isAuthError from domain (canonical); WhoopApiError stays
+// in infrastructure (HTTP-status-driven, not a domain concept).
+// ERRC-01 (#89): isAuthError maps refresh-side AuthError to the same
+// status 401 the WhoopApiError(unauthorized) path emits.
+import { isAuthError } from '../domain/errors/auth.js';
 import type { DailyReviewResult, WeeklyReviewResult } from '../domain/review/types.js';
 import { WhoopRawProfile } from '../domain/schemas/whoop-api.js';
 import type { Decision } from '../domain/types/entities.js';
@@ -90,9 +95,7 @@ import {
   type WorkoutsRepo,
 } from '../infrastructure/db/repositories/workouts.repo.js';
 import { httpGet } from '../infrastructure/whoop/client.js';
-// ERRC-01 (#89): isAuthError maps refresh-side AuthError to the same
-// status 401 the WhoopApiError(unauthorized) path emits.
-import { isAuthError, WhoopApiError } from '../infrastructure/whoop/errors.js';
+import { WhoopApiError } from '../infrastructure/whoop/errors.js';
 import { getBodyMeasurement } from '../infrastructure/whoop/resources/body-measurements.js';
 import { listCycles } from '../infrastructure/whoop/resources/cycles.js';
 import { getProfile } from '../infrastructure/whoop/resources/profile.js';

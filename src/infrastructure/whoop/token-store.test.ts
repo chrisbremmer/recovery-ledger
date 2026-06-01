@@ -586,7 +586,7 @@ describe('refresh errors', () => {
     );
 
     const mod = await loadTokenStore();
-    const { AuthError } = await import('./errors.js');
+    const { AuthError } = await import('../../domain/errors/auth.js');
     const store = mod.createTokenStore({ paths, now: () => now });
     await writeFile(paths.storageModeFile, 'keychain\n', { mode: 0o600 });
 

@@ -139,7 +139,7 @@ describe('runReviewDailyCommand happy paths', () => {
 
 describe('runReviewDailyCommand failure paths', () => {
   test('bootstrap throws MigrationError → exit bootstrap_failed + `cp <backup>` remediation', async () => {
-    const { MigrationError } = await import('../../infrastructure/db/migrate.js');
+    const { MigrationError } = await import('../../domain/errors/migration.js');
     const err = new MigrationError({
       kind: 'inconsistent_state',
       backupPath: '/tmp/recovery-ledger-test/backups/db.2026-05-20-pre-0001.sqlite',

@@ -269,7 +269,7 @@ describe('refresh failure', () => {
     // rethrows. Without this, `expect().toBeInstanceOf(AuthError)` would fail
     // because the test's top-level AuthError import resolves a different
     // module-graph instance than the orchestrator's import after reset.
-    const { AuthError: AuthErrorLocal } = await import('../infrastructure/whoop/errors.js');
+    const { AuthError: AuthErrorLocal } = await import('../domain/errors/auth.js');
 
     const m = makeMockTokenStore();
     m.getValidAccessTokenSpy.mockResolvedValueOnce('at-stale');
@@ -303,7 +303,7 @@ describe('refresh failure', () => {
   });
 
   test('F-02: formatAuthError({kind: auth_expired}) mentions the `recovery-ledger auth` remediation', async () => {
-    const { AuthError, formatAuthError } = await import('../infrastructure/whoop/errors.js');
+    const { AuthError, formatAuthError } = await import('../domain/errors/auth.js');
     const expired = new AuthError({ kind: 'auth_expired' });
     const msg = formatAuthError(expired);
     expect(msg).toContain('recovery-ledger auth');

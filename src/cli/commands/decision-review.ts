@@ -18,11 +18,11 @@
 //   bootstrap_failed = 1
 
 import { createInterface } from 'node:readline/promises';
+import { isMigrationError } from '../../domain/errors/migration.js';
 import type { Decision } from '../../domain/types/entities.js';
 import { renderDecisionList } from '../../formatters/decision.txt.js';
 import { formatBootstrapError } from '../../formatters/sync.txt.js';
 import { paths } from '../../infrastructure/config/paths.js';
-import { isMigrationError } from '../../infrastructure/db/migrate.js';
 import { sanitize } from '../../infrastructure/observability/sanitize.js';
 import { type Bootstrapped, bootstrap } from '../../services/index.js';
 

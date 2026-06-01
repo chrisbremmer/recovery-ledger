@@ -6,14 +6,17 @@
 // Wave 2 plans (02-02 token-store + 02-03 oauth).
 
 import { describe, expect, test } from 'vitest';
-import { sanitize, serializeError } from '../observability/sanitize.js';
+// ARCH-04 (#92): AuthError contract from domain; WhoopApiError stays here.
 import {
   AUTH_ERROR_KINDS,
   AuthError,
   type AuthErrorKind,
   formatAuthError,
-  formatWhoopApiError,
   isAuthError,
+} from '../../domain/errors/auth.js';
+import { sanitize, serializeError } from '../observability/sanitize.js';
+import {
+  formatWhoopApiError,
   isWhoopApiError,
   WHOOP_API_ERROR_KINDS,
   WhoopApiError,

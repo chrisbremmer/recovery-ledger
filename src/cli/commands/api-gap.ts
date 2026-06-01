@@ -9,10 +9,10 @@
 // ADR-0001: this file lives under src/cli/commands/, so Gate B/C exempt
 // it from the console.* / process.stdout.write prohibitions.
 
+import { isMigrationError } from '../../domain/errors/migration.js';
 import { renderApiGap } from '../../formatters/api-gap.txt.js';
 import { formatBootstrapError } from '../../formatters/sync.txt.js';
 import { paths } from '../../infrastructure/config/paths.js';
-import { isMigrationError } from '../../infrastructure/db/migrate.js';
 import { sanitize } from '../../infrastructure/observability/sanitize.js';
 import { type Bootstrapped, bootstrap } from '../../services/index.js';
 

@@ -9,7 +9,9 @@
 
 import { describe, expect, it } from 'vitest';
 import { ZodError } from 'zod';
-import { AuthError, WhoopApiError } from '../../infrastructure/whoop/errors.js';
+// ARCH-04 (#92): AuthError from domain; WhoopApiError stays in infrastructure.
+import { AuthError } from '../../domain/errors/auth.js';
+import { WhoopApiError } from '../../infrastructure/whoop/errors.js';
 import { classifyOutcome, computeStatus } from './per-resource.js';
 
 describe('classifyOutcome', () => {

@@ -26,9 +26,9 @@ import { mkdir, open, readFile, rename, unlink, writeFile } from 'node:fs/promis
 import { Entry } from '@napi-rs/keyring';
 import * as lockfile from 'proper-lockfile';
 import { z } from 'zod';
+import { AuthError } from '../../domain/errors/auth.js';
 import { logger } from '../config/logger.js';
 import { paths as defaultPaths, type ResolvedPaths } from '../config/paths.js';
-import { AuthError } from './errors.js';
 
 // -----------------------------------------------------------------------------
 // Constants — exported so callers can re-use the same buffer (Plan 02-04 and

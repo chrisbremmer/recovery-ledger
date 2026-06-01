@@ -55,9 +55,9 @@ import { createHash, randomBytes } from 'node:crypto';
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { z } from 'zod';
+import { AuthError } from '../../domain/errors/auth.js';
 import { logger } from '../config/logger.js';
 import { sanitize } from '../observability/sanitize.js';
-import { AuthError } from './errors.js';
 import { TOKEN_REQUEST_TIMEOUT_MS, type Tokens, WHOOP_TOKEN_URL } from './token-store.js';
 
 // ---------------------------------------------------------------------------

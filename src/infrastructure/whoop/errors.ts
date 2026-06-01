@@ -1,17 +1,8 @@
-// AuthError contracts moved to `src/domain/errors/auth.ts` per #18 so
-// the formatter and other domain-adjacent consumers can `import type`
-// without crossing the lite-hexagonal boundary. Re-exported here so
-// existing `import { AuthError, formatAuthError, isAuthError } from
-// '.../infrastructure/whoop/errors.js'` paths continue to resolve;
-// domain is the new source of truth.
-export {
-  AUTH_ERROR_KINDS,
-  AuthError,
-  type AuthErrorInit,
-  type AuthErrorKind,
-  formatAuthError,
-  isAuthError,
-} from '../../domain/errors/auth.js';
+// ARCH-04 (#92): AuthError + helpers used to re-export from here for
+// historical-import compatibility; ARCH-04 codemodded every consumer to
+// `from '.../domain/errors/auth.js'` directly. The re-exports are deleted
+// so future contributors cannot accidentally reintroduce the dual-import
+// drift hazard. This file now owns only WhoopApiError.
 
 // ---------------------------------------------------------------------------
 // WhoopApiError — discriminated union for the Phase 3 WHOOP HTTP client

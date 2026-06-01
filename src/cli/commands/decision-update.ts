@@ -18,10 +18,10 @@
 //   invalid_input    = 1
 //   bootstrap_failed = 1
 
+import { isMigrationError } from '../../domain/errors/migration.js';
 import { renderDecisionUpdate } from '../../formatters/decision.txt.js';
 import { formatBootstrapError } from '../../formatters/sync.txt.js';
 import { paths } from '../../infrastructure/config/paths.js';
-import { isMigrationError } from '../../infrastructure/db/migrate.js';
 import { sanitize } from '../../infrastructure/observability/sanitize.js';
 import { type Bootstrapped, bootstrap } from '../../services/index.js';
 

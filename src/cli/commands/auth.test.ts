@@ -144,7 +144,7 @@ describe('runAuthCommand', () => {
 
   test('A-02 state mismatch — formatAuthError remediation, exit 1', async () => {
     await seedConfig();
-    const { AuthError } = await import('../../infrastructure/whoop/errors.js');
+    const { AuthError } = await import('../../domain/errors/auth.js');
     mockRunOAuth(async () => {
       throw new AuthError({ kind: 'auth_state_mismatch' });
     });
@@ -163,7 +163,7 @@ describe('runAuthCommand', () => {
 
   test('A-03 timeout — exit 1, remediation mentions auth or timeout', async () => {
     await seedConfig();
-    const { AuthError } = await import('../../infrastructure/whoop/errors.js');
+    const { AuthError } = await import('../../domain/errors/auth.js');
     mockRunOAuth(async () => {
       throw new AuthError({ kind: 'auth_timeout' });
     });
@@ -178,7 +178,7 @@ describe('runAuthCommand', () => {
 
   test('A-04 port in use — exit 1, remediation mentions init AND port number', async () => {
     await seedConfig();
-    const { AuthError } = await import('../../infrastructure/whoop/errors.js');
+    const { AuthError } = await import('../../domain/errors/auth.js');
     mockRunOAuth(async () => {
       throw new AuthError({ kind: 'auth_port_in_use', detail: 'port 4321' });
     });
@@ -194,7 +194,7 @@ describe('runAuthCommand', () => {
 
   test('A-05 refresh_failed during code exchange — exit 1', async () => {
     await seedConfig();
-    const { AuthError } = await import('../../infrastructure/whoop/errors.js');
+    const { AuthError } = await import('../../domain/errors/auth.js');
     mockRunOAuth(async () => {
       throw new AuthError({ kind: 'refresh_failed', detail: 'token endpoint 400' });
     });

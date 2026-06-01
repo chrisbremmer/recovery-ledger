@@ -4,9 +4,10 @@
 // list as a runtime guard layered ON TOP of the source-file Gate A grep.
 
 import { describe, expect, test } from 'vitest';
+// ARCH-04 (#92): single canonical import path for domain errors.
+import { AuthError } from '../domain/errors/auth.js';
+import { MigrationError } from '../domain/errors/migration.js';
 import type { RunSyncResult } from '../domain/types/sync.js';
-import { MigrationError } from '../infrastructure/db/migrate.js';
-import { AuthError } from '../infrastructure/whoop/errors.js';
 import { formatBootstrapError, formatSyncResult } from './sync.txt.js';
 
 // Common fixture builder — every test starts from this and overlays the

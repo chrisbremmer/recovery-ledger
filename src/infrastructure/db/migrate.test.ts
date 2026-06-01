@@ -21,7 +21,10 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import Database from 'better-sqlite3';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { isMigrationError, type MigrationError, migrate, pruneBackups } from './migrate.js';
+// ARCH-04 (#92): MigrationError contract from domain; migrator implementation
+// stays in infrastructure.
+import { isMigrationError, type MigrationError } from '../../domain/errors/migration.js';
+import { migrate, pruneBackups } from './migrate.js';
 
 interface JournalEntry {
   idx: number;
