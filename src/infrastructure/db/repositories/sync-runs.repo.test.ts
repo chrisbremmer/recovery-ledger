@@ -260,3 +260,72 @@ describe("sync-runs repo — DBIN-01 'aborted' enum round-trip (#75)", () => {
     expect(SYNC_RUN_STATUSES).toContain('aborted');
   });
 });
+
+describe('sync-runs repo — DBIN-05 wal_checkpoint incomplete escalation (#94)', () => {
+  let mem: InMemoryDbResult;
+  beforeEach(() => {
+    mem = createInMemoryDb();
+  });
+  afterEach(() => mem.close());
+
+  it('markCheckpointIncomplete merges {walCheckpointIncomplete:true} into existing flags JSON', () => {
+    const repo = createSyncRunsRepo(mem.db);
+    const id = repo.insertRunning({
+      startedAt: '2026-06-01T10:00:00.000Z',
+      flags: JSON.stringify({ days: 30, resources: null, since: null }),
+    });
+    repo.finalize(id, 'ok', 0, '2026-06-01T10:05:00.000Z');
+    repo.markCheckpointIncomplete(id);
+
+    const recent = repo.listRecent(1);
+    expect(recent[0]?.flags).toContain('"walCheckpointIncomplete":true');
+    expect(recent[0]?.flags).toContain('"days":30');
+    expect(recent[0]?.flags).toContain('"resources":null');
+  });
+
+  it('markCheckpointIncomplete handles null flags (no prior JSON to merge into)', () => {
+    const repo = createSyncRunsRepo(mem.db);
+    const id = repo.insertRunning({ startedAt: '2026-06-01T10:00:00.000Z', flags: null });
+    repo.finalize(id, 'ok', 0, '2026-06-01T10:05:00.000Z');
+    repo.markCheckpointIncomplete(id);
+
+    const recent = repo.listRecent(1);
+    expect(recent[0]?.flags).toContain('"walCheckpointIncomplete":true');
+  });
+
+  it('previousCheckpointWasIncomplete returns false when no prior run', () => {
+    const repo = createSyncRunsRepo(mem.db);
+    expect(repo.previousCheckpointWasIncomplete()).toBe(false);
+  });
+
+  it('previousCheckpointWasIncomplete returns true when the immediate predecessor was marked', () => {
+    const repo = createSyncRunsRepo(mem.db);
+    const a = repo.insertRunning({ startedAt: '2026-06-01T10:00:00.000Z', flags: null });
+    repo.finalize(a, 'ok', 0, '2026-06-01T10:05:00.000Z');
+    repo.markCheckpointIncomplete(a);
+    expect(repo.previousCheckpointWasIncomplete()).toBe(true);
+  });
+
+  it('previousCheckpointWasIncomplete returns false when a CLEAN run happened after the marked one (twice-in-a-row, strict)', () => {
+    const repo = createSyncRunsRepo(mem.db);
+    const a = repo.insertRunning({ startedAt: '2026-06-01T10:00:00.000Z', flags: null });
+    repo.finalize(a, 'ok', 0, '2026-06-01T10:05:00.000Z');
+    repo.markCheckpointIncomplete(a);
+    const b = repo.insertRunning({ startedAt: '2026-06-01T11:00:00.000Z', flags: null });
+    repo.finalize(b, 'ok', 0, '2026-06-01T11:05:00.000Z');
+    // Immediate predecessor (b) is clean — the strict "twice in a row" rule
+    // returns false even though `a` carries the marker.
+    expect(repo.previousCheckpointWasIncomplete()).toBe(false);
+  });
+
+  it("previousCheckpointWasIncomplete skips 'running' rows when finding the predecessor", () => {
+    const repo = createSyncRunsRepo(mem.db);
+    const a = repo.insertRunning({ startedAt: '2026-06-01T10:00:00.000Z', flags: null });
+    repo.finalize(a, 'ok', 0, '2026-06-01T10:05:00.000Z');
+    repo.markCheckpointIncomplete(a);
+    // A new in-flight run that has NOT yet finalized: the lookup should
+    // still see `a` (finished) as the predecessor and report true.
+    repo.insertRunning({ startedAt: '2026-06-01T11:00:00.000Z', flags: null });
+    expect(repo.previousCheckpointWasIncomplete()).toBe(true);
+  });
+});
