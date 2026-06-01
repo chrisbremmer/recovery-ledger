@@ -377,3 +377,49 @@ describe('cycles repo — rowToCycle() row → entity mapper (D-28)', () => {
     expect(() => rowToCycle(malformedRow)).toThrow(/SCORED but a score field is NULL/);
   });
 });
+
+// DBIN-03 (#77): the SQL-level CHECK constraint added by migration 0001
+// catches the same invariant the rowToCycle defensive throw guards at read
+// time — but at WRITE time, before the bad row can ever reach the
+// repository. Pre-DBIN-03 a hand-crafted INSERT (manual SQL, future
+// migration mistake, partial restore) could silently land a violator row;
+// post-DBIN-03 the INSERT fails with the named constraint.
+describe('cycles repo — DBIN-03 CHECK constraint enforces score_state invariant (#77)', () => {
+  let mem: InMemoryDbResult;
+  beforeEach(() => {
+    mem = createInMemoryDb();
+  });
+  afterEach(() => mem.close());
+
+  it('rejects SCORED row with null strain (cycles_score_state_invariant)', () => {
+    const insert = mem.db.$client.prepare(
+      'INSERT INTO cycles (id, user_id, created_at, updated_at, start, timezone_offset, score_state, strain, kilojoule, average_heart_rate, max_heart_rate, baseline_excluded, raw_json) ' +
+        "VALUES (1, 42, '2026-05-01T00:00:00Z', '2026-05-01T01:00:00Z', '2026-04-30T07:00:00Z', '-08:00', 'SCORED', NULL, 8300, 67, 176, 0, '{}')",
+    );
+    expect(() => insert.run()).toThrow(/CHECK constraint failed.*cycles_score_state_invariant/);
+  });
+
+  it('rejects PENDING_SCORE row with non-null strain (cycles_score_state_invariant)', () => {
+    const insert = mem.db.$client.prepare(
+      'INSERT INTO cycles (id, user_id, created_at, updated_at, start, timezone_offset, score_state, strain, kilojoule, average_heart_rate, max_heart_rate, baseline_excluded, raw_json) ' +
+        "VALUES (2, 42, '2026-05-01T00:00:00Z', '2026-05-01T01:00:00Z', '2026-04-30T07:00:00Z', '-08:00', 'PENDING_SCORE', 10.5, NULL, NULL, NULL, 0, '{}')",
+    );
+    expect(() => insert.run()).toThrow(/CHECK constraint failed.*cycles_score_state_invariant/);
+  });
+
+  it('accepts valid SCORED row with all 4 metric columns non-null', () => {
+    const insert = mem.db.$client.prepare(
+      'INSERT INTO cycles (id, user_id, created_at, updated_at, start, timezone_offset, score_state, strain, kilojoule, average_heart_rate, max_heart_rate, baseline_excluded, raw_json) ' +
+        "VALUES (3, 42, '2026-05-01T00:00:00Z', '2026-05-01T01:00:00Z', '2026-04-30T07:00:00Z', '-08:00', 'SCORED', 10.5, 8300, 67, 176, 0, '{}')",
+    );
+    expect(() => insert.run()).not.toThrow();
+  });
+
+  it('accepts valid PENDING_SCORE row with all 4 metric columns null', () => {
+    const insert = mem.db.$client.prepare(
+      'INSERT INTO cycles (id, user_id, created_at, updated_at, start, timezone_offset, score_state, baseline_excluded, raw_json) ' +
+        "VALUES (4, 42, '2026-05-01T00:00:00Z', '2026-05-01T01:00:00Z', '2026-04-30T07:00:00Z', '-08:00', 'PENDING_SCORE', 0, '{}')",
+    );
+    expect(() => insert.run()).not.toThrow();
+  });
+});
