@@ -25,8 +25,8 @@
 //   bootstrap_failed  = 1   openDb or migrate threw before sync started
 
 import { z } from 'zod';
-// Cross-layer import: src/domain/observability/sanitize.ts is the single source of truth for
-// secret-bearing pattern redaction. Mirrors the auth.ts cross-layer import.
+// `sanitize` is the single source of truth for secret-bearing pattern
+// redaction (D-07 / Pitfall 17); auth.ts uses it for the same reason.
 // ARCH-04 (#92): domain-layer AuthError helpers; infrastructure-layer
 // WhoopApiError helpers. Pre-ARCH-04 both pulled from the infrastructure
 // re-export — two class identities under vi.resetModules + drift risk.

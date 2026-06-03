@@ -25,14 +25,14 @@ import open from 'open';
 import { z } from 'zod';
 // ARCH-04 (#92): single canonical import path for AuthError + helpers.
 import { AuthError, formatAuthError, isAuthError } from '../../domain/errors/auth.js';
-// Cross-layer import: src/domain/observability/sanitize.ts is the single source of truth for
-// secret-bearing pattern redaction (D-07 / Pitfall 17). CR-04: a Zod or
-// JSON.parse error raised inside the outer try wraps the offending value
-// verbatim in its message; running `String(err)` through `sanitize()` is the
-// last line of defense before that string lands on the user's terminal. The
-// same cross-layer dependency exists in src/infrastructure/whoop/oauth.ts;
-// relocating sanitize to src/domain/observability/ is tracked as
-// deferred work (PLAN-03-CROSS-LAYER).
+// Phase 10 ARCH-01: `sanitize` lives in `src/domain/observability/` —
+// pure string transforms, no I/O. The PLAN-03-CROSS-LAYER deferral noted
+// in CR-04 was closed by relocating the module out of infrastructure into
+// domain. `sanitize` is the single source of truth for secret-bearing
+// pattern redaction (D-07 / Pitfall 17): a Zod or JSON.parse error raised
+// inside the outer try wraps the offending value verbatim in its message;
+// running `String(err)` through `sanitize()` is the last line of defense
+// before that string lands on the user's terminal.
 import { sanitize } from '../../domain/observability/sanitize.js';
 import { paths } from '../../infrastructure/config/paths.js';
 import { ConfigSchema } from '../../infrastructure/config/schema.js';
