@@ -1,32 +1,35 @@
 // Unit coverage for `httpGet` (D-17 + D-18 + D-21 + ADR-0007 +
 // 03-PATTERNS.md §B1). The tests stand up MSW inline because the
 // per-resource helpers ship in Plan 03-07; this file declares the
-// handlers it needs in `beforeEach`. The `callWithAuth` chokepoint is
-// mocked at the module boundary via `vi.mock(...)` so a real refresh
-// chain (which would call into `token-store.ts` and the OS keychain)
-// never runs. Test 10 spies the mock to enforce the D-18 runtime
-// attestation: callWithAuth fires exactly once per `httpGet` call.
+// handlers it needs in `beforeEach`.
+//
+// Phase 10 ARCH-03: `httpGet` now takes `authedCall` as its 4th positional
+// parameter. The test constructs a per-test `authedCallSpy` (a vi.fn that
+// invokes the supplied op with a fixed access token), so `fetch` runs
+// through MSW with `Authorization: Bearer test-token-123` and no real
+// refresh chain runs. C-10 inspects the call count on the spy to enforce
+// the D-18 runtime attestation: authedCall fires exactly once per `httpGet`
+// call. There is no longer any `vi.mock('refresh-orchestrator')` block —
+// client.ts no longer imports from `src/services/`.
 
 import { HttpResponse, http } from 'msw';
 import { setupServer } from 'msw/node';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, test, vi } from 'vitest';
 import { z } from 'zod';
+import { type AuthedCall, httpGet, WHOOP_API_BASE } from './client.js';
+import { WhoopApiError } from './errors.js';
+import { _resetForTest as resetRateLimit } from './rate-limit.js';
 
-// vi.mock factory — the production `callWithAuth` reaches into
-// `tokenStore.getValidAccessToken()`, which reads OS keychain state. The
-// mock returns a fixed access token by simply invoking the supplied
-// operation, so `fetch` runs through MSW with `Authorization: Bearer
-// test-token-123` and the rest of the orchestrator chain is bypassed.
-// Test 10 inspects the call count on this mock.
-const callWithAuthSpy = vi.fn();
-vi.mock('../../services/refresh-orchestrator.js', () => ({
-  callWithAuth: (op: (token: string) => Promise<unknown>) => callWithAuthSpy(op),
-}));
-
-// Imported AFTER the mock so the client picks up the fake.
-const { httpGet, WHOOP_API_BASE } = await import('./client.js');
-const { _resetForTest: resetRateLimit } = await import('./rate-limit.js');
-const { WhoopApiError } = await import('./errors.js');
+// Per-test authedCall spy. Default behavior: invoke `op` with the fixed
+// fake access token. Tests can override via `mockImplementationOnce` to
+// exercise the 401-retry path (C-06). The spy is intentionally untyped at
+// the vi.fn boundary so individual tests can narrow the op's response
+// shape; `AuthedCall` is generic over `<T extends {status: number}>` and
+// vi.fn cannot encode that quantifier directly.
+const authedCallSpy = vi.fn();
+// biome-ignore lint/suspicious/noExplicitAny: see comment above the spy
+const authedCall: AuthedCall = ((op: (token: string) => Promise<any>) =>
+  authedCallSpy(op)) as AuthedCall;
 
 const server = setupServer();
 
@@ -40,11 +43,11 @@ afterAll(() => {
 
 beforeEach(() => {
   resetRateLimit();
-  callWithAuthSpy.mockReset();
-  // Default callWithAuth behavior: invoke the operation once with the
+  authedCallSpy.mockReset();
+  // Default authedCall behavior: invoke the operation once with the
   // fixed access token. Tests can override before each call when they
   // need to exercise a different path.
-  callWithAuthSpy.mockImplementation(async (op: (token: string) => Promise<unknown>) =>
+  authedCallSpy.mockImplementation(async (op: (token: string) => Promise<{ status: number }>) =>
     op('test-token-123'),
   );
 });
@@ -65,7 +68,7 @@ describe('httpGet — URL + headers + method', () => {
       }),
     );
 
-    const result = await httpGet('/v2/cycle', { limit: 25 }, okSchema);
+    const result = await httpGet('/v2/cycle', { limit: 25 }, okSchema, authedCall);
 
     expect(result).toEqual({ ok: true });
     expect(observedUrl).toContain(`${WHOOP_API_BASE}/v2/cycle`);
@@ -81,7 +84,7 @@ describe('httpGet — URL + headers + method', () => {
       }),
     );
 
-    await httpGet('/v2/cycle', {}, okSchema);
+    await httpGet('/v2/cycle', {}, okSchema, authedCall);
     expect(observedAuth).toBe('Bearer test-token-123');
   });
 
@@ -94,7 +97,7 @@ describe('httpGet — URL + headers + method', () => {
       }),
     );
 
-    await httpGet('/v2/cycle', {}, okSchema);
+    await httpGet('/v2/cycle', {}, okSchema, authedCall);
     expect(observedMethod).toBe('GET');
   });
 
@@ -107,7 +110,7 @@ describe('httpGet — URL + headers + method', () => {
       }),
     );
 
-    await httpGet('/v2/cycle', { nextToken: 'abc' }, okSchema);
+    await httpGet('/v2/cycle', { nextToken: 'abc' }, okSchema, authedCall);
     expect(observedUrl).toContain('nextToken=abc');
   });
 
@@ -120,7 +123,12 @@ describe('httpGet — URL + headers + method', () => {
       }),
     );
 
-    await httpGet('/v2/cycle', { keep: 'yes', drop1: undefined, drop2: null }, okSchema);
+    await httpGet(
+      '/v2/cycle',
+      { keep: 'yes', drop1: undefined, drop2: null },
+      okSchema,
+      authedCall,
+    );
     expect(observedUrl).toContain('keep=yes');
     expect(observedUrl).not.toContain('drop1');
     expect(observedUrl).not.toContain('drop2');
@@ -144,7 +152,7 @@ describe('httpGet — retry + error mapping', () => {
         return HttpResponse.json({ ok: true });
       }),
     );
-    callWithAuthSpy.mockImplementationOnce(async (op: (token: string) => Promise<Response>) => {
+    authedCallSpy.mockImplementationOnce(async (op: (token: string) => Promise<Response>) => {
       const first = await op('stale-token');
       if (first.status === 401) {
         return op('fresh-token');
@@ -152,7 +160,7 @@ describe('httpGet — retry + error mapping', () => {
       return first;
     });
 
-    const result = await httpGet('/v2/cycle', {}, okSchema);
+    const result = await httpGet('/v2/cycle', {}, okSchema, authedCall);
     expect(result).toEqual({ ok: true });
     expect(calls).toBe(2);
   });
@@ -169,7 +177,7 @@ describe('httpGet — retry + error mapping', () => {
       }),
     );
 
-    const result = await httpGet('/v2/cycle', {}, okSchema);
+    const result = await httpGet('/v2/cycle', {}, okSchema, authedCall);
     expect(result).toEqual({ ok: true });
     expect(calls).toBe(2);
   });
@@ -181,7 +189,7 @@ describe('httpGet — retry + error mapping', () => {
 
     let captured: unknown;
     try {
-      await httpGet('/v2/cycle', {}, okSchema);
+      await httpGet('/v2/cycle', {}, okSchema, authedCall);
     } catch (err) {
       captured = err;
     }
@@ -196,7 +204,7 @@ describe('httpGet — retry + error mapping', () => {
 
     let captured: unknown;
     try {
-      await httpGet('/v2/cycle', {}, okSchema);
+      await httpGet('/v2/cycle', {}, okSchema, authedCall);
     } catch (err) {
       captured = err;
     }
@@ -207,9 +215,9 @@ describe('httpGet — retry + error mapping', () => {
   test('C-10: callWithAuth is invoked EXACTLY ONCE per httpGet call (D-18 runtime attestation)', async () => {
     server.use(http.get(`${WHOOP_API_BASE}/v2/cycle`, () => HttpResponse.json({ ok: true })));
 
-    callWithAuthSpy.mockClear();
-    await httpGet('/v2/cycle', {}, okSchema);
-    expect(callWithAuthSpy).toHaveBeenCalledTimes(1);
+    authedCallSpy.mockClear();
+    await httpGet('/v2/cycle', {}, okSchema, authedCall);
+    expect(authedCallSpy).toHaveBeenCalledTimes(1);
   });
 
   test('C-11: fetch is invoked at least once (smoke — load-bearing assertions live in C-01..C-05)', async () => {
@@ -221,7 +229,7 @@ describe('httpGet — retry + error mapping', () => {
       }),
     );
 
-    await httpGet('/v2/cycle', {}, okSchema);
+    await httpGet('/v2/cycle', {}, okSchema, authedCall);
     expect(hits).toBeGreaterThanOrEqual(1);
   });
 });

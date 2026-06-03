@@ -315,12 +315,15 @@ describe('refresh failure', () => {
 // =============================================================================
 
 describe('services barrel', () => {
-  test('S-01: createServices() returns both runDoctor and refreshOrchestrator; callWithAuth is a function', async () => {
+  test('S-01: createServices() returns runDoctor; refreshOrchestrator moved off ServicesBase (ARCH-02)', async () => {
     const mod = await import('./index.js');
     const services = mod.createServices();
     expect(typeof services.runDoctor).toBe('function');
-    expect(services.refreshOrchestrator).toBeDefined();
-    expect(typeof services.refreshOrchestrator.callWithAuth).toBe('function');
+    // Phase 10 ARCH-02 (#85): refreshOrchestrator is no longer on
+    // ServicesBase. bootstrap() is the sole construction site and
+    // exposes it on `Services` (which extends `ServicesBase`). The
+    // lightweight createServices() path does NOT include it.
+    expect((services as unknown as Record<string, unknown>).refreshOrchestrator).toBeUndefined();
   });
 
   test('S-02: createRefreshOrchestrator(mockStore).callWithAuth(op) end-to-end happy path returns op result', async () => {

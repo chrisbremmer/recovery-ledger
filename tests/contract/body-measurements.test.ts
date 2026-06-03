@@ -10,27 +10,24 @@
 // ADR-0006: onUnhandledRequest:'error' on MSW. The injected clock is
 // explicit per call so captured_at is deterministic and `latest()`
 // orderBy(desc(captured_at)) is unambiguous in Test 3.
+//
+// Phase 10 ARCH-03 composes the resource factory with a deterministic fake
+// `authedCall` instead of mocking the (now-deleted)
+// `services/refresh-orchestrator` singleton.
 
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, test, vi } from 'vitest';
+import { createBodyMeasurementsRepo } from '../../src/infrastructure/db/repositories/body-measurements.repo.js';
+import type { AuthedCall } from '../../src/infrastructure/whoop/client.js';
+import { _resetForTest as resetRateLimit } from '../../src/infrastructure/whoop/rate-limit.js';
+import { createGetBodyMeasurement } from '../../src/infrastructure/whoop/resources/body-measurements.js';
 import { createInMemoryDb, type InMemoryDbResult } from '../helpers/in-memory-db.js';
 import {
   createWhoopBodyMeasurementsHelper,
   type WhoopBodyMeasurementsHelper,
 } from '../helpers/msw-whoop-body-measurements.js';
 
-vi.mock('../../src/services/refresh-orchestrator.js', () => ({
-  callWithAuth: (op: (token: string) => Promise<unknown>) => op('test-token-123'),
-}));
-
-const { getBodyMeasurement } = await import(
-  '../../src/infrastructure/whoop/resources/body-measurements.js'
-);
-const { createBodyMeasurementsRepo } = await import(
-  '../../src/infrastructure/db/repositories/body-measurements.repo.js'
-);
-const { _resetForTest: resetRateLimit } = await import(
-  '../../src/infrastructure/whoop/rate-limit.js'
-);
+const authedCall: AuthedCall = (op) => op('test-token-123');
+const getBodyMeasurement = createGetBodyMeasurement({ authedCall });
 
 vi.setConfig({ testTimeout: 5_000 });
 

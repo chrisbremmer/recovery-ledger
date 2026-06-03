@@ -18,49 +18,35 @@
 // layer (which logs via Pino BEFORE the sanitizer fires) holds the
 // invariant on its own.
 
+// Phase 10 ARCH-03: compose each resource factory with a fake `authedCall`.
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, test, vi } from 'vitest';
+import { logger } from '../../../src/infrastructure/config/logger.js';
+import { createBodyMeasurementsRepo } from '../../../src/infrastructure/db/repositories/body-measurements.repo.js';
+import { createCyclesRepo } from '../../../src/infrastructure/db/repositories/cycles.repo.js';
+import { createProfileRepo } from '../../../src/infrastructure/db/repositories/profile.repo.js';
+import { createRecoveryRepo } from '../../../src/infrastructure/db/repositories/recovery.repo.js';
+import { createSleepsRepo } from '../../../src/infrastructure/db/repositories/sleep.repo.js';
+import { createSyncRunsRepo } from '../../../src/infrastructure/db/repositories/sync-runs.repo.js';
+import { createWorkoutsRepo } from '../../../src/infrastructure/db/repositories/workouts.repo.js';
+import type { AuthedCall } from '../../../src/infrastructure/whoop/client.js';
+import { _resetForTest as resetRateLimit } from '../../../src/infrastructure/whoop/rate-limit.js';
+import { createGetBodyMeasurement } from '../../../src/infrastructure/whoop/resources/body-measurements.js';
+import { createListCycles } from '../../../src/infrastructure/whoop/resources/cycles.js';
+import { createGetProfile } from '../../../src/infrastructure/whoop/resources/profile.js';
+import { createListRecovery } from '../../../src/infrastructure/whoop/resources/recovery.js';
+import { createListSleep } from '../../../src/infrastructure/whoop/resources/sleep.js';
+import { createListWorkouts } from '../../../src/infrastructure/whoop/resources/workouts.js';
+import { runSync } from '../../../src/services/sync/index.js';
 import { createInMemoryDb, type InMemoryDbResult } from '../../helpers/in-memory-db.js';
 import { type AllResourcesMswHelper, createAllResourcesMsw } from './helpers/all-resources-msw.js';
 
-vi.mock('../../../src/services/refresh-orchestrator.js', () => ({
-  callWithAuth: (op: (token: string) => Promise<unknown>) => op('test-token-123'),
-}));
-
-const { runSync } = await import('../../../src/services/sync/index.js');
-
-const { _resetForTest: resetRateLimit } = await import(
-  '../../../src/infrastructure/whoop/rate-limit.js'
-);
-const { createCyclesRepo } = await import(
-  '../../../src/infrastructure/db/repositories/cycles.repo.js'
-);
-const { createRecoveryRepo } = await import(
-  '../../../src/infrastructure/db/repositories/recovery.repo.js'
-);
-const { createSleepsRepo } = await import(
-  '../../../src/infrastructure/db/repositories/sleep.repo.js'
-);
-const { createWorkoutsRepo } = await import(
-  '../../../src/infrastructure/db/repositories/workouts.repo.js'
-);
-const { createProfileRepo } = await import(
-  '../../../src/infrastructure/db/repositories/profile.repo.js'
-);
-const { createBodyMeasurementsRepo } = await import(
-  '../../../src/infrastructure/db/repositories/body-measurements.repo.js'
-);
-const { createSyncRunsRepo } = await import(
-  '../../../src/infrastructure/db/repositories/sync-runs.repo.js'
-);
-const { listCycles } = await import('../../../src/infrastructure/whoop/resources/cycles.js');
-const { listRecovery } = await import('../../../src/infrastructure/whoop/resources/recovery.js');
-const { listSleep } = await import('../../../src/infrastructure/whoop/resources/sleep.js');
-const { listWorkouts } = await import('../../../src/infrastructure/whoop/resources/workouts.js');
-const { getProfile } = await import('../../../src/infrastructure/whoop/resources/profile.js');
-const { getBodyMeasurement } = await import(
-  '../../../src/infrastructure/whoop/resources/body-measurements.js'
-);
-const { logger } = await import('../../../src/infrastructure/config/logger.js');
+const authedCall: AuthedCall = (op) => op('test-token-123');
+const listCycles = createListCycles({ authedCall });
+const listRecovery = createListRecovery({ authedCall });
+const listSleep = createListSleep({ authedCall });
+const listWorkouts = createListWorkouts({ authedCall });
+const getProfile = createGetProfile({ authedCall });
+const getBodyMeasurement = createGetBodyMeasurement({ authedCall });
 
 // 429 + 5xx retries sleep based on header values; pump the test timeout
 // up so the 1s X-RateLimit-Reset fallback in retry.ts does not flake.

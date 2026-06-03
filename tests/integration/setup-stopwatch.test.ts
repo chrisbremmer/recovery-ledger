@@ -211,7 +211,12 @@ describe.skipIf(!RUN_STOPWATCH)('setup stopwatch — npm install to first review
       // expires_in (3600s) puts expiresAt ~1h out, so the subsequent sync's
       // getValidAccessToken returns the stored token WITHOUT a refresh.
       const { exchangeCode } = await import('../../src/infrastructure/whoop/oauth.js');
-      const { tokenStore } = await import('../../src/infrastructure/whoop/token-store.js');
+      // Phase 10 ARCH-02 (#85): the module-load `tokenStore` singleton is
+      // gone; this stopwatch step constructs its own instance because it
+      // runs BEFORE bootstrap (mirroring the CLI auth.ts flow exactly —
+      // see ADR-0002 §Enforcement and the OAuth-login exception).
+      const { createTokenStore } = await import('../../src/infrastructure/whoop/token-store.js');
+      const tokenStore = createTokenStore();
       const tokens = await exchangeCode({
         code: 'test_auth_code',
         redirectUri: `http://127.0.0.1:${config.redirectPort}/callback`,

@@ -5,23 +5,21 @@
 // per A6; no DST flag on the sleep row (D-14 + Plan 03-08 sleep.repo.ts
 // docs the includeExcluded no-op for symmetry with the four scored repos).
 //
-// ADR-0006: onUnhandledRequest:'error' on MSW. vi.mock of the
-// refresh-orchestrator bypasses the keychain.
+// ADR-0006: onUnhandledRequest:'error' on MSW. Phase 10 ARCH-03 composes
+// the resource factory with a deterministic fake `authedCall` instead of
+// mocking the (now-deleted) `services/refresh-orchestrator` singleton.
 
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, test, vi } from 'vitest';
 import type { Sleep } from '../../src/domain/types/entities.js';
+import { createSleepsRepo } from '../../src/infrastructure/db/repositories/sleep.repo.js';
+import type { AuthedCall } from '../../src/infrastructure/whoop/client.js';
+import { _resetForTest as resetRateLimit } from '../../src/infrastructure/whoop/rate-limit.js';
+import { createListSleep } from '../../src/infrastructure/whoop/resources/sleep.js';
 import { createInMemoryDb, type InMemoryDbResult } from '../helpers/in-memory-db.js';
 import { createWhoopSleepHelper, type WhoopSleepHelper } from '../helpers/msw-whoop-sleep.js';
 
-vi.mock('../../src/services/refresh-orchestrator.js', () => ({
-  callWithAuth: (op: (token: string) => Promise<unknown>) => op('test-token-123'),
-}));
-
-const { listSleep } = await import('../../src/infrastructure/whoop/resources/sleep.js');
-const { createSleepsRepo } = await import('../../src/infrastructure/db/repositories/sleep.repo.js');
-const { _resetForTest: resetRateLimit } = await import(
-  '../../src/infrastructure/whoop/rate-limit.js'
-);
+const authedCall: AuthedCall = (op) => op('test-token-123');
+const listSleep = createListSleep({ authedCall });
 
 vi.setConfig({ testTimeout: 5_000 });
 

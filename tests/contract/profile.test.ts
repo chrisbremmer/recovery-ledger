@@ -5,23 +5,20 @@
 // profileRepo.getCurrent. ON CONFLICT(user_id) DO UPDATE per D-11 keeps
 // the row count at 1 across repeated syncs.
 //
-// ADR-0006: onUnhandledRequest:'error' on MSW.
+// ADR-0006: onUnhandledRequest:'error' on MSW. Phase 10 ARCH-03 composes
+// the resource factory with a deterministic fake `authedCall` instead of
+// mocking the (now-deleted) `services/refresh-orchestrator` singleton.
 
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, test, vi } from 'vitest';
+import { createProfileRepo } from '../../src/infrastructure/db/repositories/profile.repo.js';
+import type { AuthedCall } from '../../src/infrastructure/whoop/client.js';
+import { _resetForTest as resetRateLimit } from '../../src/infrastructure/whoop/rate-limit.js';
+import { createGetProfile } from '../../src/infrastructure/whoop/resources/profile.js';
 import { createInMemoryDb, type InMemoryDbResult } from '../helpers/in-memory-db.js';
 import { createWhoopProfileHelper, type WhoopProfileHelper } from '../helpers/msw-whoop-profile.js';
 
-vi.mock('../../src/services/refresh-orchestrator.js', () => ({
-  callWithAuth: (op: (token: string) => Promise<unknown>) => op('test-token-123'),
-}));
-
-const { getProfile } = await import('../../src/infrastructure/whoop/resources/profile.js');
-const { createProfileRepo } = await import(
-  '../../src/infrastructure/db/repositories/profile.repo.js'
-);
-const { _resetForTest: resetRateLimit } = await import(
-  '../../src/infrastructure/whoop/rate-limit.js'
-);
+const authedCall: AuthedCall = (op) => op('test-token-123');
+const getProfile = createGetProfile({ authedCall });
 
 vi.setConfig({ testTimeout: 5_000 });
 
