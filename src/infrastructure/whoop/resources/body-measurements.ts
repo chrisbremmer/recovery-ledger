@@ -3,6 +3,9 @@
 // `/v2/user/measurement/body` verified against the WHOOP v2 docs + the
 // Plan 03-07 MSW helper's BODY_MEASUREMENTS_URL constant.
 //
+// Phase 10 ARCH-03: factory shape — `createGetBodyMeasurement({authedCall})`
+// captures the orchestrator's callWithAuth via closure.
+//
 // Returns BOTH the raw payload AND the normalized intermediate shape so
 // the sync orchestrator (Plan 03-11) can pass `JSON.stringify(raw)` to
 // the Plan 03-08 bodyMeasurementsRepo.upsertOnChange `rawJson` parameter
@@ -15,15 +18,26 @@ import {
   normalizeBodyMeasurement,
 } from '../../../domain/normalize/body-measurements.js';
 import { WhoopRawBodyMeasurement } from '../../../domain/schemas/whoop-api.js';
-import { httpGet } from '../client.js';
+import { type AuthedCall, httpGet } from '../client.js';
+
+export interface GetBodyMeasurementDeps {
+  authedCall: AuthedCall;
+}
 
 export interface GetBodyMeasurementResult {
   raw: z.infer<typeof WhoopRawBodyMeasurement>;
   entity: NormalizedBodyMeasurement;
 }
 
-export async function getBodyMeasurement(): Promise<GetBodyMeasurementResult> {
-  const raw = await httpGet('/v2/user/measurement/body', {}, WhoopRawBodyMeasurement);
-  const entity = normalizeBodyMeasurement(raw, { clock: new Date() });
-  return { raw, entity };
+export function createGetBodyMeasurement(deps: GetBodyMeasurementDeps) {
+  return async function getBodyMeasurement(): Promise<GetBodyMeasurementResult> {
+    const raw = await httpGet(
+      '/v2/user/measurement/body',
+      {},
+      WhoopRawBodyMeasurement,
+      deps.authedCall,
+    );
+    const entity = normalizeBodyMeasurement(raw, { clock: new Date() });
+    return { raw, entity };
+  };
 }

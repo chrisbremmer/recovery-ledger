@@ -56,12 +56,19 @@ import type { RecoveryRepo } from '../../infrastructure/db/repositories/recovery
 import type { SleepsRepo } from '../../infrastructure/db/repositories/sleep.repo.js';
 import type { SyncRunsRepo } from '../../infrastructure/db/repositories/sync-runs.repo.js';
 import type { WorkoutsRepo } from '../../infrastructure/db/repositories/workouts.repo.js';
-import type { getBodyMeasurement } from '../../infrastructure/whoop/resources/body-measurements.js';
-import type { listCycles } from '../../infrastructure/whoop/resources/cycles.js';
-import type { getProfile } from '../../infrastructure/whoop/resources/profile.js';
-import type { listRecovery } from '../../infrastructure/whoop/resources/recovery.js';
-import type { listSleep } from '../../infrastructure/whoop/resources/sleep.js';
-import type { listWorkouts } from '../../infrastructure/whoop/resources/workouts.js';
+// Phase 10 ARCH-03: the resource modules are factories now
+// (`createListCycles({authedCall}) → listCycles`). We capture the resource
+// function type via ReturnType<typeof createList*> so RunSyncDeps continues
+// to constrain the consumer shape (a `(opts) => Promise<Result>` callable)
+// without depending on a named runtime export at the resource-module top
+// level. The bootstrap layer (composition root) and the integration test
+// suite both pass the factory-built closure here.
+import type { createGetBodyMeasurement } from '../../infrastructure/whoop/resources/body-measurements.js';
+import type { createListCycles } from '../../infrastructure/whoop/resources/cycles.js';
+import type { createGetProfile } from '../../infrastructure/whoop/resources/profile.js';
+import type { createListRecovery } from '../../infrastructure/whoop/resources/recovery.js';
+import type { createListSleep } from '../../infrastructure/whoop/resources/sleep.js';
+import type { createListWorkouts } from '../../infrastructure/whoop/resources/workouts.js';
 import { computeWindow } from './cursor.js';
 import { classifyOutcome, computeStatus } from './per-resource.js';
 
@@ -85,12 +92,12 @@ export interface RunSyncDeps {
   };
   whoop: {
     resources: {
-      cycles: typeof listCycles;
-      recoveries: typeof listRecovery;
-      sleeps: typeof listSleep;
-      workouts: typeof listWorkouts;
-      profile: typeof getProfile;
-      body_measurements: typeof getBodyMeasurement;
+      cycles: ReturnType<typeof createListCycles>;
+      recoveries: ReturnType<typeof createListRecovery>;
+      sleeps: ReturnType<typeof createListSleep>;
+      workouts: ReturnType<typeof createListWorkouts>;
+      profile: ReturnType<typeof createGetProfile>;
+      body_measurements: ReturnType<typeof createGetBodyMeasurement>;
     };
   };
   /** Raw better-sqlite3 handle — needed for `wal_checkpoint(TRUNCATE)` per D-32.

@@ -3,6 +3,9 @@
 // keyFn passed. Workouts inherit DST/tz exclusion via cycle_id at query
 // time (D-14), so this module does NOT compute exclusion here.
 //
+// Phase 10 ARCH-03: factory shape — `createListWorkouts({authedCall})`
+// captures the orchestrator's callWithAuth via closure.
+//
 // Endpoint path `/v2/activity/workout` verified against the WHOOP v2 docs
 // + the Plan 03-07 MSW helper's WORKOUTS_URL constant.
 
@@ -13,8 +16,12 @@ import {
   WhoopWorkoutsPageSchema,
 } from '../../../domain/schemas/whoop-api.js';
 import type { Workout } from '../../../domain/types/entities.js';
-import { httpGet } from '../client.js';
+import { type AuthedCall, httpGet } from '../client.js';
 import { PAGE_SIZE, paginateAll } from '../pagination.js';
+
+export interface ListWorkoutsDeps {
+  authedCall: AuthedCall;
+}
 
 export interface ListWorkoutsOpts {
   since: string;
@@ -32,19 +39,22 @@ export interface ListWorkoutsResult {
   rawRecords: z.infer<typeof WhoopRawWorkout>[];
 }
 
-export async function listWorkouts(opts: ListWorkoutsOpts): Promise<ListWorkoutsResult> {
-  const rawRecords = await paginateAll<z.infer<typeof WhoopRawWorkout>>(async (nextToken) =>
-    httpGet(
-      '/v2/activity/workout',
-      {
-        start: opts.since,
-        end: opts.until,
-        limit: PAGE_SIZE,
-        nextToken: nextToken ?? undefined,
-      },
-      WhoopWorkoutsPageSchema,
-    ),
-  );
+export function createListWorkouts(deps: ListWorkoutsDeps) {
+  return async function listWorkouts(opts: ListWorkoutsOpts): Promise<ListWorkoutsResult> {
+    const rawRecords = await paginateAll<z.infer<typeof WhoopRawWorkout>>(async (nextToken) =>
+      httpGet(
+        '/v2/activity/workout',
+        {
+          start: opts.since,
+          end: opts.until,
+          limit: PAGE_SIZE,
+          nextToken: nextToken ?? undefined,
+        },
+        WhoopWorkoutsPageSchema,
+        deps.authedCall,
+      ),
+    );
 
-  return { entities: rawRecords.map(normalizeWorkout), rawRecords };
+    return { entities: rawRecords.map(normalizeWorkout), rawRecords };
+  };
 }
