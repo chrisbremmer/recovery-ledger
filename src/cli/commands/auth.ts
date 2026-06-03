@@ -62,6 +62,13 @@ export async function runAuthCommand(opts: {
   // See `agent_docs/decisions/0002-single-flight-oauth-refresh.md`
   // §Enforcement and 10-RESEARCH.md Q7-RESOLVED. Every other DB-coupled
   // flow pulls `tokenStore` off `bootstrap().services`.
+  //
+  // DO NOT COPY this pattern to add a third construction site. Gate N
+  // (scripts/ci-grep-gates.sh) forbids new `createTokenStore(` call
+  // sites in `src/` outside the three sanctioned files (token-store.ts
+  // itself, bootstrap.ts, and this file). If a future flow legitimately
+  // needs the OAuth-login exception, AMEND ADR-0002 first and update
+  // Gate N's whitelist — do not bypass.
   const tokenStore = createTokenStore();
   try {
     // Read config (D-01) — Zod-validate via the canonical schema.

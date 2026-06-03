@@ -100,10 +100,26 @@ all callers go through it.
   the login flow does not bootstrap (no DB needed; bootstrapping would
   slow login and surface migration errors during a DB-independent
   action). Tests construct fresh stores via `createTokenStore(...)`;
-  nothing imports the (deleted) singleton. Enforced by
-  `rg "^export const tokenStore" src` returning zero matches AND
-  `rg "import.*tokenStore[^A-Za-z]" src` returning matches only in
-  `src/services/bootstrap.ts` and `src/cli/commands/auth.ts`.
+  nothing imports the (deleted) singleton. Enforced by three CI grep
+  gates plus their text-form equivalents:
+  - Gate L (`^export const (tokenStore|refreshOrchestrator|callWithAuth)`
+    in `src/`): forbids the historical module-load singleton exports.
+    Text form: `rg "^export const tokenStore" src` MUST return zero
+    matches.
+  - Gate N (`createTokenStore\(` call sites in non-test `src/`): forbids
+    new call sites outside the two sanctioned files. Text form:
+    `rg -n 'createTokenStore\(' src --type ts | rg -v '\.test\.ts:' | rg -v
+    -E '(src/infrastructure/whoop/token-store\.ts|src/services/bootstrap\.ts|src/cli/commands/auth\.ts):'`
+    MUST return zero matches. (`token-store.ts` is the definition
+    itself; `bootstrap.ts` is the DB-coupled construction site;
+    `auth.ts` is the OAuth-login exception.)
+  - Gate M (`from '.../services/'` inside `src/infrastructure/`): forbids
+    the cross-layer arrow ARCH-03 inverted.
+
+  **For future contributors:** if you need a third sanctioned
+  construction site, AMEND THIS ADR FIRST and update Gate N's
+  whitelist. Do not copy the auth.ts pattern silently — Gate N will
+  fire in CI.
 
 ## Cross-references
 

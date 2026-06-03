@@ -214,7 +214,20 @@ describe.skipIf(!RUN_STOPWATCH)('setup stopwatch — npm install to first review
       // Phase 10 ARCH-02 (#85): the module-load `tokenStore` singleton is
       // gone; this stopwatch step constructs its own instance because it
       // runs BEFORE bootstrap (mirroring the CLI auth.ts flow exactly —
-      // see ADR-0002 §Enforcement and the OAuth-login exception).
+      // see ADR-0002 §Enforcement and the OAuth-login exception). Step 5
+      // below will call `bootstrap()` which constructs a SECOND tokenStore
+      // inside the same Node process. That is safe HERE because Step 4 and
+      // Step 5 are strictly sequential — Step 4 writes-then-exits before
+      // Step 5 reads — so the two stores never coexist on a concurrent
+      // refresh. DO NOT copy this dual-store pattern into a test (or any
+      // code path) where the two phases could interleave: each
+      // tokenStore has its own per-instance in-process single-flight
+      // gate, so concurrent refreshes from two stores in one process
+      // would bypass each other's `inFlightRefresh` Promise and rely on
+      // the OS-level file lock alone to arbitrate. Gate N forbids new
+      // `createTokenStore(` call sites outside the three sanctioned
+      // src/ files (token-store.ts, bootstrap.ts, auth.ts) — test files
+      // are exempt by design, but the invariant still applies.
       const { createTokenStore } = await import('../../src/infrastructure/whoop/token-store.js');
       const tokenStore = createTokenStore();
       const tokens = await exchangeCode({

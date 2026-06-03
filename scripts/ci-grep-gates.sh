@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# CI grep gates — thirteen rules (A-M) that Biome cannot catch on its own.
+# CI grep gates — fourteen rules (A-N) that Biome cannot catch on its own.
 #
 # Gate A: banned tone words (CLAUDE.md "Critical Rules" list) — banned in code,
 #         tests, formatters, configs, and docs other than the rule definitions
@@ -99,6 +99,13 @@
 #         (*.test.ts) are exempt (a contract test may briefly import a
 #         service-layer type in prose for documentation, never as a
 #         runtime dependency).
+# Gate N: no `createTokenStore(` call sites in src/ outside the three
+#         sanctioned files (the definition itself, bootstrap.ts, and the
+#         OAuth-login exception in auth.ts). Gate L catches only the
+#         module-load export form; this gate closes the local-call
+#         loophole so the ARCH-02 single-flight invariant is mechanically
+#         enforced instead of resting on code review alone. Amend
+#         ADR-0002 §Enforcement before extending the whitelist.
 #
 # Exit-code semantics (Pitfall 10): grep returns 0 on match (= violation found).
 # Each gate inverts that: if grep -rEn matches, the gate prints ::error:: and
@@ -523,6 +530,35 @@ if "$GREP" -rEn "$SERVICES_IMPORT_RE" --include='*.ts' src/infrastructure/ 2>/de
   fi
 fi
 rm -f /tmp/gate-m.$$
+
+# ----------------------------------------------------------------------------
+# Gate N — no `createTokenStore(` call sites in src/ outside the three
+# sanctioned files. Gate L catches only the historical module-load
+# *export* form; a future contributor could otherwise call the factory
+# locally in any DB-coupled flow and silently introduce a second
+# per-process instance, defeating the ADR-0002 single-flight invariant.
+# The three allowed files are:
+#   - the definition itself (src/infrastructure/whoop/token-store.ts)
+#   - the DB-coupled construction site (src/services/bootstrap.ts)
+#   - the OAuth-login exception (src/cli/commands/auth.ts)
+# Test files (*.test.ts) are exempt — they construct per-test fakes.
+# Pre-amble: amend ADR-0002 §Enforcement before extending this list.
+# ----------------------------------------------------------------------------
+CREATE_TOKEN_STORE_CALL_RE='createTokenStore\('
+CREATE_TOKEN_STORE_ALLOWED_RE='^(src/infrastructure/whoop/token-store\.ts|src/services/bootstrap\.ts|src/cli/commands/auth\.ts):'
+
+if "$GREP" -rEn "$CREATE_TOKEN_STORE_CALL_RE" --include='*.ts' src/ 2>/dev/null \
+   | "$GREP" -Ev '\.test\.ts:' \
+   | "$GREP" -Ev "$CREATE_TOKEN_STORE_ALLOWED_RE" \
+   > /tmp/gate-n.$$; then
+  if [ -s /tmp/gate-n.$$ ]; then
+    echo "::error::Gate N — forbidden createTokenStore() call site (ARCH-02: only the three sanctioned files may construct an instance; AMEND ADR-0002 §Enforcement before extending this list):"
+    cat /tmp/gate-n.$$
+    rm -f /tmp/gate-n.$$
+    exit 1
+  fi
+fi
+rm -f /tmp/gate-n.$$
 
 echo "All grep gates passed."
 exit 0

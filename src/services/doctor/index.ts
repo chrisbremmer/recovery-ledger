@@ -290,6 +290,11 @@ export async function runDoctor(opts: RunDoctorOptions = {}): Promise<DoctorResu
   // location-probing fallback runs (createServices / test path).
   const schemaVersionDeps =
     opts.migrationsDir != null ? { ...sqliteDeps, migrationsDir: opts.migrationsDir } : sqliteDeps;
+  // Capture once so TypeScript can narrow it inside the probeAuth /
+  // probeTokenFreshness closures. Narrowing on `opts.tokenStore != null`
+  // would not survive the closure boundary (the property could change
+  // between read and call), forcing `as TokenStore` casts at every use.
+  const tokenStoreHandle = opts.tokenStore;
   const settled = await Promise.allSettled([
     probeBetterSqlite3(),
     probeKeyring(),
@@ -308,16 +313,16 @@ export async function runDoctor(opts: RunDoctorOptions = {}): Promise<DoctorResu
     // that returns null for both readers so each probe surfaces its
     // standard "no tokens" structured fail (instead of throwing).
     probeAuth(
-      opts.tokenStore != null
+      tokenStoreHandle != null
         ? {
-            readStorageMode: () => (opts.tokenStore as TokenStore).readStorageMode(),
-            readTokens: () => (opts.tokenStore as TokenStore).read(),
+            readStorageMode: () => tokenStoreHandle.readStorageMode(),
+            readTokens: () => tokenStoreHandle.read(),
           }
         : { readStorageMode: async () => null, readTokens: async () => null },
     ),
     probeTokenFreshness(
-      opts.tokenStore != null
-        ? { read: () => (opts.tokenStore as TokenStore).read(), now: Date.now }
+      tokenStoreHandle != null
+        ? { read: () => tokenStoreHandle.read(), now: Date.now }
         : { read: async () => null, now: Date.now },
     ),
     // Plan 05-06: the ONE online probe. When deps are present and --offline

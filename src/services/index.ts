@@ -136,11 +136,16 @@ export interface Services extends ServicesBase {
    */
   refreshOrchestrator: RefreshOrchestrator;
   /**
-   * Phase 10 ARCH-02 (#85): the bootstrap-constructed `TokenStore` instance.
-   * Any future DB-coupled flow can pull it from `Bootstrapped.services`
-   * rather than instantiating its own. The OAuth-login flow
+   * Phase 10 ARCH-02 (#85): the bootstrap-constructed `TokenStore` instance,
+   * surfaced so DB-coupled flows can route through `bootstrap().services`
+   * instead of constructing their own. Sensitive surface — exposes
+   * `read()`/`write()` on raw token material. Consumers SHOULD prefer
+   * `refreshOrchestrator.callWithAuth(...)` and only reach for
+   * `tokenStore` when the caller genuinely needs storage-mode or
+   * lifecycle access (e.g. doctor probes). The OAuth-login flow
    * (`src/cli/commands/auth.ts`) is the sole documented exception per
-   * ADR-0002 §Enforcement.
+   * ADR-0002 §Enforcement; everything else MUST pull this field rather
+   * than constructing a second instance — Gate N enforces.
    */
   tokenStore: TokenStore;
 }

@@ -466,6 +466,17 @@ export function bootstrap(opts: BootstrapOptions = {}): Bootstrapped {
   // (`recoveries`/`sleeps`) to the singular keys the recency / scored-day /
   // data-quality probes consume (`recovery`/`sleep`) — the narrow union
   // structurally matches `RunDoctorOptions.repos`.
+  // Spread-then-override semantics: each individual `opts.X ?? default`
+  // gives the caller's CONCRETE value priority and falls back to the
+  // bootstrap-bound default when the caller's value is null/undefined.
+  // A caller passing `{ tokenStore: undefined }` explicitly will land
+  // on the bootstrap default (not stay undefined) — this is the
+  // test-seam contract the surrounding tests rely on. The `...opts`
+  // spread first copies every key (including unrelated ones) onto the
+  // payload; the subsequent named keys then re-evaluate the defaulted
+  // fields, with later keys winning. Do NOT collapse this into a single
+  // `{ ...opts }` without the named-key overrides — the defaults will
+  // be dropped on every call.
   const services_runDoctor = (opts: RunDoctorOptions = {}): Promise<DoctorResult> =>
     runDoctorImpl({
       ...opts,

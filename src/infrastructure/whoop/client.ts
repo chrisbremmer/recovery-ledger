@@ -37,8 +37,11 @@ import { withRetry } from './retry.js';
  * minimum the client + resource modules need from the orchestrator —
  * `<T extends {status: number}>` so the 401-reactive retry path inside
  * `RefreshOrchestrator.callWithAuth` still narrows on the response shape.
- * Bootstrap constructs this via `refreshOrchestrator.callWithAuth.bind(...)`;
- * tests inject `(op) => op('test-token-...')` directly.
+ * Bootstrap wraps this as an arrow closure
+ * (`(op) => refreshOrchestrator.callWithAuth(op)` in `src/services/bootstrap.ts`),
+ * which routes through whichever orchestrator instance is live without
+ * pinning a particular `this` binding. Tests inject
+ * `(op) => op('test-token-...')` directly.
  */
 export type AuthedCall = <T extends { status: number }>(
   op: (accessToken: string) => Promise<T>,
