@@ -56,7 +56,7 @@ export async function listRecovery(opts: ListRecoveryOpts): Promise<ListRecovery
         WhoopRecoveryPageSchema,
       ),
     // Compound-key dedup per A12 + Plan 03-06 paginateAll keyFn parameter.
-    (row) => row.cycle_id + ':' + row.sleep_id,
+    (row) => `${row.cycle_id}:${row.sleep_id}`,
   );
 
   return { entities: rawRecords.map(normalizeRecovery), rawRecords };

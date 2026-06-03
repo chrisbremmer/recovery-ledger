@@ -20,7 +20,6 @@
 import { createInterface } from 'node:readline/promises';
 import type { Decision } from '../../domain/types/entities.js';
 import { renderDecisionList } from '../../formatters/decision.txt.js';
-import { sanitize } from '../../infrastructure/observability/sanitize.js';
 // ARCH-05 (#93): shared bootstrap-error rendering.
 import { tryBootstrap } from '../lib/with-bootstrap.js';
 
