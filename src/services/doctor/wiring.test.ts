@@ -3,11 +3,19 @@
 //      deps through to `runDoctorImpl` when the caller supplies no opts.
 //   2. User-supplied opts win over the bootstrap defaults (test-seam
 //      contract — the surrounding integration tests rely on this).
-//   3. The captured `productionWhoopFetcher` maps a `WhoopApiError({kind:
-//      'unauthorized'})` thrown from `httpGet` to status 401.
-//   4. The captured `productionWhoopFetcher` maps an `AuthError` thrown from
-//      `httpGet` to status 401 (ERRC-01 parity with the WhoopApiError path
-//      so both surface the same "re-auth" remediation).
+//   3. The captured `productionWhoopFetcher` returns status 200 on the
+//      happy path (httpGet resolves without throwing).
+//   4. The captured `productionWhoopFetcher` maps each `WhoopApiError` kind
+//      to a representative HTTP status (unauthorized→401, rate_limited→429,
+//      server→500, network/validation/unknown→0).
+//   5. The captured `productionWhoopFetcher` maps an `AuthError` thrown
+//      from `httpGet` to status 401 (ERRC-01 parity with the
+//      WhoopApiError({kind:'unauthorized'}) path so both surface the same
+//      "re-auth" remediation).
+//   6. A non-WhoopApiError / non-AuthError thrown from `httpGet` lands in
+//      the catch-all `else` branch and maps to status 0.
+//   7. The 4th positional argument to `httpGet` is the bootstrap-bound
+//      `authedCall` (ADR-0002 single-flight gate must remain wired).
 //
 // The factory and the `runDoctor` closure it returns are the only surface
 // under test. `runDoctorImpl` (./index.js) is mocked so each test can
@@ -19,12 +27,13 @@
 
 import type Database from 'better-sqlite3';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import type { z } from 'zod';
 import { AuthError } from '../../domain/errors/auth.js';
 import type { CyclesRepo } from '../../infrastructure/db/repositories/cycles.repo.js';
 import type { RecoveryRepo } from '../../infrastructure/db/repositories/recovery.repo.js';
 import type { SleepsRepo } from '../../infrastructure/db/repositories/sleep.repo.js';
 import type { SyncRunsRepo } from '../../infrastructure/db/repositories/sync-runs.repo.js';
-import type { AuthedCall } from '../../infrastructure/whoop/client.js';
+import type { AuthedCall, HttpGetQuery } from '../../infrastructure/whoop/client.js';
 import { WhoopApiError } from '../../infrastructure/whoop/errors.js';
 import type { TokenStore } from '../../infrastructure/whoop/token-store.js';
 import type { RefreshOrchestrator } from '../refresh-orchestrator.js';
@@ -59,7 +68,15 @@ vi.mock('../../infrastructure/whoop/client.js', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../../infrastructure/whoop/client.js')>();
   return {
     ...actual,
-    httpGet: (...args: unknown[]) => httpGetMock(...args),
+    // Typed shim matches the real httpGet signature so the mock preserves
+    // generic type-safety (no `unknown[]` widening). The mock itself is
+    // still a `vi.fn()` — only the wrapping arrow is typed.
+    httpGet: (
+      path: string,
+      query: HttpGetQuery,
+      schema: z.ZodSchema<unknown>,
+      authedCall: AuthedCall,
+    ) => httpGetMock(path, query, schema, authedCall),
   };
 });
 
@@ -114,6 +131,31 @@ function makeFakeAuthedCall(): AuthedCall {
   return vi.fn(async (op) => op('fake-access-token'));
 }
 
+// Reusable factory-construction + fetcher-capture helper. The error-mapping
+// tests all need to construct the factory, invoke the returned runDoctor,
+// then pull the captured `whoopFetcher` off the runDoctorImpl mock call.
+// Centralizing the boilerplate keeps each error-mapping test ~5 lines
+// instead of ~30 and gives a single place to change the construction shape
+// if the input contract evolves.
+async function constructFactoryAndCaptureFetcher(
+  authedCall: AuthedCall = makeFakeAuthedCall(),
+): Promise<NonNullable<RunDoctorOptions['whoopFetcher']>> {
+  const runDoctor = createProductionDoctorDeps({
+    sqlite: {} as Database.Database,
+    repos: makeFakeRepos(),
+    refreshOrchestrator: makeFakeRefreshOrchestrator(),
+    authedCall,
+    tokenStore: makeFakeTokenStore(),
+    migrationsDir: '/fake',
+  });
+  await runDoctor();
+  const passedOpts = runDoctorImplMock.mock.calls.at(-1)?.[0];
+  if (passedOpts === undefined || passedOpts.whoopFetcher === undefined) {
+    throw new Error('whoopFetcher missing from captured runDoctorImpl call');
+  }
+  return passedOpts.whoopFetcher;
+}
+
 describe('createProductionDoctorDeps', () => {
   beforeEach(() => {
     runDoctorImplMock.mockClear();
@@ -163,7 +205,7 @@ describe('createProductionDoctorDeps', () => {
 
     // whoopFetcher must be the production closure the factory constructed;
     // the only assertion possible without exposing it is that it is a
-    // function. (Its behavior is covered by the two error-mapping tests.)
+    // function. (Its behavior is covered by the error-mapping tests.)
     expect(typeof passedOpts.whoopFetcher).toBe('function');
   });
 
@@ -176,6 +218,8 @@ describe('createProductionDoctorDeps', () => {
     const userTokenStore = makeFakeTokenStore();
     const productionAuthedCall = makeFakeAuthedCall();
     const productionRepos = makeFakeRepos();
+    const userRepos = makeFakeRepos() as unknown as NonNullable<RunDoctorOptions['repos']>;
+    const userFetcher = vi.fn(async () => ({ status: 200, durationMs: 0 }));
     const userMigrationsDir = '/user/override/migrations';
 
     const runDoctor = createProductionDoctorDeps({
@@ -192,6 +236,8 @@ describe('createProductionDoctorDeps', () => {
       refreshOrchestrator: userOrchestrator,
       tokenStore: userTokenStore,
       migrationsDir: userMigrationsDir,
+      repos: userRepos,
+      whoopFetcher: userFetcher,
     });
 
     expect(runDoctorImplMock).toHaveBeenCalledTimes(1);
@@ -208,37 +254,43 @@ describe('createProductionDoctorDeps', () => {
     expect(passedOpts.tokenStore).not.toBe(productionTokenStore);
     expect(passedOpts.migrationsDir).toBe(userMigrationsDir);
     expect(passedOpts.migrationsDir).not.toBe('/production/migrations');
+    // Repos and whoopFetcher follow the same opts-win contract — caller's
+    // value replaces the production default whole-object.
+    expect(passedOpts.repos).toBe(userRepos);
+    expect(passedOpts.whoopFetcher).toBe(userFetcher);
   });
 
-  it('productionWhoopFetcher maps WhoopApiError kinds to HTTP statuses', async () => {
+  it('productionWhoopFetcher returns status 200 when httpGet resolves', async () => {
+    // Happy path: httpGet's return value is ignored by productionWhoopFetcher
+    // (it only cares about reaching the call without throwing). Resolving
+    // with `undefined` is the simplest possible drive — any value would
+    // produce the same observable status: 200.
+    httpGetMock.mockResolvedValueOnce(undefined);
+    const fetcher = await constructFactoryAndCaptureFetcher();
+    const result = await fetcher('unused-access-token');
+    expect(result.status).toBe(200);
+    expect(typeof result.durationMs).toBe('number');
+    expect(result.durationMs).toBeGreaterThanOrEqual(0);
+  });
+
+  it.each([
+    ['unauthorized', 401],
+    ['rate_limited', 429],
+    ['server', 500],
+    ['network', 0],
+    ['validation', 0],
+    ['unknown', 0],
+  ] as const)('productionWhoopFetcher maps WhoopApiError kind %s to status %i', async (kind, expectedStatus) => {
     // Drive the fetcher by having the mocked httpGet throw the
     // discriminated WhoopApiError directly (which is exactly what the
     // real httpGet does after `classifyHttpError` runs on a non-200
     // response). The factory's productionWhoopFetcher catches it and
-    // maps `kind: 'unauthorized'` back to status 401 via the embedded
+    // maps `kind` back to the representative status via the embedded
     // whoopErrorKindToStatus.
-    httpGetMock.mockRejectedValueOnce(
-      new WhoopApiError({ kind: 'unauthorized', detail: 'token revoked' }),
-    );
-
-    const runDoctor = createProductionDoctorDeps({
-      sqlite: {} as Database.Database,
-      repos: makeFakeRepos(),
-      refreshOrchestrator: makeFakeRefreshOrchestrator(),
-      authedCall: makeFakeAuthedCall(),
-      tokenStore: makeFakeTokenStore(),
-      migrationsDir: '/fake',
-    });
-
-    await runDoctor();
-    const passedOpts = runDoctorImplMock.mock.calls[0]?.[0];
-    expect(passedOpts?.whoopFetcher).toBeDefined();
-    if (passedOpts === undefined || passedOpts.whoopFetcher === undefined) {
-      throw new Error('whoopFetcher missing');
-    }
-
-    const result = await passedOpts.whoopFetcher('unused-access-token');
-    expect(result.status).toBe(401);
+    httpGetMock.mockRejectedValueOnce(new WhoopApiError({ kind, detail: 'test' }));
+    const fetcher = await constructFactoryAndCaptureFetcher();
+    const result = await fetcher('unused-access-token');
+    expect(result.status).toBe(expectedStatus);
     expect(typeof result.durationMs).toBe('number');
     expect(result.durationMs).toBeGreaterThanOrEqual(0);
   });
@@ -252,26 +304,43 @@ describe('createProductionDoctorDeps', () => {
     httpGetMock.mockRejectedValueOnce(
       new AuthError({ kind: 'auth_expired', detail: 'refresh budget exhausted' }),
     );
-
-    const runDoctor = createProductionDoctorDeps({
-      sqlite: {} as Database.Database,
-      repos: makeFakeRepos(),
-      refreshOrchestrator: makeFakeRefreshOrchestrator(),
-      authedCall: makeFakeAuthedCall(),
-      tokenStore: makeFakeTokenStore(),
-      migrationsDir: '/fake',
-    });
-
-    await runDoctor();
-    const passedOpts = runDoctorImplMock.mock.calls[0]?.[0];
-    expect(passedOpts?.whoopFetcher).toBeDefined();
-    if (passedOpts === undefined || passedOpts.whoopFetcher === undefined) {
-      throw new Error('whoopFetcher missing');
-    }
-
-    const result = await passedOpts.whoopFetcher('unused-access-token');
+    const fetcher = await constructFactoryAndCaptureFetcher();
+    const result = await fetcher('unused-access-token');
     expect(result.status).toBe(401);
     expect(typeof result.durationMs).toBe('number');
     expect(result.durationMs).toBeGreaterThanOrEqual(0);
+  });
+
+  it('productionWhoopFetcher maps a non-WhoopApiError / non-AuthError throw to status 0', async () => {
+    // Defense-in-depth: a plain `Error` (or any throw that fails both the
+    // `isAuthError` check and the `instanceof WhoopApiError` check) lands
+    // in the catch-all else branch and maps to status 0 — which the probe
+    // renders as a generic roundtrip-failed warn. This exercises the
+    // final ternary fallthrough that #2/#3's parametrized WhoopApiError
+    // cases do not touch.
+    httpGetMock.mockRejectedValueOnce(new Error('boom'));
+    const fetcher = await constructFactoryAndCaptureFetcher();
+    const result = await fetcher('unused-access-token');
+    expect(result.status).toBe(0);
+    expect(typeof result.durationMs).toBe('number');
+    expect(result.durationMs).toBeGreaterThanOrEqual(0);
+  });
+
+  it('productionWhoopFetcher routes the bootstrap-bound authedCall as the 4th httpGet arg (ADR-0002)', async () => {
+    // ADR-0002 single-flight enforcement: the factory must pass the
+    // bootstrap-bound `authedCall` as the 4th positional argument to
+    // `httpGet` so the WHOOP roundtrip routes through the three-layer
+    // refresh gate. Drive the happy path and assert the exact 4-arg call
+    // shape against the locally-bound authedCall instance.
+    const authedCall = makeFakeAuthedCall();
+    httpGetMock.mockResolvedValueOnce(undefined);
+    const fetcher = await constructFactoryAndCaptureFetcher(authedCall);
+    await fetcher('unused-access-token');
+    expect(httpGetMock).toHaveBeenCalledWith(
+      '/v2/user/profile/basic',
+      {},
+      expect.anything(),
+      authedCall,
+    );
   });
 });
