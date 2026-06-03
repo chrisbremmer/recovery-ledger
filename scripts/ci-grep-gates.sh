@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# CI grep gates — ten rules (A-J) that Biome cannot catch on its own.
+# CI grep gates — eleven rules (A-K) that Biome cannot catch on its own.
 #
 # Gate A: banned tone words (CLAUDE.md "Critical Rules" list) — banned in code,
 #         tests, formatters, configs, and docs other than the rule definitions
@@ -24,7 +24,7 @@
 #         Biome's noRestrictedImports operates on import paths, not URL
 #         strings, so this grep gate is the load-bearing enforcement for
 #         literal URL references. Test files (*.test.ts) are excluded — the
-#         Plan 02-07 fixture in src/infrastructure/observability/sanitize.test.ts deliberately
+#         Plan 02-07 fixture in src/domain/observability/sanitize.test.ts deliberately
 #         includes the URL as a redaction-coverage test input, and
 #         src/infrastructure/whoop/oauth.test.ts has test cases that
 #         exercise the URL constant in error paths. Production-module
@@ -66,6 +66,17 @@
 #         Gate I for the prompt surface (sanitize-walks
 #         messages[].content.text on success; isError envelope on throw).
 #         Test files exempt for the same reason as Gate I.
+# Gate K: no import of the redaction module via the legacy infrastructure
+#         path. Phase 10 ARCH-01 relocated sanitize from the infrastructure
+#         observability folder into the domain observability folder
+#         because it is a pure string transform with no I/O. This gate
+#         is the anti-regression guard that prevents a future plan from
+#         silently re-introducing an import from the old location (which
+#         would also reintroduce the layering inversion: transports and
+#         services reaching into infrastructure for a pure utility). The
+#         scan scope is src/ + tests/ — scripts/ is intentionally not
+#         scanned, so the gate's own grep pattern (which must reference
+#         the legacy path string literally to detect it) does not trip.
 #
 # Exit-code semantics (Pitfall 10): grep returns 0 on match (= violation found).
 # Each gate inverts that: if grep -rEn matches, the gate prints ::error:: and
@@ -221,7 +232,7 @@ rm -f /tmp/gate-d.$$
 # grep gate is the load-bearing enforcement for literal URL references.
 #
 # Test files (*.test.ts) are excluded for two reasons:
-#  - src/infrastructure/observability/sanitize.test.ts has a Plan 02-07 fixture that includes the
+#  - src/domain/observability/sanitize.test.ts has a Plan 02-07 fixture that includes the
 #    literal URL as a redaction-coverage test input.
 #  - src/infrastructure/whoop/oauth.test.ts has test cases that reference
 #    the URL constant in error paths (Plan 02-03).
@@ -409,6 +420,34 @@ if "$GREP" -rEn "$REGISTER_PROMPT_RE" --include='*.ts' src/mcp/ 2>/dev/null \
   fi
 fi
 rm -f /tmp/gate-j.$$
+
+# ----------------------------------------------------------------------------
+# Gate K — no import of the redaction module via the legacy infrastructure
+# observability path. Phase 10 ARCH-01 relocated sanitize.ts (a pure
+# string transform with no I/O) from the infrastructure layer to the
+# domain layer; every importer now points at src/domain/observability/.
+# This gate is the anti-regression guard so a future plan cannot
+# silently re-introduce an import from the old path — doing so would
+# also re-introduce the layering inversion the move closed.
+#
+# Pattern: any `from '...'` (or "...") clause whose path segment
+# contains the legacy "infrastructure/observability" prefix. Scan
+# scope is src/ + tests/. The scripts/ directory is intentionally
+# not scanned, so the literal path string in this gate's own grep
+# pattern is safe.
+# ----------------------------------------------------------------------------
+INFRA_OBSERVABILITY_IMPORT_RE="from\s+['\"][^'\"]*infrastructure/observability"
+
+if "$GREP" -rEn "$INFRA_OBSERVABILITY_IMPORT_RE" --include='*.ts' src/ tests/ 2>/dev/null \
+   > /tmp/gate-k.$$; then
+  if [ -s /tmp/gate-k.$$ ]; then
+    echo "::error::Gate K — legacy infrastructure/observability import (ARCH-01: sanitize now lives in src/domain/observability/):"
+    cat /tmp/gate-k.$$
+    rm -f /tmp/gate-k.$$
+    exit 1
+  fi
+fi
+rm -f /tmp/gate-k.$$
 
 echo "All grep gates passed."
 exit 0

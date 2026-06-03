@@ -21,8 +21,8 @@
 //
 // Pitfall E (token leakage via WhoopApiError.cause): the catch block logs
 // the resource + status fields only; the raw error never lands in the log
-// payload. The error itself flows through `src/infrastructure/observability/sanitize.ts` at the
-// MCP boundary when surfaced through Phase 4's tool.
+// payload. The error itself flows through the domain-tier redaction module
+// at the MCP boundary when surfaced through Phase 4's tool.
 // `tests/integration/sync/partial-failure.test.ts` Test 2 asserts on
 // captured stderr that `grep -E '(Bearer|access_token=)'` returns 0
 // matches after a 401-flow run — runtime confirmation.

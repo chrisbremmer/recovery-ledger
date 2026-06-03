@@ -96,7 +96,7 @@ describe('MCP stdout purity (dist smoke)', () => {
       path.resolve(REPO_ROOT, 'src', 'mcp', 'register.ts'),
       path.resolve(REPO_ROOT, 'src', 'mcp', 'register-resource.ts'),
       path.resolve(REPO_ROOT, 'src', 'mcp', 'register-prompt.ts'),
-      path.resolve(REPO_ROOT, 'src', 'infrastructure', 'observability', 'sanitize.ts'),
+      path.resolve(REPO_ROOT, 'src', 'domain', 'observability', 'sanitize.ts'),
       path.resolve(REPO_ROOT, 'src', 'mcp', 'tools', 'whoop-doctor.ts'),
       path.resolve(REPO_ROOT, 'src', 'services', 'doctor', 'index.ts'),
       path.resolve(REPO_ROOT, 'src', 'services', 'bootstrap.ts'),

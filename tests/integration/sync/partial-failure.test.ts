@@ -14,7 +14,7 @@
 // that an error carrying a Bearer / access_token / JWT through its
 // WhoopApiError.cause chain does NOT leak into the orchestrator's
 // stderr log payload. Phase 4's whoop_sync MCP tool will route the same
-// error through src/infrastructure/observability/sanitize.ts; this test confirms the orchestrator
+// error through src/domain/observability/sanitize.ts; this test confirms the orchestrator
 // layer (which logs via Pino BEFORE the sanitizer fires) holds the
 // invariant on its own.
 

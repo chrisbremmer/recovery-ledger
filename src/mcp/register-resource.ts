@@ -22,7 +22,7 @@ import type {
   ReadResourceCallback,
   ResourceMetadata,
 } from '@modelcontextprotocol/sdk/server/mcp.js';
-import { sanitize, serializeError } from '../infrastructure/observability/sanitize.js';
+import { sanitize, serializeError } from '../domain/observability/sanitize.js';
 
 export interface ResourceContent {
   uri: string;
