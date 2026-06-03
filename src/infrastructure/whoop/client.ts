@@ -5,9 +5,13 @@
 // Composition (each side responsibility lives in one named file):
 //   - rate-limit.ts owns the semaphore-of-4 + remaining<10 throttle (D-20)
 //   - retry.ts owns 429-with-X-RateLimit-Reset + 5xx backoff (D-20 + A5)
-//   - refresh-orchestrator.ts (Plan 02-04) owns the 401-reactive
-//     refresh-and-retry budget (callWithAuth — wrapped here EXACTLY
-//     ONCE per `httpGet` call, D-18)
+//   - `authedCall: AuthedCall` (Phase 10 ARCH-03) is INJECTED as the 4th
+//     parameter to `httpGet` — wraps the underlying fetch in the
+//     bootstrap-constructed `refreshOrchestrator.callWithAuth` (ADR-0002
+//     three-layer single-flight gate). The previous module-level
+//     `callWithAuth` import was the last infrastructure → services upward
+//     arrow in the codebase; Phase 10 ARCH-03 inverted it so this module
+//     no longer imports from `src/services/`.
 //   - errors.ts owns the WhoopApiError union + classifyHttpError mapping
 //   - zod schemas (`src/domain/schemas/whoop-api.ts`) own response shape
 //     validation; we call `.parse` at the boundary
@@ -22,11 +26,26 @@
 // `WHOOP_TOKEN_URL` is constrained by Gate E.
 
 import type { z } from 'zod';
-import { callWithAuth } from '../../services/refresh-orchestrator.js';
 import { logger } from '../config/logger.js';
 import { classifyHttpError, WhoopApiError } from './errors.js';
 import { acquire, release } from './rate-limit.js';
 import { withRetry } from './retry.js';
+
+/**
+ * Phase 10 ARCH-03: the injected single-flight refresh closure passed to
+ * `httpGet` (and to every resource-module factory). The shape is the bare
+ * minimum the client + resource modules need from the orchestrator —
+ * `<T extends {status: number}>` so the 401-reactive retry path inside
+ * `RefreshOrchestrator.callWithAuth` still narrows on the response shape.
+ * Bootstrap wraps this as an arrow closure
+ * (`(op) => refreshOrchestrator.callWithAuth(op)` in `src/services/bootstrap.ts`),
+ * which routes through whichever orchestrator instance is live without
+ * pinning a particular `this` binding. Tests inject
+ * `(op) => op('test-token-...')` directly.
+ */
+export type AuthedCall = <T extends { status: number }>(
+  op: (accessToken: string) => Promise<T>,
+) => Promise<T>;
 
 /**
  * Production WHOOP API host. Pinned per ADR-0007 (read-only WHOOP) and
@@ -56,11 +75,18 @@ export type HttpGetQuery = Record<string, string | number | boolean | undefined 
 /**
  * Issue an authenticated GET against the WHOOP API. The single chokepoint
  * for every WHOOP read in the codebase. Composes (in order): rate-limit
- * semaphore → retry-on-429/5xx → callWithAuth (401 refresh + retry) →
+ * semaphore → retry-on-429/5xx → `authedCall` (401 refresh + retry) →
  * `fetch` → status check → JSON parse → Zod validate.
  *
+ * Phase 10 ARCH-03: `authedCall` is the injected 4th parameter (replacing
+ * the prior module-level `callWithAuth` import from
+ * `src/services/refresh-orchestrator`). Bootstrap binds the production
+ * orchestrator's `callWithAuth` to this slot; resource modules
+ * (cycles/recovery/sleep/workouts/profile/body-measurements) receive a
+ * shared `authedCall` via factory closure and pass it through here.
+ *
  * Errors are either:
- *   - `AuthError` (from `callWithAuth` when refresh itself fails) — passed
+ *   - `AuthError` (from `authedCall` when refresh itself fails) — passed
  *     through so the CLI/MCP layer can surface the standard
  *     re-authorization message.
  *   - `WhoopApiError` — every other non-OK path: status mapped via
@@ -71,6 +97,7 @@ export async function httpGet<T>(
   path: string,
   query: HttpGetQuery,
   schema: z.ZodSchema<T>,
+  authedCall: AuthedCall,
 ): Promise<T> {
   const url = buildUrl(path, query);
   // LIFE-04 (#91): construct the AbortController + timeout BEFORE acquire()
@@ -97,7 +124,7 @@ export async function httpGet<T>(
       const timeoutId = setTimeout(() => controller.abort(), HTTP_REQUEST_TIMEOUT_MS);
       let response: Response;
       try {
-        response = await callWithAuth(async (accessToken) =>
+        response = await authedCall(async (accessToken) =>
           fetch(url, {
             method: 'GET',
             headers: {

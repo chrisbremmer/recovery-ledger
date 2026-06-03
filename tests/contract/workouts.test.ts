@@ -5,27 +5,24 @@
 // id per A6; SCORED workout carries strain on the entity, PENDING_SCORE /
 // UNSCORABLE do not — locked via `ts-expect-error` discriminator narrowing.
 //
-// ADR-0006: onUnhandledRequest:'error' on MSW.
+// ADR-0006: onUnhandledRequest:'error' on MSW. Phase 10 ARCH-03 composes
+// the resource factory with a deterministic fake `authedCall` instead of
+// mocking the (now-deleted) `services/refresh-orchestrator` singleton.
 
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, test, vi } from 'vitest';
 import type { Workout } from '../../src/domain/types/entities.js';
+import { createWorkoutsRepo } from '../../src/infrastructure/db/repositories/workouts.repo.js';
+import type { AuthedCall } from '../../src/infrastructure/whoop/client.js';
+import { _resetForTest as resetRateLimit } from '../../src/infrastructure/whoop/rate-limit.js';
+import { createListWorkouts } from '../../src/infrastructure/whoop/resources/workouts.js';
 import { createInMemoryDb, type InMemoryDbResult } from '../helpers/in-memory-db.js';
 import {
   createWhoopWorkoutsHelper,
   type WhoopWorkoutsHelper,
 } from '../helpers/msw-whoop-workouts.js';
 
-vi.mock('../../src/services/refresh-orchestrator.js', () => ({
-  callWithAuth: (op: (token: string) => Promise<unknown>) => op('test-token-123'),
-}));
-
-const { listWorkouts } = await import('../../src/infrastructure/whoop/resources/workouts.js');
-const { createWorkoutsRepo } = await import(
-  '../../src/infrastructure/db/repositories/workouts.repo.js'
-);
-const { _resetForTest: resetRateLimit } = await import(
-  '../../src/infrastructure/whoop/rate-limit.js'
-);
+const authedCall: AuthedCall = (op) => op('test-token-123');
+const listWorkouts = createListWorkouts({ authedCall });
 
 vi.setConfig({ testTimeout: 5_000 });
 

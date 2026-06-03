@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# CI grep gates — eleven rules (A-K) that Biome cannot catch on its own.
+# CI grep gates — fourteen rules (A-N) that Biome cannot catch on its own.
 #
 # Gate A: banned tone words (CLAUDE.md "Critical Rules" list) — banned in code,
 #         tests, formatters, configs, and docs other than the rule definitions
@@ -77,6 +77,35 @@
 #         scan scope is src/ + tests/ — scripts/ is intentionally not
 #         scanned, so the gate's own grep pattern (which must reference
 #         the legacy path string literally to detect it) does not trip.
+# Gate L: no module-load singleton exports for the three Phase 10 ARCH-02
+#         collaborators (the bootstrap-owned token store, the bootstrap-
+#         owned refresh orchestrator, and its bound call-with-auth
+#         closure). Phase 10 ARCH-02 (#85) deleted the historical
+#         `export const tokenStore = createTokenStore()` in
+#         src/infrastructure/whoop/token-store.ts AND the matching
+#         orchestrator/closure exports in
+#         src/services/refresh-orchestrator.ts; bootstrap.ts is the sole
+#         construction site for DB-coupled flows. src/cli/commands/auth.ts
+#         is the sole documented exception (OAuth-login flow does not
+#         need DB). The gate scans `src/` only; test files are exempt.
+# Gate M: no upward `from '.../services/'` import inside `src/infrastructure/`.
+#         Phase 10 ARCH-03 inverted the last infrastructure → services
+#         arrow: src/infrastructure/whoop/client.ts no longer imports
+#         `callWithAuth` from src/services/refresh-orchestrator. The
+#         client now receives `authedCall: AuthedCall` as an injected
+#         parameter; resource modules (cycles/recovery/sleep/workouts/
+#         profile/body-measurements) become factories capturing it via
+#         closure. The gate scans src/infrastructure/ only; test files
+#         (*.test.ts) are exempt (a contract test may briefly import a
+#         service-layer type in prose for documentation, never as a
+#         runtime dependency).
+# Gate N: no `createTokenStore(` call sites in src/ outside the three
+#         sanctioned files (the definition itself, bootstrap.ts, and the
+#         OAuth-login exception in auth.ts). Gate L catches only the
+#         module-load export form; this gate closes the local-call
+#         loophole so the ARCH-02 single-flight invariant is mechanically
+#         enforced instead of resting on code review alone. Amend
+#         ADR-0002 §Enforcement before extending the whitelist.
 #
 # Exit-code semantics (Pitfall 10): grep returns 0 on match (= violation found).
 # Each gate inverts that: if grep -rEn matches, the gate prints ::error:: and
@@ -448,6 +477,88 @@ if "$GREP" -rEn "$INFRA_OBSERVABILITY_IMPORT_RE" --include='*.ts' src/ tests/ 2>
   fi
 fi
 rm -f /tmp/gate-k.$$
+
+# ----------------------------------------------------------------------------
+# Gate L — no module-load singleton exports for the three Phase 10 ARCH-02
+# collaborators (bootstrap-owned token store, bootstrap-owned refresh
+# orchestrator, and its bound call-with-auth closure). The historical
+# `export const tokenStore = createTokenStore()` line in
+# src/infrastructure/whoop/token-store.ts AND the matching
+# `export const refreshOrchestrator = ...` + `export const callWithAuth = ...`
+# lines in src/services/refresh-orchestrator.ts are forbidden. Bootstrap is
+# the sole construction site for DB-coupled flows; src/cli/commands/auth.ts
+# is the documented OAuth-login-flow exception (it constructs its own
+# `createTokenStore()` directly because the login flow does not need the DB).
+# Scope is src/ only; test files (*.test.ts) are exempt — they construct
+# per-test fakes via local consts which is allowed.
+# ----------------------------------------------------------------------------
+SINGLETON_EXPORT_RE='^export[[:space:]]+const[[:space:]]+(tokenStore|refreshOrchestrator|callWithAuth)\b'
+
+if "$GREP" -rEn "$SINGLETON_EXPORT_RE" --include='*.ts' src/ 2>/dev/null \
+   | "$GREP" -Ev '\.test\.ts:' \
+   > /tmp/gate-l.$$; then
+  if [ -s /tmp/gate-l.$$ ]; then
+    echo "::error::Gate L — forbidden module-load singleton export (ARCH-02: bootstrap is the sole construction site for DB-coupled flows; auth.ts is the documented OAuth-login exception):"
+    cat /tmp/gate-l.$$
+    rm -f /tmp/gate-l.$$
+    exit 1
+  fi
+fi
+rm -f /tmp/gate-l.$$
+
+# ----------------------------------------------------------------------------
+# Gate M — no upward `from '.../services/'` import inside src/infrastructure/.
+# Phase 10 ARCH-03 inverted the last infrastructure → services arrow:
+# src/infrastructure/whoop/client.ts no longer imports `callWithAuth` from
+# src/services/refresh-orchestrator. The client now receives
+# `authedCall: AuthedCall` as an injected parameter; resource modules
+# (cycles/recovery/sleep/workouts/profile/body-measurements) become
+# factories capturing it via closure. Bootstrap binds the production
+# closure; tests construct deterministic stubs. The gate scans
+# src/infrastructure/ only; test files (*.test.ts) are exempt.
+# ----------------------------------------------------------------------------
+SERVICES_IMPORT_RE="from[[:space:]]+['\"](\\.\\.?/)+services/"
+
+if "$GREP" -rEn "$SERVICES_IMPORT_RE" --include='*.ts' src/infrastructure/ 2>/dev/null \
+   | "$GREP" -Ev '\.test\.ts:' \
+   > /tmp/gate-m.$$; then
+  if [ -s /tmp/gate-m.$$ ]; then
+    echo "::error::Gate M — forbidden upward import from services/ inside infrastructure/ (ARCH-03: client.ts and resource modules receive authedCall via DI; nothing in infrastructure imports services):"
+    cat /tmp/gate-m.$$
+    rm -f /tmp/gate-m.$$
+    exit 1
+  fi
+fi
+rm -f /tmp/gate-m.$$
+
+# ----------------------------------------------------------------------------
+# Gate N — no `createTokenStore(` call sites in src/ outside the three
+# sanctioned files. Gate L catches only the historical module-load
+# *export* form; a future contributor could otherwise call the factory
+# locally in any DB-coupled flow and silently introduce a second
+# per-process instance, defeating the ADR-0002 single-flight invariant.
+# The three allowed files are:
+#   - the definition itself (src/infrastructure/whoop/token-store.ts)
+#   - the DB-coupled construction site (src/services/bootstrap.ts)
+#   - the OAuth-login exception (src/cli/commands/auth.ts)
+# Test files (*.test.ts) are exempt — they construct per-test fakes.
+# Pre-amble: amend ADR-0002 §Enforcement before extending this list.
+# ----------------------------------------------------------------------------
+CREATE_TOKEN_STORE_CALL_RE='createTokenStore\('
+CREATE_TOKEN_STORE_ALLOWED_RE='^(src/infrastructure/whoop/token-store\.ts|src/services/bootstrap\.ts|src/cli/commands/auth\.ts):'
+
+if "$GREP" -rEn "$CREATE_TOKEN_STORE_CALL_RE" --include='*.ts' src/ 2>/dev/null \
+   | "$GREP" -Ev '\.test\.ts:' \
+   | "$GREP" -Ev "$CREATE_TOKEN_STORE_ALLOWED_RE" \
+   > /tmp/gate-n.$$; then
+  if [ -s /tmp/gate-n.$$ ]; then
+    echo "::error::Gate N — forbidden createTokenStore() call site (ARCH-02: only the three sanctioned files may construct an instance; AMEND ADR-0002 §Enforcement before extending this list):"
+    cat /tmp/gate-n.$$
+    rm -f /tmp/gate-n.$$
+    exit 1
+  fi
+fi
+rm -f /tmp/gate-n.$$
 
 echo "All grep gates passed."
 exit 0

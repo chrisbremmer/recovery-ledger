@@ -37,7 +37,7 @@ import { sanitize } from '../../domain/observability/sanitize.js';
 import { paths } from '../../infrastructure/config/paths.js';
 import { ConfigSchema } from '../../infrastructure/config/schema.js';
 import { runOAuth } from '../../infrastructure/whoop/oauth.js';
-import { tokenStore } from '../../infrastructure/whoop/token-store.js';
+import { createTokenStore } from '../../infrastructure/whoop/token-store.js';
 
 export const AUTH_EXIT_CODES: Readonly<Record<string, number>> = Object.freeze({
   success: 0,
@@ -53,6 +53,23 @@ export async function runAuthCommand(opts: {
   noBrowser?: boolean;
   timeout?: number;
 }): Promise<void> {
+  // Phase 10 ARCH-02 (#85) — Q7-RESOLVED: ADR-0002 §Enforcement requires
+  // exactly one tokenStore per process for DB-coupled flows. The OAuth-
+  // login command is the SOLE documented exception: it constructs its
+  // own `createTokenStore()` directly because the login flow does not
+  // bootstrap (no DB needed; routing it through `bootstrap()` would slow
+  // login and surface migration errors during a DB-independent action).
+  // See `agent_docs/decisions/0002-single-flight-oauth-refresh.md`
+  // §Enforcement and 10-RESEARCH.md Q7-RESOLVED. Every other DB-coupled
+  // flow pulls `tokenStore` off `bootstrap().services`.
+  //
+  // DO NOT COPY this pattern to add a third construction site. Gate N
+  // (scripts/ci-grep-gates.sh) forbids new `createTokenStore(` call
+  // sites in `src/` outside the three sanctioned files (token-store.ts
+  // itself, bootstrap.ts, and this file). If a future flow legitimately
+  // needs the OAuth-login exception, AMEND ADR-0002 first and update
+  // Gate N's whitelist — do not bypass.
+  const tokenStore = createTokenStore();
   try {
     // Read config (D-01) — Zod-validate via the canonical schema.
     let configText: string;

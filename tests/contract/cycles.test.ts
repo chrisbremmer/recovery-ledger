@@ -16,30 +16,25 @@
 // ADR-0006: MSW listens with `onUnhandledRequest: 'error'` so any
 // accidental live network call fails the test.
 //
-// vi.mock of `services/refresh-orchestrator.js` mirrors client.test.ts —
-// the production `callWithAuth` reaches into `tokenStore.getValidAccessToken`
-// which reads the OS keychain. The mock invokes the operation directly with
-// a fixed test token so the contract test exercises the HTTP boundary
-// without touching the auth stack.
+// Phase 10 ARCH-03: the contract test composes the resource factory with a
+// deterministic fake `authedCall` instead of mocking the (now-deleted)
+// `services/refresh-orchestrator` singleton. The fake invokes the supplied
+// operation with a fixed test token, so the HTTP boundary is exercised
+// through MSW without touching the auth stack.
 
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, test, vi } from 'vitest';
+import { createCyclesRepo } from '../../src/infrastructure/db/repositories/cycles.repo.js';
+import type { AuthedCall } from '../../src/infrastructure/whoop/client.js';
+import { WhoopApiError } from '../../src/infrastructure/whoop/errors.js';
+import { _resetForTest as resetRateLimit } from '../../src/infrastructure/whoop/rate-limit.js';
+import { createListCycles } from '../../src/infrastructure/whoop/resources/cycles.js';
 import { createInMemoryDb, type InMemoryDbResult } from '../helpers/in-memory-db.js';
 import { createWhoopCyclesHelper, type WhoopCyclesHelper } from '../helpers/msw-whoop-cycles.js';
 
-vi.mock('../../src/services/refresh-orchestrator.js', () => ({
-  callWithAuth: (op: (token: string) => Promise<unknown>) => op('test-token-123'),
-}));
-
-const { listCycles } = await import('../../src/infrastructure/whoop/resources/cycles.js');
-const { createCyclesRepo } = await import(
-  '../../src/infrastructure/db/repositories/cycles.repo.js'
-);
-const { _resetForTest: resetRateLimit } = await import(
-  '../../src/infrastructure/whoop/rate-limit.js'
-);
-const { WhoopApiError } = await import('../../src/infrastructure/whoop/errors.js');
+const authedCall: AuthedCall = (op) => op('test-token-123');
+const listCycles = createListCycles({ authedCall });
 
 vi.setConfig({ testTimeout: 5_000 });
 

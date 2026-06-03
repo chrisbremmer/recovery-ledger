@@ -19,11 +19,7 @@
 // process.stdout.write without going through the MCP sanitizer wrapper.
 // See auth.ts in this directory for the broader rationale.
 import { sanitize } from '../../../domain/observability/sanitize.js';
-import {
-  REFRESH_BUFFER_MS,
-  type Tokens,
-  tokenStore,
-} from '../../../infrastructure/whoop/token-store.js';
+import { REFRESH_BUFFER_MS, type Tokens } from '../../../infrastructure/whoop/token-store.js';
 import type { DoctorCheck } from '../index.js';
 import { CHECK_NAMES } from './check-names.js';
 
@@ -44,19 +40,23 @@ export function formatDuration(ms: number): string {
   return `${hours}h ${minutes}m`;
 }
 
+// Phase 10 ARCH-07: deps are REQUIRED. The historical
+// `deps?.read ?? (() => tokenStore.read())` fallback is gone; callers
+// MUST supply `read` and `now`. The production composition root
+// (`src/services/bootstrap.ts` → runDoctor) constructs these from the
+// bootstrap-bound `tokenStore`.
 export interface TokenFreshnessProbeDeps {
-  /** Override for `tokenStore.read`. Test-only seam — production callers
-   *  leave this undefined. NEVER the refresh-aware accessor: that would
-   *  trigger a refresh and break the D-22 offline-safe contract. */
-  read?: () => Promise<Tokens | null>;
-  /** Override for `Date.now`. Test-only seam — production callers leave
-   *  this undefined and `Date.now` is used. */
-  now?: () => number;
+  /** Reader for `tokenStore.read`. NEVER the refresh-aware accessor:
+   *  that would trigger a refresh and break the D-22 offline-safe
+   *  contract. */
+  read: () => Promise<Tokens | null>;
+  /** Injected clock. Production passes `Date.now`; tests pin a fixed
+   *  value so window computation is deterministic. */
+  now: () => number;
 }
 
-export async function probeTokenFreshness(deps?: TokenFreshnessProbeDeps): Promise<DoctorCheck> {
-  const read = deps?.read ?? (() => tokenStore.read());
-  const now = deps?.now ?? Date.now;
+export async function probeTokenFreshness(deps: TokenFreshnessProbeDeps): Promise<DoctorCheck> {
+  const { read, now } = deps;
 
   try {
     const tokens = await read();

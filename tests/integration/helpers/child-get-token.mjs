@@ -1,10 +1,20 @@
 // Child helper for tests/integration/auth-concurrency.test.ts.
 //
-// Spawned via child_process.fork(). Imports the compiled `tokenStore` from
-// `dist/infrastructure/whoop/token-store.mjs` (a top-level tsup entry added
-// per checker WARNING PLAN-08-BUILD-DEP — see tsup.config.ts), calls
+// Spawned via child_process.fork(). Imports the compiled
+// `createTokenStore` factory from `dist/infrastructure/whoop/token-store.mjs`
+// (a top-level tsup entry added per checker WARNING PLAN-08-BUILD-DEP — see
+// tsup.config.ts), constructs ONE tokenStore per child process, calls
 // `getValidAccessToken()`, prints `{accessToken, storageMode}` as a single
 // JSON line to stdout, exits 0.
+//
+// Phase 10 ARCH-02 (#85): the historical `export const tokenStore` module-
+// load singleton is gone. Each forked child constructs its own
+// `createTokenStore()` instance. The ADR-0002 cross-process file lock and
+// atomic-write contract are unchanged — they live at the OS level
+// (`proper-lockfile` + temp-and-rename), not in-process. The "exactly one
+// WHOOP refresh across 10 children" assertion in the parent test still
+// holds: the OS-level lock is the chokepoint, and the in-process Promise
+// single-flight gate is per-process either way.
 //
 // Env injected by the parent test:
 //   - WHOOP_TOKEN_URL                  parent mock HTTP server URL
@@ -20,9 +30,13 @@
 // test asserts no token-material appears in stderr regardless; this is
 // belt-and-suspenders.
 
-import { tokenStore } from '../../../dist/infrastructure/whoop/token-store.mjs';
+import { createTokenStore } from '../../../dist/infrastructure/whoop/token-store.mjs';
 
 async function main() {
+  // Phase 10 ARCH-02: construct a fresh tokenStore per child (the OS
+  // file lock + atomic write is the cross-process gate, not a shared
+  // module-level singleton).
+  const tokenStore = createTokenStore();
   try {
     const accessToken = await tokenStore.getValidAccessToken();
     const storageMode = await tokenStore.readStorageMode();

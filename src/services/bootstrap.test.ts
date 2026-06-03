@@ -14,7 +14,8 @@
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { resolve } from 'node:path';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import type { TokenStore, Tokens } from '../infrastructure/whoop/token-store.js';
 import { type Bootstrapped, bootstrap } from './bootstrap.js';
 import { createServices } from './index.js';
 
@@ -60,6 +61,49 @@ describe('bootstrap() — Phase 4 service wiring', () => {
     expect(result.rows).toHaveLength(0);
   });
 
+  // Phase 10 ARCH-02 (#85): bootstrap accepts an injected `tokenStore` and
+  // threads it through both the constructed `refreshOrchestrator` (so
+  // future getValidAccessToken calls route through the fake) AND the
+  // `services.tokenStore` surface. The injected instance MUST be the same
+  // object both consumers reach.
+  it('Test 4a: bootstrap honors an injected tokenStore (ARCH-02 wiring)', () => {
+    const fakeTokens: Tokens = {
+      accessToken: 'inject-at',
+      refreshToken: 'inject-rt',
+      tokenType: 'bearer',
+      scope: 'offline',
+      obtainedAt: 0,
+      expiresAt: Date.now() + 60 * 60 * 1000,
+    };
+    const getValidAccessToken = vi.fn(async () => fakeTokens.accessToken);
+    const customStore: TokenStore = {
+      getValidAccessToken,
+      read: async () => fakeTokens,
+      write: async () => undefined,
+      clear: async () => undefined,
+      readStorageMode: async () => 'file',
+    };
+    app = bootstrap({
+      dbFile: resolve(tmpDir, 'db.sqlite'),
+      tokenStore: customStore,
+    });
+    // Identity assertion — the injected store IS the one on the surface.
+    expect(app.services.tokenStore).toBe(customStore);
+    // The bootstrap-constructed orchestrator must route through the same
+    // injected store. Drive a callWithAuth and assert the fake's
+    // `getValidAccessToken` fired exactly once.
+    return app.services.refreshOrchestrator
+      .callWithAuth(async (accessToken) => ({
+        status: 200,
+        token: accessToken,
+      }))
+      .then((res) => {
+        expect(res.status).toBe(200);
+        expect((res as { token: string }).token).toBe('inject-at');
+        expect(getValidAccessToken).toHaveBeenCalledTimes(1);
+      });
+  });
+
   // LIFE-01 (#81): bootstrap pairs openDb with try/catch closing the
   // sqlite handle when migrate() throws. A second open on the same dbFile
   // immediately after the throw must succeed without SQLITE_BUSY.
@@ -92,12 +136,12 @@ describe('createServices() — DB-dependent methods are absent from the type (D-
     const services = createServices();
     // Phase 1-2 surface is present.
     expect(typeof services.runDoctor).toBe('function');
-    expect(typeof services.refreshOrchestrator.callWithAuth).toBe('function');
-    // Runtime confirms the absence — the previous stub satisfied the full
-    // Services interface with throwing functions, so these property reads
-    // returned a callable that threw on invocation. After the fix the type
-    // is narrowed to ServicesBase and these reads return undefined.
+    // Phase 10 ARCH-02 (#85): refreshOrchestrator and tokenStore are no
+    // longer on ServicesBase — bootstrap() owns construction. The
+    // lightweight createServices() returns only `{ runDoctor }`.
     const asAny = services as unknown as Record<string, unknown>;
+    expect(asAny.refreshOrchestrator).toBeUndefined();
+    expect(asAny.tokenStore).toBeUndefined();
     expect(asAny.runSync).toBeUndefined();
     expect(asAny.getDailyReview).toBeUndefined();
     expect(asAny.getWeeklyReview).toBeUndefined();
@@ -108,11 +152,11 @@ describe('createServices() — DB-dependent methods are absent from the type (D-
   });
 });
 
-// Compile-time regression guard for #13. Each line below would FAIL to
-// compile if `createServices()`'s return type ever widens back to include
-// the method, because @ts-expect-error requires the suppressed line to
-// actually emit a type error. Wrapped in a function never invoked so the
-// expressions are never executed at runtime.
+// Compile-time regression guard for #13 + Phase 10 ARCH-02. Each line below
+// would FAIL to compile if `createServices()`'s return type ever widens back
+// to include the method, because @ts-expect-error requires the suppressed
+// line to actually emit a type error. Wrapped in a function never invoked
+// so the expressions are never executed at runtime.
 function _typeGuard_createServicesIsServicesBase(): void {
   const services = createServices();
   // @ts-expect-error — runSync is not on ServicesBase
@@ -129,4 +173,9 @@ function _typeGuard_createServicesIsServicesBase(): void {
   type _Query = typeof services.queryCache;
   // @ts-expect-error — getApiGap is not on ServicesBase
   type _Gap = typeof services.getApiGap;
+  // Phase 10 ARCH-02: refreshOrchestrator + tokenStore moved off ServicesBase
+  // @ts-expect-error — refreshOrchestrator is not on ServicesBase (ARCH-02)
+  type _Refresh = typeof services.refreshOrchestrator;
+  // @ts-expect-error — tokenStore is not on ServicesBase (ARCH-02)
+  type _TokStore = typeof services.tokenStore;
 }

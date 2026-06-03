@@ -104,7 +104,12 @@ function mockRunOAuth(impl: () => Promise<unknown>): {
   return { runOAuthSpy };
 }
 
-// Mock tokenStore.write to a spy.
+// Phase 10 ARCH-02 (#85): auth.ts now constructs its own TokenStore via
+// `createTokenStore()` (Q7-RESOLVED documented exception — the OAuth login
+// flow does not bootstrap). The test mocks the FACTORY so the runtime
+// `tokenStore` inside auth.ts is the fake we control, while keeping every
+// other token-store export (createTokenStore returns this same fake; the
+// real `TokenStore` type stays unchanged).
 function mockTokenStoreWrite(impl: (t: unknown) => Promise<void> = async () => undefined): {
   writeSpy: ReturnType<typeof vi.fn>;
 } {
@@ -113,12 +118,19 @@ function mockTokenStoreWrite(impl: (t: unknown) => Promise<void> = async () => u
     const actual = await vi.importActual<
       typeof import('../../infrastructure/whoop/token-store.js')
     >('../../infrastructure/whoop/token-store.js');
+    // The fake TokenStore satisfies the TokenStore interface; only
+    // `write` carries observable behavior — the other methods are unused
+    // by the OAuth-login command path.
+    const fakeStore = {
+      getValidAccessToken: async () => 'unused',
+      read: async () => null,
+      write: writeSpy,
+      clear: async () => undefined,
+      readStorageMode: async () => null,
+    };
     return {
       ...actual,
-      tokenStore: {
-        ...actual.tokenStore,
-        write: writeSpy,
-      },
+      createTokenStore: () => fakeStore,
     };
   });
   return { writeSpy };

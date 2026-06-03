@@ -134,9 +134,11 @@ const StoredTokensSchema = z.object({
 });
 
 // -----------------------------------------------------------------------------
-// Factory + singleton — mirrors `src/infrastructure/config/logger.ts`. The
-// production singleton binds module-load defaults; tests construct fresh
-// instances via the factory so the in-process gate is per-instance.
+// Factory — the sole construction surface for the token store. The
+// composition root in `src/services/bootstrap.ts` instantiates it once per
+// process; `src/cli/commands/auth.ts` constructs its own instance directly
+// (documented OAuth-flow exception per ADR-0002 §Enforcement). Tests build
+// per-test instances so the in-process single-flight gate stays isolated.
 // -----------------------------------------------------------------------------
 
 export function createTokenStore(opts: TokenStoreOptions = {}): TokenStore {
@@ -515,7 +517,13 @@ function isNotFound(err: unknown): boolean {
   );
 }
 
-// Production singleton — bound at module load to the default paths + global
-// fetch. Plans 03/04/05/06 import this directly; tests construct their own
-// via `createTokenStore({paths, now})`.
-export const tokenStore: TokenStore = createTokenStore();
+// Phase 10 ARCH-02 (#85): the module-load singleton
+// `export const tokenStore = createTokenStore()` is GONE. The composition
+// root in `src/services/bootstrap.ts` constructs `tokenStore` exactly once
+// per process and threads it through `Bootstrapped.services`. The OAuth
+// login flow in `src/cli/commands/auth.ts` is the sole documented
+// exception: it constructs its own `createTokenStore()` directly because
+// the login flow does not need the DB (see ADR-0002 §Enforcement and
+// 10-RESEARCH.md Q7-RESOLVED). Tests construct fresh stores via
+// `createTokenStore({...})`. Enforced by Gate L in
+// `scripts/ci-grep-gates.sh`.

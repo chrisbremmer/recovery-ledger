@@ -29,11 +29,7 @@
 // ARCH-04 (#92): single canonical import path for AuthError.
 import { AuthError } from '../domain/errors/auth.js';
 import { logger } from '../infrastructure/config/logger.js';
-import {
-  tokenStore as defaultTokenStore,
-  REFRESH_BUFFER_MS,
-  type TokenStore,
-} from '../infrastructure/whoop/token-store.js';
+import { REFRESH_BUFFER_MS, type TokenStore } from '../infrastructure/whoop/token-store.js';
 
 // -----------------------------------------------------------------------------
 // Public types — the surface Phase 3 (and future WHOOP-call sites) consume.
@@ -51,9 +47,10 @@ export interface FetchLikeResponse {
 export type AuthedOperation<T extends FetchLikeResponse> = (accessToken: string) => Promise<T>;
 
 export interface CallWithAuthOptions {
-  /** Test seam — defaults to the production tokenStore singleton. Production
-   *  call sites should never pass this; the singleton is the load-bearing
-   *  chokepoint. */
+  /** Test seam — overrides the orchestrator's bound `TokenStore` for a
+   *  single call. Production call sites should never pass this; the
+   *  bootstrap-constructed orchestrator binds the canonical store
+   *  (ADR-0002 §Enforcement). */
   tokenStore?: TokenStore;
 }
 
@@ -65,9 +62,11 @@ export interface RefreshOrchestrator {
 }
 
 // -----------------------------------------------------------------------------
-// Factory + singleton — mirrors token-store.ts and logger.ts. The production
-// singleton binds to the production tokenStore; tests construct fresh
-// orchestrators via createRefreshOrchestrator(mockStore).
+// Factory — the sole construction surface. Phase 10 ARCH-02 (#85) removed
+// the module-load singleton; `src/services/bootstrap.ts` constructs the
+// orchestrator exactly once per process and threads it through
+// `Bootstrapped.services`. Tests construct fresh orchestrators via
+// `createRefreshOrchestrator(mockStore)`.
 // -----------------------------------------------------------------------------
 
 export function createRefreshOrchestrator(store: TokenStore): RefreshOrchestrator {
@@ -126,16 +125,12 @@ async function callWithAuthImpl<T extends FetchLikeResponse>(
   return operation(freshAccessToken);
 }
 
-// Production singleton — bound at module load to the default tokenStore.
-// Phase 3's WHOOP sync service imports `callWithAuth` directly or pulls
-// `refreshOrchestrator` through the services barrel.
-export const refreshOrchestrator: RefreshOrchestrator =
-  createRefreshOrchestrator(defaultTokenStore);
-
-/**
- * Convenience re-export so Phase 3 call sites can `import { callWithAuth }`
- * without first dereferencing through the singleton object. Bound to the
- * production tokenStore; tests that need a mock TokenStore must use
- * `createRefreshOrchestrator(mockStore).callWithAuth` instead.
- */
-export const callWithAuth = refreshOrchestrator.callWithAuth.bind(refreshOrchestrator);
+// Phase 10 ARCH-02 (#85) + ARCH-03: the module-load singletons
+// `export const refreshOrchestrator` and `export const callWithAuth` are
+// GONE. The composition root in `src/services/bootstrap.ts` constructs the
+// orchestrator exactly once and binds `authedCall` (the call-with-auth
+// closure) for the WHOOP client. Consumers receive both through the
+// `Bootstrapped.services` surface. `src/cli/commands/auth.ts` does NOT
+// consume this module — the OAuth login flow has no 401-reactive boundary.
+// Enforced by Gates L (no singleton exports) and M (no services/ imports
+// from infrastructure) in `scripts/ci-grep-gates.sh`.

@@ -21,34 +21,28 @@
 // uses cycle_ids 40001/40002/40003 — those must exist in the cycles table
 // before the recovery upsert fires. Each test seeds parent cycles first.
 //
-// vi.mock of `services/refresh-orchestrator.js` mirrors client.test.ts so
-// the contract test does not touch the OS keychain.
+// Phase 10 ARCH-03: the contract test composes the resource factory with
+// a deterministic fake `authedCall` instead of mocking the (now-deleted)
+// `services/refresh-orchestrator` singleton.
 
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, test, vi } from 'vitest';
 import type { Cycle, Recovery } from '../../src/domain/types/entities.js';
+import { createCyclesRepo } from '../../src/infrastructure/db/repositories/cycles.repo.js';
+import { createRecoveryRepo } from '../../src/infrastructure/db/repositories/recovery.repo.js';
+import type { AuthedCall } from '../../src/infrastructure/whoop/client.js';
+import { WhoopApiError } from '../../src/infrastructure/whoop/errors.js';
+import { _resetForTest as resetRateLimit } from '../../src/infrastructure/whoop/rate-limit.js';
+import { createListRecovery } from '../../src/infrastructure/whoop/resources/recovery.js';
 import { createInMemoryDb, type InMemoryDbResult } from '../helpers/in-memory-db.js';
 import {
   createWhoopRecoveryHelper,
   type WhoopRecoveryHelper,
 } from '../helpers/msw-whoop-recovery.js';
 
-vi.mock('../../src/services/refresh-orchestrator.js', () => ({
-  callWithAuth: (op: (token: string) => Promise<unknown>) => op('test-token-123'),
-}));
-
-const { listRecovery } = await import('../../src/infrastructure/whoop/resources/recovery.js');
-const { createRecoveryRepo } = await import(
-  '../../src/infrastructure/db/repositories/recovery.repo.js'
-);
-const { createCyclesRepo } = await import(
-  '../../src/infrastructure/db/repositories/cycles.repo.js'
-);
-const { _resetForTest: resetRateLimit } = await import(
-  '../../src/infrastructure/whoop/rate-limit.js'
-);
-const { WhoopApiError } = await import('../../src/infrastructure/whoop/errors.js');
+const authedCall: AuthedCall = (op) => op('test-token-123');
+const listRecovery = createListRecovery({ authedCall });
 
 vi.setConfig({ testTimeout: 5_000 });
 

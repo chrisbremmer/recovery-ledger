@@ -27,23 +27,29 @@
 // closed by relocating the pure-string-transform module out of
 // infrastructure into the domain layer.
 import { sanitize } from '../../../domain/observability/sanitize.js';
-import { type Tokens, tokenStore } from '../../../infrastructure/whoop/token-store.js';
+import type { Tokens } from '../../../infrastructure/whoop/token-store.js';
 import type { DoctorCheck } from '../index.js';
 import { CHECK_NAMES } from './check-names.js';
 
+// Phase 10 ARCH-07: deps are REQUIRED, not optional. The historical
+// `deps?.readStorageMode ?? (() => tokenStore.readStorageMode())` fallback
+// is gone; callers MUST supply both `readStorageMode` and `readTokens`. The
+// production composition root (`src/services/bootstrap.ts` → runDoctor)
+// constructs these from the bootstrap-bound `tokenStore`. The lightweight
+// `createServices()` path does not call this probe (it lives behind the
+// runDoctor surface which only bootstrap supplies with deps).
 export interface AuthProbeDeps {
-  /** Override for `tokenStore.readStorageMode`. Test-only seam — production
-   *  callers leave this undefined and the singleton's binding is used. */
-  readStorageMode?: () => Promise<'keychain' | 'file' | null>;
-  /** Override for `tokenStore.read`. Test-only seam — production callers
-   *  leave this undefined. NEVER the refresh-aware accessor: that would
-   *  trigger a refresh and break the D-22 offline-safe contract. */
-  readTokens?: () => Promise<Tokens | null>;
+  /** Reader for `tokenStore.readStorageMode`. Bootstrap binds the
+   *  production tokenStore; tests inject stubs. */
+  readStorageMode: () => Promise<'keychain' | 'file' | null>;
+  /** Reader for `tokenStore.read`. NEVER the refresh-aware accessor:
+   *  that would trigger a refresh and break the D-22 offline-safe
+   *  contract. */
+  readTokens: () => Promise<Tokens | null>;
 }
 
-export async function probeAuth(deps?: AuthProbeDeps): Promise<DoctorCheck> {
-  const readStorageMode = deps?.readStorageMode ?? (() => tokenStore.readStorageMode());
-  const readTokens = deps?.readTokens ?? (() => tokenStore.read());
+export async function probeAuth(deps: AuthProbeDeps): Promise<DoctorCheck> {
+  const { readStorageMode, readTokens } = deps;
 
   try {
     const mode = await readStorageMode();
