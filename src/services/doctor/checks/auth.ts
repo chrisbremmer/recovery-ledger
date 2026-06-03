@@ -22,10 +22,11 @@
 // would land on the user's terminal unredacted. Routing `err.message` through
 // the shared sanitizer is defense-in-depth — the primary contract still
 // requires that errors NOT carry token bytes, but this is the second net.
-// Relocating sanitize into `src/infrastructure/observability/` remains
-// deferred work (PLAN-03-CROSS-LAYER); the same cross-layer dependency
-// exists in oauth.ts and auth.ts (CR-04).
-import { sanitize } from '../../../infrastructure/observability/sanitize.js';
+// Phase 10 ARCH-01: sanitize now lives at `src/domain/observability/`
+// — the cross-layer concern noted in PLAN-03-CROSS-LAYER / CR-04 was
+// closed by relocating the pure-string-transform module out of
+// infrastructure into the domain layer.
+import { sanitize } from '../../../domain/observability/sanitize.js';
 import { type Tokens, tokenStore } from '../../../infrastructure/whoop/token-store.js';
 import type { DoctorCheck } from '../index.js';
 import { CHECK_NAMES } from './check-names.js';

@@ -11,8 +11,8 @@
 // ADR-0001: this file lives under src/cli/commands/, so Gate B/C exempt
 // it from the console.* / process.stdout.write prohibitions.
 
+import { sanitize } from '../../domain/observability/sanitize.js';
 import { renderWeeklyReview } from '../../formatters/weekly-review.txt.js';
-import { sanitize } from '../../infrastructure/observability/sanitize.js';
 // ARCH-05 (#93): shared bootstrap-error rendering.
 import { tryBootstrap } from '../lib/with-bootstrap.js';
 

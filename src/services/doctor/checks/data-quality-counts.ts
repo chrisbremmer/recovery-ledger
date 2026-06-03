@@ -24,7 +24,7 @@
 // ADR-0001: no console calls. Gate G: src/services/ file — consumes the
 // injected repo methods only, never imports drizzle-orm.
 
-import { sanitize } from '../../../infrastructure/observability/sanitize.js';
+import { sanitize } from '../../../domain/observability/sanitize.js';
 import type { DoctorCheck } from '../index.js';
 import { CHECK_NAMES } from './check-names.js';
 

@@ -20,10 +20,10 @@
 
 import { mkdir, open, rename } from 'node:fs/promises';
 import { createInterface } from 'node:readline/promises';
+// SECH-02 (#79): outer-catch sanitization parity with auth.ts/sync.ts/doctor.ts.
+import { sanitize } from '../../domain/observability/sanitize.js';
 import { paths } from '../../infrastructure/config/paths.js';
 import { ConfigSchema, D13_SCOPES, type InitConfig } from '../../infrastructure/config/schema.js';
-// SECH-02 (#79): outer-catch sanitization parity with auth.ts/sync.ts/doctor.ts.
-import { sanitize } from '../../infrastructure/observability/sanitize.js';
 
 export type { InitConfig } from '../../infrastructure/config/schema.js';
 

@@ -16,7 +16,7 @@
 // writes from this module. Gate G: this file is in src/services/ — it
 // consumes the injected repo methods only and never imports drizzle-orm.
 
-import { sanitize } from '../../../infrastructure/observability/sanitize.js';
+import { sanitize } from '../../../domain/observability/sanitize.js';
 import type { DoctorCheck } from '../index.js';
 import { CHECK_NAMES } from './check-names.js';
 

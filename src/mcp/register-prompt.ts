@@ -17,7 +17,7 @@
 // multi-message return shape is covered without changes.
 
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import { sanitize, serializeError } from '../infrastructure/observability/sanitize.js';
+import { sanitize, serializeError } from '../domain/observability/sanitize.js';
 
 export interface PromptConfig {
   title?: string;

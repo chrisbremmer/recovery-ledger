@@ -26,8 +26,8 @@
 // The decision-add.test.ts T-04-S2 fixtures verify (a) + (b) by asserting
 // the decision text round-trips through the service unchanged.
 
+import { sanitize } from '../../domain/observability/sanitize.js';
 import { renderDecisionDetail } from '../../formatters/decision.txt.js';
-import { sanitize } from '../../infrastructure/observability/sanitize.js';
 // ARCH-05 (#93): shared bootstrap-error rendering.
 import { tryBootstrap } from '../lib/with-bootstrap.js';
 

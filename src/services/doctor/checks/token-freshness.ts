@@ -17,7 +17,7 @@
 // Cross-layer import (WR-06): see auth.ts in this directory for the full
 // rationale. CLI path's runDoctorCommand emits probe detail strings via
 // process.stdout.write without going through the MCP sanitizer wrapper.
-import { sanitize } from '../../../infrastructure/observability/sanitize.js';
+import { sanitize } from '../../../domain/observability/sanitize.js';
 import {
   REFRESH_BUFFER_MS,
   type Tokens,

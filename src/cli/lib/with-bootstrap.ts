@@ -17,9 +17,9 @@
 // caller still owns the single stdout write call.
 
 import { isMigrationError } from '../../domain/errors/migration.js';
+import { sanitize } from '../../domain/observability/sanitize.js';
 import { formatBootstrapError } from '../../formatters/sync.txt.js';
 import { paths } from '../../infrastructure/config/paths.js';
-import { sanitize } from '../../infrastructure/observability/sanitize.js';
 import { type Bootstrapped, bootstrap } from '../../services/index.js';
 
 export type TryBootstrapResult =

@@ -45,19 +45,18 @@
 // permits (the token endpoint is auth-only, not a content-write path).
 // No PUT/PATCH/DELETE; no other POST destinations.
 //
-// Cross-layer import: this module imports `sanitize` from src/mcp/. The
-// planner-level note PLAN-03-CROSS-LAYER documents the deferral of a
-// cleaner refactor (move sanitize to src/infrastructure/observability/)
-// to a later hardening pass. ADR-0001 §Consequences endorses one
-// sanitizer module, cross-layer.
+// Phase 10 ARCH-01: `sanitize` lives in `src/domain/observability/` —
+// pure string transforms, no I/O. The PLAN-03-CROSS-LAYER deferral was
+// closed by relocating the module out of infrastructure into domain.
+// ADR-0001 §Consequences endorses one sanitizer module.
 
 import { createHash, randomBytes } from 'node:crypto';
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { z } from 'zod';
 import { AuthError } from '../../domain/errors/auth.js';
+import { sanitize } from '../../domain/observability/sanitize.js';
 import { logger } from '../config/logger.js';
-import { sanitize } from '../observability/sanitize.js';
 import { TOKEN_REQUEST_TIMEOUT_MS, type Tokens, WHOOP_TOKEN_URL } from './token-store.js';
 
 // ---------------------------------------------------------------------------

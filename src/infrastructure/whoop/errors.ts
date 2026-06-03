@@ -34,7 +34,7 @@
 // either direction surfaces.
 //
 // Phase 3 D-34 attestation: instances of this class flow through the
-// existing src/infrastructure/observability/sanitize.ts pipeline UNMODIFIED. The Phase 1 D-07
+// existing src/domain/observability/sanitize.ts pipeline UNMODIFIED. The Phase 1 D-07
 // patterns + Phase 2 D-19 patterns (code= / client_secret / Bearer / JWT /
 // Authorization) cover every WHOOP-derived error shape Phase 3 produces.
 // The shape mirrors AuthError (named field + cause chain), which has

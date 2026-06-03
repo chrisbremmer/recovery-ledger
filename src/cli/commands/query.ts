@@ -11,10 +11,10 @@
 //   invalid_input    = 1   unknown resource OR flag/resource mismatch
 //   bootstrap_failed = 1
 
+import { sanitize, serializeError } from '../../domain/observability/sanitize.js';
 // ARCH-04+ARCH-05 path imports left below; see tryBootstrap import.
 import { renderQueryCache } from '../../formatters/query-cache.txt.js';
 import { logger } from '../../infrastructure/config/logger.js';
-import { sanitize, serializeError } from '../../infrastructure/observability/sanitize.js';
 import type { QueryCacheInput } from '../../services/cache/types.js';
 // ARCH-05 (#93): shared bootstrap-error rendering.
 import { tryBootstrap } from '../lib/with-bootstrap.js';

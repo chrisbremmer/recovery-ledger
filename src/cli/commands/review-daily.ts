@@ -19,8 +19,8 @@
 //   failed            = 1   getDailyReview threw after bootstrap succeeded
 //   bootstrap_failed  = 1   openDb / migrate threw before service ran
 
+import { sanitize } from '../../domain/observability/sanitize.js';
 import { renderDailyReview } from '../../formatters/daily-review.txt.js';
-import { sanitize } from '../../infrastructure/observability/sanitize.js';
 // ARCH-05 (#93): shared bootstrap-error rendering.
 import { tryBootstrap } from '../lib/with-bootstrap.js';
 

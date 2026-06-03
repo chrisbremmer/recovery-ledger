@@ -25,15 +25,15 @@
 //   bootstrap_failed  = 1   openDb or migrate threw before sync started
 
 import { z } from 'zod';
-// Cross-layer import: src/infrastructure/observability/sanitize.ts is the single source of truth for
+// Cross-layer import: src/domain/observability/sanitize.ts is the single source of truth for
 // secret-bearing pattern redaction. Mirrors the auth.ts cross-layer import.
 // ARCH-04 (#92): domain-layer AuthError helpers; infrastructure-layer
 // WhoopApiError helpers. Pre-ARCH-04 both pulled from the infrastructure
 // re-export — two class identities under vi.resetModules + drift risk.
 import { formatAuthError, isAuthError } from '../../domain/errors/auth.js';
+import { sanitize } from '../../domain/observability/sanitize.js';
 import { RESOURCE_NAMES_SET, type ResourceName } from '../../domain/types/sync.js';
 import { formatSyncResult } from '../../formatters/sync.txt.js';
-import { sanitize } from '../../infrastructure/observability/sanitize.js';
 import { formatWhoopApiError, isWhoopApiError } from '../../infrastructure/whoop/errors.js';
 // ARCH-05 (#93): shared bootstrap-error rendering.
 import type { Bootstrapped } from '../../services/index.js';

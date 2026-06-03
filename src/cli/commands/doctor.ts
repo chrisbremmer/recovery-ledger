@@ -4,10 +4,10 @@
 // or MCP JSON-RPC framing. ci-grep-gates.sh Gate C enforces this exclusively
 // for `src/cli/commands/doctor.ts`.
 
+// SECH-02 (#79): outer-catch sanitization parity with sync.ts/auth.ts/init.ts.
+import { sanitize } from '../../domain/observability/sanitize.js';
 import { renderDoctor } from '../../formatters/doctor.txt.js';
 import { createLogger } from '../../infrastructure/config/logger.js';
-// SECH-02 (#79): outer-catch sanitization parity with sync.ts/auth.ts/init.ts.
-import { sanitize } from '../../infrastructure/observability/sanitize.js';
 // MR-32: route CLI invocations through the Services composition root so
 // the lite-hexagonal "CLI and MCP both consume the same Services surface"
 // pattern (CLAUDE.md §Architecture) is real instead of aspirational. The

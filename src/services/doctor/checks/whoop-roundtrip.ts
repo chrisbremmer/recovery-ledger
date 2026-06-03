@@ -19,7 +19,7 @@
 // double-sanitizing (idempotent, locked by sanitize.test.ts).
 //
 // SECH-02 (#79): sanitize wrapper at the catch arm.
-import { sanitize } from '../../../infrastructure/observability/sanitize.js';
+import { sanitize } from '../../../domain/observability/sanitize.js';
 import type { RefreshOrchestrator } from '../../refresh-orchestrator.js';
 import type { DoctorCheck } from '../index.js';
 import { CHECK_NAMES } from './check-names.js';
