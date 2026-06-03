@@ -282,7 +282,8 @@ Concerns originate in the phase where the first vulnerable code is introduced; t
   1. All #95 residual items (decisions/sync_runs indexes; `findByPrefix` min-length guard; body_measurements float quantize; cycles.cursor() comment; token-store mkdir 0o700; OAuth callback `.unref()`; Pino flush signal handlers) ship in one PR; CHANGELOG enumerates each.
   2. All #95 testing backlog items (FDR↔weekly integration, DST fixture hard-coded ids, stopwatch env-gate polarity guard, auth-concurrency I-01 typed assertion, concurrent_writers_stress detail regex, doctor/index integration detail regex, body_measurements concurrent-readers test, refresh-orchestrator behavioral assertions) land in the same PR; full-suite green; suite still finishes under 60 seconds locally.
   3. Phase-close gate: every one of the 26 v1.1 REQ-IDs is flipped to Complete in the REQUIREMENTS.md v1.1 Traceability table; milestone v1.1 close is appended to STATE.md.
-**Plans**: TBD
+**Plans**: 1 plan
+- [ ] 12-01-backlog-drain-PLAN.md — Omnibus closing PR for v1.1 milestone: BACK-01 B1 covering indexes + B7 Pino flush; TSTC-03 T1-T8 testing backlog; 26 REQ-ID milestone-close flip (TSTC-03, BACK-01)
 **PR boundaries**: 1 PR (residual + TSTC-03 fold-in)
 **UI hint**: no
 
