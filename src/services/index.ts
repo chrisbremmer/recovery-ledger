@@ -34,7 +34,6 @@
 //     Returns the full `Services` interface (`ServicesBase` + DB methods).
 
 import { runDoctor } from './doctor/index.js';
-import { refreshOrchestrator } from './refresh-orchestrator.js';
 
 export type {
   DailyReviewResult,
@@ -83,6 +82,7 @@ export { runSync } from './sync/index.js';
 import type { DailyReviewResult, WeeklyReviewResult } from '../domain/review/types.js';
 import type { Decision } from '../domain/types/entities.js';
 import type { RunSyncInput, RunSyncResult } from '../domain/types/sync.js';
+import type { TokenStore } from '../infrastructure/whoop/token-store.js';
 import type { ApiGapResult } from './api-gap/types.js';
 import type { QueryCacheInput, QueryCacheResult } from './cache/types.js';
 import type {
@@ -90,22 +90,28 @@ import type {
   ReviewDecisionsInput,
   ReviewDecisionsResult,
 } from './decision/types.js';
+import type { RefreshOrchestrator } from './refresh-orchestrator.js';
 
 /**
- * Phase 1-2 surface: doctor + auth only. No DB dependency. `createServices()`
+ * Phase 1-2 surface: doctor only. No DB dependency. `createServices()`
  * returns this — DB-backed methods are simply absent from the type, so a
  * caller that wires `whoop_sync` (or any review/decision/cache tool) against
  * `createServices()` instead of `bootstrap()` fails to compile.
+ *
+ * Phase 10 ARCH-02 (#85): `refreshOrchestrator` is no longer on
+ * `ServicesBase`. The historical module-load singleton is gone; the only
+ * sanctioned construction site for DB-coupled flows is `bootstrap()`,
+ * which exposes it on `Services` (extending `ServicesBase`). The
+ * lightweight `createServices()` path returns only `{ runDoctor }`.
  */
 export interface ServicesBase {
   runDoctor: typeof runDoctor;
-  refreshOrchestrator: typeof refreshOrchestrator;
 }
 
 /**
  * Full Phase 3+4 surface. Returned by `bootstrap()` — every method below
  * is DB-backed and the bootstrap layer wires the repos + resource modules.
- * `Services` extends `ServicesBase` so doctor/auth code that takes a
+ * `Services` extends `ServicesBase` so doctor code that takes a
  * `ServicesBase` keeps working when handed the full `Services`.
  */
 export interface Services extends ServicesBase {
@@ -123,6 +129,20 @@ export interface Services extends ServicesBase {
   queryCache: (input: QueryCacheInput) => Promise<QueryCacheResult>;
   /** `whoop_api_gap` catalog accessor (Phase 4 Plan 04-06 D-28). DB-backed. */
   getApiGap: () => Promise<ApiGapResult>;
+  /**
+   * Phase 10 ARCH-02 (#85): the 401-reactive refresh orchestrator. The
+   * historical module-load singleton is gone; bootstrap constructs this
+   * exactly once and binds the canonical `TokenStore`.
+   */
+  refreshOrchestrator: RefreshOrchestrator;
+  /**
+   * Phase 10 ARCH-02 (#85): the bootstrap-constructed `TokenStore` instance.
+   * Any future DB-coupled flow can pull it from `Bootstrapped.services`
+   * rather than instantiating its own. The OAuth-login flow
+   * (`src/cli/commands/auth.ts`) is the sole documented exception per
+   * ADR-0002 §Enforcement.
+   */
+  tokenStore: TokenStore;
 }
 
 /**
@@ -151,6 +171,5 @@ export interface Services extends ServicesBase {
 export function createServices(): ServicesBase {
   return {
     runDoctor,
-    refreshOrchestrator,
   };
 }

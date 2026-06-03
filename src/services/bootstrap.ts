@@ -94,14 +94,15 @@ import {
   createWorkoutsRepo,
   type WorkoutsRepo,
 } from '../infrastructure/db/repositories/workouts.repo.js';
-import { httpGet } from '../infrastructure/whoop/client.js';
+import { type AuthedCall, httpGet } from '../infrastructure/whoop/client.js';
 import { WhoopApiError } from '../infrastructure/whoop/errors.js';
-import { getBodyMeasurement } from '../infrastructure/whoop/resources/body-measurements.js';
-import { listCycles } from '../infrastructure/whoop/resources/cycles.js';
-import { getProfile } from '../infrastructure/whoop/resources/profile.js';
-import { listRecovery } from '../infrastructure/whoop/resources/recovery.js';
-import { listSleep } from '../infrastructure/whoop/resources/sleep.js';
-import { listWorkouts } from '../infrastructure/whoop/resources/workouts.js';
+import { createGetBodyMeasurement } from '../infrastructure/whoop/resources/body-measurements.js';
+import { createListCycles } from '../infrastructure/whoop/resources/cycles.js';
+import { createGetProfile } from '../infrastructure/whoop/resources/profile.js';
+import { createListRecovery } from '../infrastructure/whoop/resources/recovery.js';
+import { createListSleep } from '../infrastructure/whoop/resources/sleep.js';
+import { createListWorkouts } from '../infrastructure/whoop/resources/workouts.js';
+import { createTokenStore, type TokenStore } from '../infrastructure/whoop/token-store.js';
 import { getApiGap } from './api-gap/index.js';
 import type { ApiGapResult } from './api-gap/types.js';
 import { queryCache } from './cache/index.js';
@@ -118,7 +119,7 @@ import {
   type runDoctor,
   runDoctor as runDoctorImpl,
 } from './doctor/index.js';
-import { refreshOrchestrator } from './refresh-orchestrator.js';
+import { createRefreshOrchestrator, type RefreshOrchestrator } from './refresh-orchestrator.js';
 import { getDailyReview } from './review/daily.js';
 import { getWeeklyReview } from './review/weekly.js';
 import { type RunSyncDeps, runSync } from './sync/index.js';
@@ -162,7 +163,13 @@ export interface Bootstrapped {
     // + refreshOrchestrator surfaces must be present on this map too.
     // Both are zero-DB-dependency, so wiring them here costs nothing.
     runDoctor: typeof runDoctor;
-    refreshOrchestrator: typeof refreshOrchestrator;
+    refreshOrchestrator: RefreshOrchestrator;
+    // Phase 10 ARCH-02 (#85): expose the bootstrap-constructed tokenStore
+    // on the services surface so any future DB-coupled flow can pull it
+    // from `Bootstrapped` rather than instantiating its own. The OAuth-
+    // login flow in `src/cli/commands/auth.ts` is the sole documented
+    // exception and continues to construct its own `createTokenStore()`.
+    tokenStore: TokenStore;
   };
   close(): void;
 }
@@ -176,6 +183,20 @@ export interface BootstrapOptions {
   migrationsDir?: string;
   /** Inject a custom logger — defaults to the production Pino singleton. */
   logger?: Logger;
+  /**
+   * Phase 10 ARCH-02 (#85): inject a custom `TokenStore` instance. Defaults
+   * to `createTokenStore()` (bound to the production keychain + file backend
+   * via the canonical paths). Tests pass a fake store; production callers
+   * leave this undefined so bootstrap constructs the single canonical
+   * instance per process. See ADR-0002 §Enforcement.
+   */
+  tokenStore?: TokenStore;
+  /**
+   * Phase 10 ARCH-02 (#85): inject a custom `RefreshOrchestrator`. Defaults
+   * to `createRefreshOrchestrator(tokenStore)`. Tests use this to bypass
+   * the OAuth refresh chain; production callers leave it undefined.
+   */
+  refreshOrchestrator?: RefreshOrchestrator;
 }
 
 /**
@@ -205,6 +226,17 @@ function resolveMigrationsDir(here: string): string {
 
 export function bootstrap(opts: BootstrapOptions = {}): Bootstrapped {
   const dbFile = opts.dbFile ?? paths.dbFile;
+  // Phase 10 ARCH-02 (#85) + ARCH-03: construct the per-process collaborators
+  // exactly once here. tokenStore is the load-bearing chokepoint for the
+  // ADR-0002 three-layer single-flight gate; the orchestrator binds the
+  // 401-reactive retry policy on top of it; authedCall is the closure handed
+  // to the WHOOP HTTP client (ARCH-03 inverts the previous client →
+  // services/refresh-orchestrator import). Override seams on
+  // `BootstrapOptions` exist so tests can inject fakes without touching
+  // any real keychain / file backend.
+  const tokenStore = opts.tokenStore ?? createTokenStore();
+  const refreshOrchestrator = opts.refreshOrchestrator ?? createRefreshOrchestrator(tokenStore);
+  const authedCall: AuthedCall = (op) => refreshOrchestrator.callWithAuth(op);
   // Resolve migrations dir from import.meta.url. The directory lives at
   // two locations depending on path shape:
   //   - DEV (tsx, src/): `src/services/bootstrap.ts` →
@@ -298,14 +330,18 @@ export function bootstrap(opts: BootstrapOptions = {}): Bootstrapped {
     });
   }
 
+  // Phase 10 ARCH-03: each resource module is a factory that captures the
+  // bootstrap-constructed `authedCall` via closure. The consumer shape on
+  // RunSyncDeps['whoop'] is unchanged — each value is still a `(opts) =>
+  // Promise<Result>` function — so `runSync` needs no changes.
   const whoop: RunSyncDeps['whoop'] = {
     resources: {
-      cycles: listCycles,
-      recoveries: listRecovery,
-      sleeps: listSleep,
-      workouts: listWorkouts,
-      profile: getProfile,
-      body_measurements: getBodyMeasurement,
+      cycles: createListCycles({ authedCall }),
+      recoveries: createListRecovery({ authedCall }),
+      sleeps: createListSleep({ authedCall }),
+      workouts: createListWorkouts({ authedCall }),
+      profile: createGetProfile({ authedCall }),
+      body_measurements: createGetBodyMeasurement({ authedCall }),
     },
   };
 
@@ -398,7 +434,12 @@ export function bootstrap(opts: BootstrapOptions = {}): Bootstrapped {
   ): Promise<{ status: number; durationMs: number }> => {
     const start = performance.now();
     try {
-      await httpGet('/v2/user/profile/basic', {}, WhoopRawProfile);
+      // Phase 10 ARCH-03: `httpGet` now takes `authedCall` as its 4th
+      // positional parameter. The local `authedCall` const constructed
+      // above wraps the same bootstrap-bound `refreshOrchestrator`, so
+      // the ADR-0002 three-layer single-flight gate still routes every
+      // GET through callWithAuth exactly once per `httpGet` invocation.
+      await httpGet('/v2/user/profile/basic', {}, WhoopRawProfile, authedCall);
       return { status: 200, durationMs: performance.now() - start };
     } catch (err) {
       // ERRC-01 (#89): a refresh-side AuthError ('auth_expired',
@@ -437,6 +478,12 @@ export function bootstrap(opts: BootstrapOptions = {}): Bootstrapped {
       },
       refreshOrchestrator: opts.refreshOrchestrator ?? refreshOrchestrator,
       whoopFetcher: opts.whoopFetcher ?? productionWhoopFetcher,
+      // Phase 10 ARCH-02 + ARCH-07: thread the bootstrap-constructed
+      // tokenStore through so the auth + token_freshness probes get
+      // required deps (RESEARCH §ARCH-07). The lightweight createServices()
+      // path leaves this undefined; those probes degrade to "no token store
+      // injected" structured fails in that mode.
+      tokenStore: opts.tokenStore ?? tokenStore,
       // Reuse the path bootstrap already resolved for the migrator so the
       // db_schema_version probe reads the same dir from the bundled dist tree
       // (the probe's own import.meta.url math is wrong once flattened).
@@ -466,6 +513,7 @@ export function bootstrap(opts: BootstrapOptions = {}): Bootstrapped {
       // wrapper with no DB dependency.
       runDoctor: services_runDoctor,
       refreshOrchestrator,
+      tokenStore,
     },
     close: () => {
       try {
