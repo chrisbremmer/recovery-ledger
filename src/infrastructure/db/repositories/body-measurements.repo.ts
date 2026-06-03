@@ -71,8 +71,7 @@ export function createBodyMeasurementsRepo(db: ReturnType<typeof drizzle>): Body
           // float round-trip noise without masking real measurement deltas
           // (smallest meaningful change is ~0.01 kg / 0.001 m).
           const FLOAT_TOL = 1e-6;
-          const closeEnough = (a: number, b: number): boolean =>
-            Math.abs(a - b) < FLOAT_TOL;
+          const closeEnough = (a: number, b: number): boolean => Math.abs(a - b) < FLOAT_TOL;
           if (
             latestRow &&
             closeEnough(latestRow.height_meter, measurement.heightMeter) &&
