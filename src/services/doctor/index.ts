@@ -30,6 +30,7 @@
 // silently green-checking.
 
 import type Database from 'better-sqlite3';
+import type { TokenStore } from '../../infrastructure/whoop/token-store.js';
 import type { RefreshOrchestrator } from '../refresh-orchestrator.js';
 import { probeAuth } from './checks/auth.js';
 import { CHECK_NAMES } from './checks/check-names.js';
@@ -165,6 +166,14 @@ export interface RunDoctorOptions {
    * fetch). When omitted, whoop_roundtrip is skipped (see refreshOrchestrator).
    */
   whoopFetcher?: (accessToken: string) => Promise<{ status: number; durationMs: number }>;
+  /**
+   * Phase 10 ARCH-02 + ARCH-07: the bootstrap-constructed token store. The
+   * auth + token_freshness probes consume `readStorageMode` / `read` from
+   * it. Absent (the lightweight createServices() path), those probes
+   * surface a structured "no token store injected" fail rather than
+   * reaching back into a now-deleted module-load singleton.
+   */
+  tokenStore?: TokenStore;
 }
 
 // MR-27: exhaustive status switch with defense-in-depth fail arm. The
@@ -293,8 +302,24 @@ export async function runDoctor(opts: RunDoctorOptions = {}): Promise<DoctorResu
     probeDbSchemaVersion(schemaVersionDeps),
     probeDbWalSize({}),
     // Plan 02-06: offline-safe probes — no subprocess gate needed.
-    probeAuth(),
-    probeTokenFreshness(),
+    // Phase 10 ARCH-07: deps are REQUIRED on both probes. Bootstrap supplies
+    // the canonical tokenStore via `opts.tokenStore`; the lightweight
+    // createServices() path leaves it undefined and we synthesize a stub
+    // that returns null for both readers so each probe surfaces its
+    // standard "no tokens" structured fail (instead of throwing).
+    probeAuth(
+      opts.tokenStore != null
+        ? {
+            readStorageMode: () => (opts.tokenStore as TokenStore).readStorageMode(),
+            readTokens: () => (opts.tokenStore as TokenStore).read(),
+          }
+        : { readStorageMode: async () => null, readTokens: async () => null },
+    ),
+    probeTokenFreshness(
+      opts.tokenStore != null
+        ? { read: () => (opts.tokenStore as TokenStore).read(), now: Date.now }
+        : { read: async () => null, now: Date.now },
+    ),
     // Plan 05-06: the ONE online probe. When deps are present and --offline
     // is not set, it routes a single GET through callWithAuth; otherwise it
     // short-circuits to the 'skipped (--offline)' pass.
