@@ -88,6 +88,22 @@ all callers go through it.
   rotated pair was already consumed by WHOOP burns the family on the
   next process invocation. Locked by
   `src/infrastructure/whoop/token-store.test.ts` R-01.
+- **ARCH-02 (#85) — exactly one tokenStore per process for DB-coupled flows:**
+  production code MUST construct `tokenStore` exactly once via
+  `bootstrap()`. The historical
+  `export const tokenStore = createTokenStore()` module-load singleton in
+  `src/infrastructure/whoop/token-store.ts` is forbidden — bootstrap is
+  the sanctioned construction site for DB-coupled flows, and consumers
+  receive the instance through the `Bootstrapped` surface.
+  The OAuth-login flow (`src/cli/commands/auth.ts`) is the sole documented exception:
+  it constructs its own `createTokenStore()` instance because
+  the login flow does not bootstrap (no DB needed; bootstrapping would
+  slow login and surface migration errors during a DB-independent
+  action). Tests construct fresh stores via `createTokenStore(...)`;
+  nothing imports the (deleted) singleton. Enforced by
+  `rg "^export const tokenStore" src` returning zero matches AND
+  `rg "import.*tokenStore[^A-Za-z]" src` returning matches only in
+  `src/services/bootstrap.ts` and `src/cli/commands/auth.ts`.
 
 ## Cross-references
 
