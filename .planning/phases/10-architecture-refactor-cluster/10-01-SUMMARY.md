@@ -229,7 +229,7 @@ None beyond the deviations above. The move itself was clean (git rendered both f
 ## Pull Request
 
 Branch: `refactor/10-arch-01-sanitize-to-domain`
-PR URL: _filled in after `gh pr create`_
+PR URL: https://github.com/chrisbremmer/recovery-ledger/pull/124
 
 ---
 
