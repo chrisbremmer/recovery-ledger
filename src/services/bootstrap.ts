@@ -44,17 +44,10 @@
 
 import { existsSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
-import { performance } from 'node:perf_hooks';
 import { fileURLToPath } from 'node:url';
 import type Database from 'better-sqlite3';
 import type { Logger } from 'pino';
-// ARCH-04 (#92): isAuthError from domain (canonical); WhoopApiError stays
-// in infrastructure (HTTP-status-driven, not a domain concept).
-// ERRC-01 (#89): isAuthError maps refresh-side AuthError to the same
-// status 401 the WhoopApiError(unauthorized) path emits.
-import { isAuthError } from '../domain/errors/auth.js';
 import type { DailyReviewResult, WeeklyReviewResult } from '../domain/review/types.js';
-import { WhoopRawProfile } from '../domain/schemas/whoop-api.js';
 import type { Decision } from '../domain/types/entities.js';
 import type { RunSyncInput, RunSyncResult } from '../domain/types/sync.js';
 import { logger } from '../infrastructure/config/logger.js';
@@ -94,8 +87,7 @@ import {
   createWorkoutsRepo,
   type WorkoutsRepo,
 } from '../infrastructure/db/repositories/workouts.repo.js';
-import { type AuthedCall, httpGet } from '../infrastructure/whoop/client.js';
-import { WhoopApiError } from '../infrastructure/whoop/errors.js';
+import type { AuthedCall } from '../infrastructure/whoop/client.js';
 import { createGetBodyMeasurement } from '../infrastructure/whoop/resources/body-measurements.js';
 import { createListCycles } from '../infrastructure/whoop/resources/cycles.js';
 import { createGetProfile } from '../infrastructure/whoop/resources/profile.js';
@@ -113,12 +105,8 @@ import type {
   ReviewDecisionsInput,
   ReviewDecisionsResult,
 } from './decision/types.js';
-import {
-  type DoctorResult,
-  type RunDoctorOptions,
-  type runDoctor,
-  runDoctor as runDoctorImpl,
-} from './doctor/index.js';
+import type { runDoctor } from './doctor/index.js';
+import { createProductionDoctorDeps } from './doctor/wiring.js';
 import { createRefreshOrchestrator, type RefreshOrchestrator } from './refresh-orchestrator.js';
 import { getDailyReview } from './review/daily.js';
 import { getWeeklyReview } from './review/weekly.js';
@@ -395,111 +383,27 @@ export function bootstrap(opts: BootstrapOptions = {}): Bootstrapped {
   };
   const cacheDeps = { repos, logger: log };
 
-  // Plan 05-06: the production whoop_roundtrip fetcher. Routes a single
-  // GET /v2/user/profile/basic through `httpGet` (ADR-0007 read-only,
-  // Gate-F-allowlisted chokepoint — NO bare fetch here). `httpGet` itself
-  // wraps the call in `callWithAuth` (ADR-0002 single-flight refresh), so a
-  // stale token triggers exactly one refresh through the three-layer gate.
-  // The probe only needs `{status, durationMs}`; `httpGet` THROWS on non-200,
-  // so the catch arm derives a representative HTTP status from the thrown
-  // error. T-05-I6: only `{status, durationMs}` flows back — no Bearer/JWT
-  // material. The `accessToken` param is unused here because the token is
-  // supplied internally by `callWithAuth` inside `httpGet`; it is present to
-  // satisfy the probe's fetcher contract.
-  //
-  // Plan 05-06 deviation (Rule 3): the plan pseudocode read
-  // `WhoopApiError.status`, but the actual error class carries a discriminated
-  // `kind` (not a numeric status — see src/infrastructure/whoop/errors.ts).
-  // We map `kind` back to a representative status so the probe's 401 / 200 /
-  // other branch logic still distinguishes the auth-revoked case. A refresh
-  // that fails entirely surfaces as an AuthError (not a WhoopApiError); that
-  // falls through to status 0, which the probe renders as a generic
-  // roundtrip-failed warn — acceptable for the doctor surface.
-  const whoopErrorKindToStatus = (kind: WhoopApiError['kind']): number => {
-    switch (kind) {
-      case 'unauthorized':
-        return 401;
-      case 'rate_limited':
-        return 429;
-      case 'server':
-        return 500;
-      default:
-        // network / validation / unknown — no meaningful HTTP status; 0
-        // routes the probe to its generic 'roundtrip failed' warn arm.
-        return 0;
-    }
-  };
-  const productionWhoopFetcher = async (
-    _accessToken: string,
-  ): Promise<{ status: number; durationMs: number }> => {
-    const start = performance.now();
-    try {
-      // Phase 10 ARCH-03: `httpGet` now takes `authedCall` as its 4th
-      // positional parameter. The local `authedCall` const constructed
-      // above wraps the same bootstrap-bound `refreshOrchestrator`, so
-      // the ADR-0002 three-layer single-flight gate still routes every
-      // GET through callWithAuth exactly once per `httpGet` invocation.
-      await httpGet('/v2/user/profile/basic', {}, WhoopRawProfile, authedCall);
-      return { status: 200, durationMs: performance.now() - start };
-    } catch (err) {
-      // ERRC-01 (#89): a refresh-side AuthError ('auth_expired',
-      // 'refresh_failed', 'auth_missing') is the same condition the
-      // user experiences as "your token is dead — re-auth". Map all of
-      // them to status 401 so the doctor's whoop_roundtrip probe emits
-      // the SAME "run `recovery-ledger auth`" remediation as the
-      // WhoopApiError({kind:'unauthorized'}) path. Pre-ERRC-01 these
-      // routed to status 0 → the probe's generic 'roundtrip failed'
-      // warn, which gave the user two different messages for one
-      // condition.
-      if (isAuthError(err)) {
-        return { status: 401, durationMs: performance.now() - start };
-      }
-      const status = err instanceof WhoopApiError ? whoopErrorKindToStatus(err.kind) : 0;
-      return { status, durationMs: performance.now() - start };
-    }
-  };
-
-  // Plan 05-06: pre-bind the production deps into runDoctor so CLI/MCP
-  // callers get the full 14-check surface without threading sqlite + repos +
-  // refreshOrchestrator + whoopFetcher by hand. User-supplied opts win over
-  // the defaults (test seam). The `repos` shape maps the bootstrap plurals
-  // (`recoveries`/`sleeps`) to the singular keys the recency / scored-day /
-  // data-quality probes consume (`recovery`/`sleep`) — the narrow union
-  // structurally matches `RunDoctorOptions.repos`.
-  // Spread-then-override semantics: each individual `opts.X ?? default`
-  // gives the caller's CONCRETE value priority and falls back to the
-  // bootstrap-bound default when the caller's value is null/undefined.
-  // A caller passing `{ tokenStore: undefined }` explicitly will land
-  // on the bootstrap default (not stay undefined) — this is the
-  // test-seam contract the surrounding tests rely on. The `...opts`
-  // spread first copies every key (including unrelated ones) onto the
-  // payload; the subsequent named keys then re-evaluate the defaulted
-  // fields, with later keys winning. Do NOT collapse this into a single
-  // `{ ...opts }` without the named-key overrides — the defaults will
-  // be dropped on every call.
-  const services_runDoctor = (opts: RunDoctorOptions = {}): Promise<DoctorResult> =>
-    runDoctorImpl({
-      ...opts,
-      sqlite: opts.sqlite ?? sqlite,
-      repos: opts.repos ?? {
-        syncRuns: repos.syncRuns,
-        cycles: repos.cycles,
-        recovery: repos.recoveries,
-        sleep: repos.sleeps,
-      },
-      refreshOrchestrator: opts.refreshOrchestrator ?? refreshOrchestrator,
-      whoopFetcher: opts.whoopFetcher ?? productionWhoopFetcher,
-      // Phase 10 ARCH-02 + ARCH-07: thread the bootstrap-constructed
-      // tokenStore through so the auth + token_freshness probes get
-      // required deps (RESEARCH §ARCH-07). The lightweight createServices()
-      // path leaves this undefined; those probes degrade to "no token store
-      // injected" structured fails in that mode.
-      tokenStore: opts.tokenStore ?? tokenStore,
-      // Reuse the path bootstrap already resolved for the migrator so the
-      // db_schema_version probe reads the same dir from the bundled dist tree
-      // (the probe's own import.meta.url math is wrong once flattened).
-      migrationsDir: opts.migrationsDir ?? migrationsDir,
-    });
+  // Phase 10 ARCH-06 (#86): the doctor production wiring (the WHOOP
+  // roundtrip fetcher closure + the kind-to-HTTP-status mapper + the
+  // pre-bound runDoctor consumer) moved to `src/services/doctor/wiring.ts`.
+  // Bootstrap now constructs the bound closure exactly once here; the
+  // consumer shape on `services.runDoctor` is byte-identical
+  // (RunDoctorOptions in, Promise<DoctorResult> out). Gate O pins the
+  // fetcher symbol's new home — referencing its literal name here would
+  // trip the gate.
+  const runDoctor = createProductionDoctorDeps({
+    sqlite,
+    repos: {
+      syncRuns: repos.syncRuns,
+      cycles: repos.cycles,
+      recoveries: repos.recoveries,
+      sleeps: repos.sleeps,
+    },
+    refreshOrchestrator,
+    authedCall,
+    tokenStore,
+    migrationsDir,
+  });
 
   return {
     db,
@@ -516,13 +420,17 @@ export function bootstrap(opts: BootstrapOptions = {}): Bootstrapped {
       reviewDecisions: (input) => reviewDecisions(input, decisionDeps),
       queryCache: (input) => queryCache(input, cacheDeps),
       getApiGap: () => getApiGap(),
-      // Plan 05-06: runDoctor is now pre-bound to the production deps
-      // (sqlite + repos + refreshOrchestrator + whoopFetcher) so the full
-      // 14-check surface runs end-to-end from both the CLI doctor command
-      // and the MCP whoop_doctor tool (both compose against this map).
-      // refreshOrchestrator stays a direct re-export — it is a pure policy
-      // wrapper with no DB dependency.
-      runDoctor: services_runDoctor,
+      // Plan 05-06: runDoctor is pre-bound to the production deps (sqlite +
+      // repos + refreshOrchestrator + whoopFetcher + tokenStore +
+      // migrationsDir) so the full 14-check surface runs end-to-end from
+      // both the CLI doctor command and the MCP whoop_doctor tool (both
+      // compose against this map). Phase 10 ARCH-06 (#86) moved the
+      // pre-binding to `./doctor/wiring.ts`; the local `runDoctor` const
+      // above is the closure returned by the doctor wiring factory. The
+      // exposed shape on the services map is byte-identical from the
+      // consumer's POV. refreshOrchestrator stays a direct re-export —
+      // it is a pure policy wrapper with no DB dependency.
+      runDoctor,
       refreshOrchestrator,
       tokenStore,
     },

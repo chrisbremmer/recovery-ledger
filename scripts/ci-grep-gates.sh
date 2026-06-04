@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# CI grep gates — fourteen rules (A-N) that Biome cannot catch on its own.
+# CI grep gates — fifteen rules (A-O) that Biome cannot catch on its own.
 #
 # Gate A: banned tone words (CLAUDE.md "Critical Rules" list) — banned in code,
 #         tests, formatters, configs, and docs other than the rule definitions
@@ -106,6 +106,18 @@
 #         loophole so the ARCH-02 single-flight invariant is mechanically
 #         enforced instead of resting on code review alone. Amend
 #         ADR-0002 §Enforcement before extending the whitelist.
+# Gate O: no `productionWhoopFetcher` reference in src/services/bootstrap.ts.
+#         Phase 10 ARCH-06 (#86) moved the doctor production wiring (the
+#         WhoopApiError-kind-to-HTTP-status mapper, the productionWhoopFetcher
+#         closure, and the pre-bound runDoctor consumer) out of bootstrap.ts
+#         into src/services/doctor/wiring.ts. Bootstrap now calls
+#         createProductionDoctorDeps() exactly once during composition. This
+#         gate pins the new home: a future plan that reintroduces the
+#         fetcher inline in the composition root would re-grow bootstrap.ts
+#         and rebuild the coupling the extract closed. Scope is
+#         bootstrap.ts only; the canonical definition lives in
+#         src/services/doctor/wiring.ts and is not scanned. Test files are
+#         exempt.
 #
 # Exit-code semantics (Pitfall 10): grep returns 0 on match (= violation found).
 # Each gate inverts that: if grep -rEn matches, the gate prints ::error:: and
@@ -559,6 +571,32 @@ if "$GREP" -rEn "$CREATE_TOKEN_STORE_CALL_RE" --include='*.ts' src/ 2>/dev/null 
   fi
 fi
 rm -f /tmp/gate-n.$$
+
+# ----------------------------------------------------------------------------
+# Gate O — no `productionWhoopFetcher` reference in src/services/bootstrap.ts.
+# Phase 10 ARCH-06 (#86) moved the doctor production wiring (the
+# productionWhoopFetcher closure + whoopErrorKindToStatus mapper + pre-bound
+# runDoctor consumer) out of bootstrap.ts into
+# src/services/doctor/wiring.ts. Bootstrap now calls
+# createProductionDoctorDeps() exactly once during composition. This gate
+# pins the new home: a future plan that reintroduces the fetcher inline in
+# the composition root would re-grow bootstrap.ts and rebuild the coupling
+# the extract closed. Scope is bootstrap.ts only — the canonical definition
+# in src/services/doctor/wiring.ts is the allowed call site. Test files are
+# exempt (a future contract test may reference the symbol name in prose).
+# ----------------------------------------------------------------------------
+PRODUCTION_WHOOP_FETCHER_RE='\bproductionWhoopFetcher\b'
+
+if "$GREP" -En "$PRODUCTION_WHOOP_FETCHER_RE" src/services/bootstrap.ts 2>/dev/null \
+   > /tmp/gate-o.$$; then
+  if [ -s /tmp/gate-o.$$ ]; then
+    echo "::error::Gate O — productionWhoopFetcher referenced in src/services/bootstrap.ts (ARCH-06: the fetcher lives in src/services/doctor/wiring.ts; bootstrap calls createProductionDoctorDeps() instead):"
+    cat /tmp/gate-o.$$
+    rm -f /tmp/gate-o.$$
+    exit 1
+  fi
+fi
+rm -f /tmp/gate-o.$$
 
 echo "All grep gates passed."
 exit 0

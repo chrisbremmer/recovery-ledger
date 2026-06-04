@@ -36,6 +36,7 @@ describe('bootstrap() — Phase 4 service wiring', () => {
 
   it('Test 1: bootstrap() returns a services object with all 7 method slots', () => {
     app = bootstrap({ dbFile: resolve(tmpDir, 'db.sqlite') });
+    expect(typeof app.services.runDoctor).toBe('function');
     expect(typeof app.services.runSync).toBe('function');
     expect(typeof app.services.getDailyReview).toBe('function');
     expect(typeof app.services.getWeeklyReview).toBe('function');
