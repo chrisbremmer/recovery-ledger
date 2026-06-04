@@ -31,9 +31,9 @@ export type { ApiGapEntry };
  * verbatim; no filtering, no pagination, no I/O.
  */
 export interface ApiGapResult {
-  // `readonly` so the cast in getApiGap() drops out — the
-  // backing `API_GAP_ENTRIES` is a frozen `as const` tuple and exposing
-  // it as a mutable array was a lie.
+  // `readonly` so the cast in getApiGap() drops out — the backing
+  // `API_GAP_ENTRIES` is an `Object.freeze`-d array annotated
+  // `readonly ApiGapEntry[]`, and exposing it as a mutable array was a lie.
   entries: readonly ApiGapEntry[];
 }
 
