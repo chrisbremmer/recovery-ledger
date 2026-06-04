@@ -15,14 +15,14 @@
 // interface moved to `src/domain/api-gap/catalog.ts` per the
 // lite-hexagonal layering rule (pure data belongs in domain). This file
 // re-exports `ApiGapEntry` so callers that previously pulled it from the
-// types module can land on `services/api-gap.js` instead, keeping the
-// service-layer barrel re-export shape unchanged.
+// types module can land on this file instead, keeping the service-layer
+// barrel re-export shape unchanged.
 
 import { API_GAP_ENTRIES, type ApiGapEntry } from '../domain/api-gap/catalog.js';
 
 // Re-export the catalog entry interface so consumers that previously
-// imported it from `services/api-gap/types.js` can switch to
-// `services/api-gap.js` without a second domain-tier import.
+// imported it from the per-types module can switch to this file without
+// a second domain-tier import.
 export type { ApiGapEntry };
 
 /**

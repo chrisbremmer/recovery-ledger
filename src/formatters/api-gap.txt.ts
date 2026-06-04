@@ -14,10 +14,11 @@
 // no substitute exists), and the free-form notes carrying the reasoning.
 //
 // ADR-0005 / D-26 banned-tone-words: catalog entries already pass the
-// source-layer lint at Plan 04-06 (`src/services/api-gap/data.ts`). The
-// D-26 contract test re-checks the rendered output here.
+// source-layer lint at Plan 04-06 (catalog now lives in
+// src/domain/api-gap/catalog.ts per ARCH-08). The D-26 contract test
+// re-checks the rendered output here.
 
-import type { ApiGapEntry, ApiGapResult } from '../services/api-gap/types.js';
+import type { ApiGapEntry, ApiGapResult } from '../services/api-gap.js';
 
 const ENTRY_INDENT = '  ';
 

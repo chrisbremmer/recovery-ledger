@@ -7,9 +7,9 @@
 //     rendered output.
 
 import { describe, expect, it } from 'vitest';
+import { API_GAP_ENTRIES } from '../domain/api-gap/catalog.js';
 import { containsBannedToneToken, EMOJI_RE } from '../domain/banned-words.js';
-import { API_GAP_ENTRIES } from '../services/api-gap/data.js';
-import { getApiGap } from '../services/api-gap/index.js';
+import { getApiGap } from '../services/api-gap.js';
 import { renderApiGap } from './api-gap.txt.js';
 
 describe('renderApiGap', () => {

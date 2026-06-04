@@ -32,6 +32,7 @@ import type { Logger } from 'pino';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ACTION_CATALOG } from '../../src/domain/actions/catalog.js';
 import { DECISION_PROMPT_CATALOG } from '../../src/domain/actions/decision-prompts.js';
+import { API_GAP_ENTRIES } from '../../src/domain/api-gap/catalog.js';
 import {
   BANNED_TONE_WORDS,
   BANNED_TONE_WORDS_SET,
@@ -61,8 +62,7 @@ import { DAILY_DECISION_BRIEF_INSTRUCTION } from '../../src/mcp/prompts/daily-de
 import { DELOAD_OR_TRAIN_INSTRUCTION } from '../../src/mcp/prompts/deload-or-train.js';
 import { EXPERIMENT_DESIGNER_INSTRUCTION } from '../../src/mcp/prompts/experiment-designer.js';
 import { WEEKLY_RECOVERY_INVESTIGATION_INSTRUCTION } from '../../src/mcp/prompts/weekly-recovery-investigation.js';
-import { API_GAP_ENTRIES } from '../../src/services/api-gap/data.js';
-import { getApiGap } from '../../src/services/api-gap/index.js';
+import { getApiGap } from '../../src/services/api-gap.js';
 import { type DailyReviewDeps, getDailyReview } from '../../src/services/review/daily.js';
 import { getWeeklyReview, type WeeklyReviewDeps } from '../../src/services/review/weekly.js';
 import { type DailyFixtureSpec, expandDailyFixture } from '../fixtures/review/_generators/daily.js';

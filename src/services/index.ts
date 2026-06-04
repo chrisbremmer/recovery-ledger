@@ -57,7 +57,7 @@ export type {
 // imports the relevant type contract from this barrel rather than reaching
 // into the per-service `types.ts` files directly. Mirrors the Phase 3
 // pattern of re-exporting `RunSyncInput` / `RunSyncResult` above.
-export type { ApiGapEntry, ApiGapResult } from './api-gap/types.js';
+export type { ApiGapEntry, ApiGapResult } from './api-gap.js';
 export type { BootstrapOptions, Bootstrapped } from './bootstrap.js';
 // Phase 3 Plan 03-11: extend the barrel surface with the sync orchestrator
 // + bootstrap composition root. Plan 03-12 (CLI sync shim) and Phase 4's
@@ -83,7 +83,7 @@ import type { DailyReviewResult, WeeklyReviewResult } from '../domain/review/typ
 import type { Decision } from '../domain/types/entities.js';
 import type { RunSyncInput, RunSyncResult } from '../domain/types/sync.js';
 import type { TokenStore } from '../infrastructure/whoop/token-store.js';
-import type { ApiGapResult } from './api-gap/types.js';
+import type { ApiGapResult } from './api-gap.js';
 import type { QueryCacheInput, QueryCacheResult } from './cache/types.js';
 import type {
   AddDecisionInput,

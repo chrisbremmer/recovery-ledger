@@ -5,13 +5,13 @@
 // §Out of Scope; Phase 5 (DOC-03/04) generates the API-gap markdown from
 // this same module.
 //
-// Phase 10 ARCH-08 (#86): this catalog was previously at
-// `src/services/api-gap/data.ts`, and the `ApiGapEntry` interface was at
-// `src/services/api-gap/types.ts`. Both moved here because the catalog is
-// pure data with zero I/O — per the lite-hexagonal layering rule (domain
-// has no upward arrows), pure data belongs in the domain tier. The
-// services-layer accessor (`getApiGap()`) now imports the catalog from
-// here through `src/services/api-gap.ts`.
+// Phase 10 ARCH-08 (#86): this catalog and the `ApiGapEntry` interface
+// were previously in the services tier (per-feature directory). Both moved
+// here because the catalog is pure data with zero I/O — per the
+// lite-hexagonal layering rule (domain has no upward arrows), pure data
+// belongs in the domain tier. The services-layer accessor (`getApiGap()`)
+// now imports the catalog from here through the flat single-file
+// `src/services/api-gap.ts`.
 //
 // Object.freeze on the array gives runtime immutability matched to the
 // `readonly ApiGapEntry[]` type. The literal `available_via_v2_api: false`

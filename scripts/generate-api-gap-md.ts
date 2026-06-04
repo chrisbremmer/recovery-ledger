@@ -1,9 +1,10 @@
 // Build-time API-gap markdown generator — DOC-03 / D-17 / D-18 / D-19.
 //
 // Turns the Phase 4 D-28 source-of-truth `API_GAP_ENTRIES` array (in
-// `src/services/api-gap/data.ts`) into the human-readable markdown file at
+// `src/domain/api-gap/catalog.ts`) into the human-readable markdown file at
 // `docs/install/api-gap.md`. The install guide links that file; this script
-// is the single place the markdown is produced.
+// is the single place the markdown is produced. (Phase 10 ARCH-08 moved the
+// catalog out of the services tier into src/domain/api-gap/.)
 //
 // Two surfaces:
 //   1. `renderApiGapMarkdown(entries)` — a PURE function (no I/O, no side
@@ -24,8 +25,7 @@
 import { writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import { API_GAP_ENTRIES } from '../src/services/api-gap/data.js';
-import type { ApiGapEntry } from '../src/services/api-gap/types.js';
+import { API_GAP_ENTRIES, type ApiGapEntry } from '../src/domain/api-gap/catalog.js';
 
 /**
  * Render the API-gap catalog to markdown. Pure: deterministic per input,
@@ -35,7 +35,7 @@ import type { ApiGapEntry } from '../src/services/api-gap/types.js';
  */
 export function renderApiGapMarkdown(entries: readonly ApiGapEntry[]): string {
   const header = [
-    '<!-- Generated from src/services/api-gap/data.ts — do not hand-edit. -->',
+    '<!-- Generated from src/domain/api-gap/catalog.ts — do not hand-edit. -->',
     '<!-- Run `npm run docs:generate-api-gap` after changing the source.   -->',
     '',
     '# WHOOP API v2 Gap',

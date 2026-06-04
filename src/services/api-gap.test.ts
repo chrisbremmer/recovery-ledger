@@ -5,14 +5,14 @@
 // Phase 5 (DOC-03/04) reads the same `API_GAP_ENTRIES` module to generate
 // markdown; these tests pin the contract the doc-gen step depends on.
 //
-// Phase 10 ARCH-08 (#86): renamed from `src/services/api-gap/index.test.ts`
+// Phase 10 ARCH-08 (#86): renamed from the prior per-directory test file
 // when the api-gap directory collapsed into a single file. The constant
 // now lives in `src/domain/api-gap/catalog.js`; the async accessor lives
 // in the sibling `./api-gap.js`.
 
 import { describe, expect, it } from 'vitest';
-import { containsBannedToneToken } from '../domain/banned-words.js';
 import { API_GAP_ENTRIES } from '../domain/api-gap/catalog.js';
+import { containsBannedToneToken } from '../domain/banned-words.js';
 import { getApiGap } from './api-gap.js';
 
 describe('services/api-gap — getApiGap()', () => {

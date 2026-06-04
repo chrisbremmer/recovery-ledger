@@ -1,4 +1,4 @@
-<!-- Generated from src/services/api-gap/data.ts — do not hand-edit. -->
+<!-- Generated from src/domain/api-gap/catalog.ts — do not hand-edit. -->
 <!-- Run `npm run docs:generate-api-gap` after changing the source.   -->
 
 # WHOOP API v2 Gap
