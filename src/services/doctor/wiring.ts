@@ -21,6 +21,8 @@ import { type AuthedCall, httpGet } from '../../infrastructure/whoop/client.js';
 import { WhoopApiError } from '../../infrastructure/whoop/errors.js';
 import type { TokenStore } from '../../infrastructure/whoop/token-store.js';
 import type { RefreshOrchestrator } from '../refresh-orchestrator.js';
+import type { AuthProbeDeps } from './checks/auth.js';
+import type { TokenFreshnessProbeDeps } from './checks/token-freshness.js';
 import { type DoctorResult, type RunDoctorOptions, runDoctor as runDoctorImpl } from './index.js';
 
 // Production composition input — kept module-private; bootstrap passes an
@@ -108,8 +110,34 @@ export function createProductionDoctorDeps(
   // defaults would be dropped on every call. The `repos` shape maps the
   // bootstrap plurals (`recoveries`/`sleeps`) to the singular keys the doctor
   // probes consume (`recovery`/`sleep`).
-  return (opts: RunDoctorOptions = {}): Promise<DoctorResult> =>
-    runDoctorImpl({
+  return (opts: RunDoctorOptions = {}): Promise<DoctorResult> => {
+    // Plan 10-04 (ARCH-07): wiring.ts is the ONE production construction
+    // site for `AuthProbeDeps` + `TokenFreshnessProbeDeps`. These shapes
+    // were previously synthesized inside `runDoctor` from
+    // `opts.tokenStore`; moving the construction here makes the wiring
+    // module the single owner of the production-dep composition and
+    // closes the `?? tokenStore.X()` fallback path at the type-system
+    // level (`runDoctor` now prefers `opts.authProbeDeps` /
+    // `opts.tokenFreshnessProbeDeps` over any local synthesis).
+    //
+    // `tokenStoreForDeps` honors the existing test-seam contract — when a
+    // caller overrides `opts.tokenStore` (the wiring.test.ts coverage),
+    // the explicit ProbeDeps shapes derive from the caller's tokenStore,
+    // not the bootstrap default. `opts.authProbeDeps` /
+    // `opts.tokenFreshnessProbeDeps` on the caller side still win over
+    // both — that path exists so unit tests can drive the auth /
+    // token_freshness probes with deterministic fakes that don't need a
+    // full TokenStore stub.
+    const tokenStoreForDeps = opts.tokenStore ?? input.tokenStore;
+    const authProbeDeps: AuthProbeDeps = opts.authProbeDeps ?? {
+      readStorageMode: () => tokenStoreForDeps.readStorageMode(),
+      readTokens: () => tokenStoreForDeps.read(),
+    };
+    const tokenFreshnessProbeDeps: TokenFreshnessProbeDeps = opts.tokenFreshnessProbeDeps ?? {
+      read: () => tokenStoreForDeps.read(),
+      now: Date.now,
+    };
+    return runDoctorImpl({
       ...opts,
       sqlite: opts.sqlite ?? input.sqlite,
       repos: opts.repos ?? {
@@ -121,9 +149,16 @@ export function createProductionDoctorDeps(
       refreshOrchestrator: opts.refreshOrchestrator ?? input.refreshOrchestrator,
       whoopFetcher: opts.whoopFetcher ?? productionWhoopFetcher,
       tokenStore: opts.tokenStore ?? input.tokenStore,
+      // Plan 10-04: pass the explicit ProbeDeps shapes through. runDoctor
+      // prefers these over deriving from `tokenStore`, which makes wiring.ts
+      // the canonical construction site (the synthesis arm in runDoctor only
+      // runs for the no-DB createServices() path, which never reaches here).
+      authProbeDeps,
+      tokenFreshnessProbeDeps,
       // Reuse the path bootstrap already resolved for the migrator so the
       // db_schema_version probe reads the same dir from the bundled dist
       // tree (the probe's own import.meta.url math is wrong once flattened).
       migrationsDir: opts.migrationsDir ?? input.migrationsDir,
     });
+  };
 }

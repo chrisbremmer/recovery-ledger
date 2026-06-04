@@ -32,7 +32,7 @@
 import type Database from 'better-sqlite3';
 import type { TokenStore } from '../../infrastructure/whoop/token-store.js';
 import type { RefreshOrchestrator } from '../refresh-orchestrator.js';
-import { probeAuth } from './checks/auth.js';
+import { type AuthProbeDeps, probeAuth } from './checks/auth.js';
 import { CHECK_NAMES } from './checks/check-names.js';
 import { probeConcurrentWritersStress } from './checks/concurrent-writers-stress.js';
 import { probeDataQualityCounts } from './checks/data-quality-counts.js';
@@ -44,7 +44,7 @@ import { probeLastSyncRecency } from './checks/last-sync-recency.js';
 import { probeMcpStdoutPurity } from './checks/mcp-stdout-purity.js';
 import { probeMostRecentScoredDay } from './checks/most-recent-scored-day.js';
 import { probeBetterSqlite3, probeKeyring } from './checks/native-modules.js';
-import { probeTokenFreshness } from './checks/token-freshness.js';
+import { probeTokenFreshness, type TokenFreshnessProbeDeps } from './checks/token-freshness.js';
 import { probeWhoopRoundtrip } from './checks/whoop-roundtrip.js';
 
 export interface DoctorCheck {
@@ -172,8 +172,38 @@ export interface RunDoctorOptions {
    * it. Absent (the lightweight createServices() path), those probes
    * surface a structured "no token store injected" fail rather than
    * reaching back into a now-deleted module-load singleton.
+   *
+   * Plan 10-04 (ARCH-07): when `authProbeDeps` / `tokenFreshnessProbeDeps`
+   * are NOT supplied, `runDoctor` synthesizes them from `tokenStore` (so
+   * old callers that only set `tokenStore` keep working). When the
+   * explicit probe-deps fields ARE supplied (production path via
+   * `createProductionDoctorDeps` in `wiring.ts`), they win — `tokenStore`
+   * itself becomes unread by the auth/freshness probes. Keep `tokenStore`
+   * on the options bag so wiring.ts can continue to expose it as a
+   * test-seam override and so a future probe needing the token surface
+   * has a single binding point.
    */
   tokenStore?: TokenStore;
+  /**
+   * Plan 10-04 (ARCH-07): explicit `AuthProbeDeps` shape for the `auth`
+   * probe. Production callers (`createProductionDoctorDeps` in
+   * `wiring.ts`) construct this from the bootstrap-bound `tokenStore` and
+   * pass it through; tests inject narrower fakes. When absent, `runDoctor`
+   * synthesizes it from `tokenStore` (the no-DB createServices() path
+   * leaves both undefined and the auth probe surfaces its "no tokens"
+   * structured fail). The wiring module owns the production construction
+   * so this entry point carries no `?? tokenStore.X()` fallback path
+   * — the deletion is enforced by the type-system + the Gate-N grep.
+   */
+  authProbeDeps?: AuthProbeDeps;
+  /**
+   * Plan 10-04 (ARCH-07): explicit `TokenFreshnessProbeDeps` shape for the
+   * `token_freshness` probe. Same wiring/lifecycle as `authProbeDeps`
+   * above — wiring.ts constructs it from `input.tokenStore` and
+   * `Date.now`; tests inject deterministic stubs; the no-DB path
+   * synthesizes from `tokenStore` or short-circuits.
+   */
+  tokenFreshnessProbeDeps?: TokenFreshnessProbeDeps;
 }
 
 // MR-27: exhaustive status switch with defense-in-depth fail arm. The
@@ -295,6 +325,29 @@ export async function runDoctor(opts: RunDoctorOptions = {}): Promise<DoctorResu
   // would not survive the closure boundary (the property could change
   // between read and call), forcing `as TokenStore` casts at every use.
   const tokenStoreHandle = opts.tokenStore;
+  // Plan 10-04 (ARCH-07): precedence for the auth / token-freshness probe
+  // deps is — explicit opts.authProbeDeps / opts.tokenFreshnessProbeDeps
+  // wins (production wiring.ts owns this construction); else synthesize
+  // from opts.tokenStore (legacy test-seam path); else fall back to a
+  // null-returning stub so the no-DB createServices() path emits each
+  // probe's standard "no tokens" structured fail. The explicit-shape
+  // arm is what makes wiring.ts the single production construction site
+  // for the auth/freshness deps — the inline derivation here exists
+  // ONLY to keep the lightweight createServices() path running without
+  // a tokenStore.
+  const authDeps: AuthProbeDeps =
+    opts.authProbeDeps ??
+    (tokenStoreHandle != null
+      ? {
+          readStorageMode: () => tokenStoreHandle.readStorageMode(),
+          readTokens: () => tokenStoreHandle.read(),
+        }
+      : { readStorageMode: async () => null, readTokens: async () => null });
+  const tokenFreshnessDeps: TokenFreshnessProbeDeps =
+    opts.tokenFreshnessProbeDeps ??
+    (tokenStoreHandle != null
+      ? { read: () => tokenStoreHandle.read(), now: Date.now }
+      : { read: async () => null, now: Date.now });
   const settled = await Promise.allSettled([
     probeBetterSqlite3(),
     probeKeyring(),
@@ -307,24 +360,16 @@ export async function runDoctor(opts: RunDoctorOptions = {}): Promise<DoctorResu
     probeDbSchemaVersion(schemaVersionDeps),
     probeDbWalSize({}),
     // Plan 02-06: offline-safe probes — no subprocess gate needed.
-    // Phase 10 ARCH-07: deps are REQUIRED on both probes. Bootstrap supplies
-    // the canonical tokenStore via `opts.tokenStore`; the lightweight
-    // createServices() path leaves it undefined and we synthesize a stub
-    // that returns null for both readers so each probe surfaces its
-    // standard "no tokens" structured fail (instead of throwing).
-    probeAuth(
-      tokenStoreHandle != null
-        ? {
-            readStorageMode: () => tokenStoreHandle.readStorageMode(),
-            readTokens: () => tokenStoreHandle.read(),
-          }
-        : { readStorageMode: async () => null, readTokens: async () => null },
-    ),
-    probeTokenFreshness(
-      tokenStoreHandle != null
-        ? { read: () => tokenStoreHandle.read(), now: Date.now }
-        : { read: async () => null, now: Date.now },
-    ),
+    // Phase 10 ARCH-07: deps are REQUIRED on both probes. Plan 10-04
+    // moves the production construction to `wiring.ts`
+    // (`createProductionDoctorDeps`); when `opts.authProbeDeps` /
+    // `opts.tokenFreshnessProbeDeps` are supplied (production path),
+    // they're used directly. The lightweight createServices() path
+    // leaves all three opts (tokenStore + the two explicit shapes)
+    // undefined and the synthesized stub above surfaces the standard
+    // "no tokens" structured fail.
+    probeAuth(authDeps),
+    probeTokenFreshness(tokenFreshnessDeps),
     // Plan 05-06: the ONE online probe. When deps are present and --offline
     // is not set, it routes a single GET through callWithAuth; otherwise it
     // short-circuits to the 'skipped (--offline)' pass.
