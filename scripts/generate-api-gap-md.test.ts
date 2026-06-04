@@ -18,7 +18,7 @@
 // is the forcing function in the default suite).
 
 import { describe, expect, it } from 'vitest';
-import { API_GAP_ENTRIES } from '../src/services/api-gap/data.js';
+import { API_GAP_ENTRIES } from '../src/domain/api-gap/catalog.js';
 import { renderApiGapMarkdown } from './generate-api-gap-md.js';
 
 describe('renderApiGapMarkdown', () => {

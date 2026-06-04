@@ -1,7 +1,7 @@
 // Plan 04-11 Task 1 api-gap.ts unit tests — simplest of the three shims.
 
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
-import type { ApiGapResult } from '../../services/api-gap/types.js';
+import type { ApiGapResult } from '../../services/api-gap.js';
 
 const originalExit = process.exit;
 const originalWrite = process.stdout.write.bind(process.stdout);

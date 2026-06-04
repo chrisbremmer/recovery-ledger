@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# CI grep gates — fifteen rules (A-O) that Biome cannot catch on its own.
+# CI grep gates — sixteen rules (A-P) that Biome cannot catch on its own.
 #
 # Gate A: banned tone words (CLAUDE.md "Critical Rules" list) — banned in code,
 #         tests, formatters, configs, and docs other than the rule definitions
@@ -118,6 +118,19 @@
 #         bootstrap.ts only; the canonical definition lives in
 #         src/services/doctor/wiring.ts and is not scanned. Test files are
 #         exempt.
+# Gate P: no per-feature api-gap subdirectory under src/services/. Phase 10
+#         ARCH-08 (#86) collapsed the over-structured 3-file directory into a
+#         single flat src/services/api-gap.ts and promoted the catalog +
+#         entry interface to the domain tier at src/domain/api-gap/catalog.ts
+#         (pure data with no I/O belongs in domain per lite-hexagonal). This
+#         gate is a filesystem check — not a grep — that prevents the
+#         directory from being re-introduced under src/services/. If a future
+#         plan needs to grow the api-gap surface (e.g. add filtering, an
+#         in-process index, pagination), the extension belongs alongside the
+#         flat file as new sibling functions, not a re-introduced directory.
+#         This gate sits filesystem-side because the directory-existence
+#         check is precise and immune to comment-substring matches in source
+#         (per L0005 — comment grep-gate avoidance).
 #
 # Exit-code semantics (Pitfall 10): grep returns 0 on match (= violation found).
 # Each gate inverts that: if grep -rEn matches, the gate prints ::error:: and
@@ -597,6 +610,20 @@ if "$GREP" -En "$PRODUCTION_WHOOP_FETCHER_RE" src/services/bootstrap.ts 2>/dev/n
   fi
 fi
 rm -f /tmp/gate-o.$$
+
+# ----------------------------------------------------------------------------
+# Gate P — no per-feature api-gap subdirectory under src/services/. Phase 10
+# ARCH-08 collapsed the over-structured directory (one async accessor plus a
+# 6-element frozen constant) into a single flat src/services/api-gap.ts; the
+# catalog + ApiGapEntry interface were promoted to the domain tier at
+# src/domain/api-gap/catalog.ts. This is a filesystem check (not a grep) —
+# precise and immune to comment-substring matches.
+# ----------------------------------------------------------------------------
+if [ -d src/services/api-gap ]; then
+  echo "::error::Gate P — src/services/api-gap/ directory exists (ARCH-08: collapse to single flat src/services/api-gap.ts; catalog lives in src/domain/api-gap/catalog.ts):"
+  ls -la src/services/api-gap
+  exit 1
+fi
 
 echo "All grep gates passed."
 exit 0

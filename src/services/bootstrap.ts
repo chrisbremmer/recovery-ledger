@@ -95,8 +95,7 @@ import { createListRecovery } from '../infrastructure/whoop/resources/recovery.j
 import { createListSleep } from '../infrastructure/whoop/resources/sleep.js';
 import { createListWorkouts } from '../infrastructure/whoop/resources/workouts.js';
 import { createTokenStore, type TokenStore } from '../infrastructure/whoop/token-store.js';
-import { getApiGap } from './api-gap/index.js';
-import type { ApiGapResult } from './api-gap/types.js';
+import { type ApiGapResult, getApiGap } from './api-gap.js';
 import { queryCache } from './cache/index.js';
 import type { QueryCacheInput, QueryCacheResult } from './cache/types.js';
 import { addDecision, reviewDecisions } from './decision/index.js';
