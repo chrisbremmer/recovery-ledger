@@ -207,6 +207,31 @@ describe('createProductionDoctorDeps', () => {
     // the only assertion possible without exposing it is that it is a
     // function. (Its behavior is covered by the error-mapping tests.)
     expect(typeof passedOpts.whoopFetcher).toBe('function');
+
+    // Plan 10-04 (ARCH-07): wiring.ts is the production construction site
+    // for `AuthProbeDeps` + `TokenFreshnessProbeDeps`. The factory MUST
+    // synthesize both shapes from the bootstrap-bound tokenStore and
+    // thread them through; runDoctor prefers these over deriving locally.
+    expect(passedOpts.authProbeDeps).toBeDefined();
+    expect(typeof passedOpts.authProbeDeps?.readStorageMode).toBe('function');
+    expect(typeof passedOpts.authProbeDeps?.readTokens).toBe('function');
+    expect(passedOpts.tokenFreshnessProbeDeps).toBeDefined();
+    expect(typeof passedOpts.tokenFreshnessProbeDeps?.read).toBe('function');
+    expect(typeof passedOpts.tokenFreshnessProbeDeps?.now).toBe('function');
+
+    // Behavioral check: invoking the constructed readers must call the
+    // bootstrap-bound tokenStore (identity through the closure). This
+    // pins the construction site — a regression that synthesized the
+    // shape from an unrelated source would observably fail here.
+    await passedOpts.authProbeDeps?.readStorageMode();
+    expect(tokenStore.readStorageMode).toHaveBeenCalledTimes(1);
+    await passedOpts.authProbeDeps?.readTokens();
+    expect(tokenStore.read).toHaveBeenCalledTimes(1);
+    await passedOpts.tokenFreshnessProbeDeps?.read();
+    expect(tokenStore.read).toHaveBeenCalledTimes(2);
+    // `now` is wired to Date.now in production; assert it returns a
+    // numeric timestamp rather than the no-DB-path stub's fixed value.
+    expect(typeof passedOpts.tokenFreshnessProbeDeps?.now()).toBe('number');
   });
 
   it('honors user-supplied opts over production defaults', async () => {
@@ -258,6 +283,67 @@ describe('createProductionDoctorDeps', () => {
     // value replaces the production default whole-object.
     expect(passedOpts.repos).toBe(userRepos);
     expect(passedOpts.whoopFetcher).toBe(userFetcher);
+
+    // Plan 10-04 (ARCH-07): when the user overrides `opts.tokenStore` but
+    // does not pass explicit ProbeDeps shapes, the wiring factory must
+    // derive the auth / token_freshness deps from the USER's tokenStore,
+    // not the bootstrap default. This pins the test-seam contract for
+    // the ProbeDeps construction.
+    expect(passedOpts.authProbeDeps).toBeDefined();
+    expect(passedOpts.tokenFreshnessProbeDeps).toBeDefined();
+    await passedOpts.authProbeDeps?.readStorageMode();
+    expect(userTokenStore.readStorageMode).toHaveBeenCalledTimes(1);
+    expect(productionTokenStore.readStorageMode).not.toHaveBeenCalled();
+    await passedOpts.tokenFreshnessProbeDeps?.read();
+    expect(userTokenStore.read).toHaveBeenCalledTimes(1);
+    expect(productionTokenStore.read).not.toHaveBeenCalled();
+  });
+
+  it('routes explicit opts.authProbeDeps / opts.tokenFreshnessProbeDeps through unchanged (test seam)', async () => {
+    // Plan 10-04 (ARCH-07): the explicit ProbeDeps fields on the runDoctor
+    // opts bag exist so unit tests can drive the auth / token_freshness
+    // probes with deterministic fakes that don't need a full TokenStore
+    // stub. When supplied, they MUST win over the wiring factory's
+    // synthesis from tokenStore. This is the seam runDoctor uses for the
+    // explicit-shape path and what makes wiring.ts the canonical owner.
+    const explicitAuthDeps = {
+      readStorageMode: vi.fn(async () => 'keychain' as const),
+      readTokens: vi.fn(async () => null),
+    };
+    const explicitFreshnessDeps = {
+      read: vi.fn(async () => null),
+      now: vi.fn(() => 0),
+    };
+    const productionTokenStore = makeFakeTokenStore();
+
+    const runDoctor = createProductionDoctorDeps({
+      sqlite: {} as Database.Database,
+      repos: makeFakeRepos(),
+      refreshOrchestrator: makeFakeRefreshOrchestrator(),
+      authedCall: makeFakeAuthedCall(),
+      tokenStore: productionTokenStore,
+      migrationsDir: '/fake',
+    });
+
+    await runDoctor({
+      authProbeDeps: explicitAuthDeps,
+      tokenFreshnessProbeDeps: explicitFreshnessDeps,
+    });
+
+    const passedOpts = runDoctorImplMock.mock.calls.at(-1)?.[0];
+    if (passedOpts === undefined) throw new Error('passedOpts');
+
+    // Identity-strict: the exact reference the caller passed must reach
+    // runDoctorImpl. A wrap-and-relay regression (factory recompiles the
+    // shape) would observably break this and the synthesis-from-tokenStore
+    // fallback would trample the test's deterministic fakes.
+    expect(passedOpts.authProbeDeps).toBe(explicitAuthDeps);
+    expect(passedOpts.tokenFreshnessProbeDeps).toBe(explicitFreshnessDeps);
+
+    // And the production tokenStore must NOT have been read — the explicit
+    // shapes are what runDoctor consumes.
+    expect(productionTokenStore.readStorageMode).not.toHaveBeenCalled();
+    expect(productionTokenStore.read).not.toHaveBeenCalled();
   });
 
   it('productionWhoopFetcher returns status 200 when httpGet resolves', async () => {
